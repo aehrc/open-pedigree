@@ -81,6 +81,145 @@ PedigreeExport.exportAsPED = function(pedigree, idGenerationPreference) {
   return output;
 };
 
+PedigreeExport.exportAsPEDX = function(pedigree, idGenerationPreference, pedigreeImagesString) {
+  const pedString = PedigreeExport.exportAsPED(pedigree, idGenerationPreference);
+
+  let out = '<openpedigree>\n<ped>\n' + pedString + '</ped>\n';
+  if (pedigreeImagesString){
+    out = out + '<image>\n' + pedigreeImagesString + '</image>\n';
+  }
+  out = out + '</openpedigree>';
+  return out;
+}
+
+/**
+ * Export as DADA2 format.
+ *
+ * The DADA2 questionnaire collects 2 pieces of information about members:
+ *   - life status
+ *      - Alive
+ *      - Deceased
+ *      - Unborn
+ *      - Stillborn
+ *      - Miscarriage
+ *      - Aborted
+ *      - Adopted
+ *   - Affected
+ *      - Has DADA2 Symptoms
+ *      - Has 1 Gene Change in ADA2
+ *      - Has 2 Gene Changes in ADA2
+ *      - Has Low ADA2 level
+ *      - Has No ADA2 (zero)
+ *      - Not Tested
+ *      - Don't Know
+ *  The format is based on PED, but there is a field for life status and adopted, and the phenotype
+ *  mapping includes 0=missing; 1= unaffected; 2=affected; 3=Carrier; 4=Pre-symptomatic;-9=missing
+ *
+ *  First entry is the proband.
+ *
+ *  (0) Family ID
+ *  (1) Individual ID
+ *  (2) Paternal ID
+ *  (3) Maternal ID
+ *  (4) Sex (1=male; 2=female; other=unknown)
+ *  (5) Affected (1= unaffected; 2=affected; 3=Carrier; 4=Pre-symptomatic;other=unaffected)
+ *  (6) Life Status (1=Alive; 2=Deceased; 3=Unborn; 4=Stillborn; 5=Miscarriage; 6=Aborted; other/blank=Alive)
+ *  (7) Adopted Outs (0=Not Adopted; 1=Adopted Out; other/blank=Not Adopted)
+ *
+ *  * @param inputText
+ */
+
+PedigreeExport.exportAsDADA2 = function(pedigree) {
+  const idGenerationPreference = 'newid';
+  var output = '';
+
+  var familyID = 'DADA2';
+
+  var idToPedId = PedigreeExport.createNewIDs(pedigree, idGenerationPreference);
+
+  for (var i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
+    if (!pedigree.GG.isPerson(i)) {
+      continue;
+    }
+
+    output += familyID + ' ' + idToPedId[i] + ' ';
+
+    // mother & father
+    var parents = pedigree.GG.getParents(i);
+    if (parents.length > 0) {
+      var father = parents[0];
+      var mother = parents[1];
+
+      if ( pedigree.GG.properties[parents[0]]['gender'] == 'F' ||
+          pedigree.GG.properties[parents[1]]['gender'] == 'M' ) {
+        father = parents[1];
+        mother = parents[0];
+      }
+      output += idToPedId[father] + ' ' + idToPedId[mother] + ' ';
+    } else {
+      output += '0 0 ';
+    }
+
+    var sex = 3;
+    if (pedigree.GG.properties[i]['gender'] == 'M') {
+      sex = 1;
+    } else if (pedigree.GG.properties[i]['gender'] == 'F') {
+      sex = 2;
+    }
+    output += (sex + ' ');
+
+    var status = -9; //missing
+    if (pedigree.GG.properties[i].hasOwnProperty('carrierStatus')) {
+      //Affected (1= unaffected; 2=affected; 3=Carrier; 4=Pre-symptomatic;other=unaffected)
+      if (pedigree.GG.properties[i]['carrierStatus'] == 'affected') {
+        status = 2;
+      } else if ( pedigree.GG.properties[i]['carrierStatus'] == 'carrier'){
+        status = 3;
+      } else if (pedigree.GG.properties[i]['carrierStatus'] == 'presymptomatic') {
+        status = 4;
+      } else {
+        status = 1;
+      }
+    }
+    output += status;
+
+    var lifeStatus = 1; //missing
+    if (pedigree.GG.properties[i].hasOwnProperty('lifeStatus')) {
+      // Life Status (1=Alive; 2=Deceased; 3=Unborn; 4=Stillborn; 5=Miscarriage; 6=Aborted; other/blank=Alive)
+      if (pedigree.GG.properties[i]['lifeStatus'] == 'deceased') {
+        lifeStatus = 2;
+      } else if ( pedigree.GG.properties[i]['lifeStatus'] == 'unborn'){
+        lifeStatus = 3;
+      } else if (pedigree.GG.properties[i]['lifeStatus'] == 'stillborn') {
+        lifeStatus = 4;
+      } else if (pedigree.GG.properties[i]['lifeStatus'] == 'miscarriage') {
+        lifeStatus = 5;
+      } else {
+        lifeStatus = 1;
+      }
+    }
+    output += ' ' + lifeStatus;
+
+    if (pedigree.GG.properties[i].hasOwnProperty('isAdopted') && pedigree.GG.properties[i]['isAdopted']) {
+      output += ' 1';
+    }
+    output += '\n';
+
+  }
+
+  return output;
+};
+
+PedigreeExport.exportAsDADA2X = function(pedigree, pedigreeImagesString) {
+  const dada2String = PedigreeExport.exportAsDADA2(pedigree);
+
+  let out = '<openpedigree>\n<dada2>\n' + dada2String + '</dada2>\n';
+  if (pedigreeImagesString){
+    out = out + '<image>\n' + pedigreeImagesString + '</image>\n';
+  }
+  out = out + '</openpedigree>';
+  return out;
+}
 /* ===============================================================================================
  *
  * Creates and returns a JSON in the "GA4GH FHIR JSON" format
@@ -98,9 +237,13 @@ PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPa
 PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
   var image = $('canvas');
   var background = image.getElementsByClassName('panning-background')[0];
-  var backgroundPosition = background.nextSibling;
-  var backgroundParent = background.parentNode;
-  backgroundParent.removeChild(background);
+  var backgroundPosition;
+  var backgroundParent;
+  if (background){
+    backgroundPosition = background.nextSibling;
+    backgroundParent = background.parentNode;
+    backgroundParent.removeChild(background);
+  }
   var bbox = image.down().getBBox();
   var pedigreeImage = image.innerHTML
     .replace(/xmlns:xlink=".*?"/, '')
@@ -110,7 +253,10 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
   var context = window.location.href.replace(/&/g, '&amp;');
   pedigreeImage = pedigreeImage.split(context).join('');
 
-  backgroundParent.insertBefore(background, backgroundPosition);
+  if (background){
+    backgroundParent.insertBefore(background, backgroundPosition);
+  }
+
 
   const parser = new DOMParser();
   const dom = parser.parseFromString(pedigreeImage, 'application/xml');

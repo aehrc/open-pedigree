@@ -56,6 +56,7 @@ var ImportSelector = Class.create( {
     typeListElement.insert(_addTypeOption(false, 'GEDCOM', 'gedcom'));
     typeListElement.insert(_addTypeOption(false, 'BOADICEA', 'BOADICEA'));
     typeListElement.insert(_addTypeOption(false, 'GA4GH FHIR(JSON)', 'GA4GH'));
+    typeListElement.insert(_addTypeOption(false, 'DADA2', 'DADA2'));
 
     var promptType = new Element('div', {'class': 'import-section'}).update('Data format:');
     var dataSection2 = new Element('div', {'class': 'import-block'});
@@ -148,7 +149,12 @@ var ImportSelector = Class.create( {
     }
 
     var saveExternalID = $$('input[type=checkbox][name="mark-external"]')[0];
-    saveExternalID.disabled = false;
+    if (importType != 'DADA2'){
+      saveExternalID.disabled = false;
+    } else {
+      saveExternalID.disabled = true;
+    }
+
   },
 
   /**

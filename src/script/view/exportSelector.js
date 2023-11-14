@@ -29,6 +29,7 @@ var ExportSelector = Class.create( {
     typeListElement.insert(_addTypeOption(false,  'GA4GH FHIR', 'GA4GH'));
     typeListElement.insert(_addTypeOption(false,  'SVG', 'svg'));
     typeListElement.insert(_addTypeOption(false,  'PDF', 'pdf'));
+    typeListElement.insert(_addTypeOption(false,  'DADA2', 'DADA2'));
 
     var fileDownload = new Element('a', {'id': 'downloadLink', 'style': 'display:none'});
     mainDiv.insert(fileDownload);
@@ -135,6 +136,9 @@ var ExportSelector = Class.create( {
     if (exportType == 'ped') {
       pedOptionsTable.show();
       privacyOptionsTable.hide();
+    } else if (exportType == 'DADA2') {
+      pedOptionsTable.hide();
+      privacyOptionsTable.hide();
     } else {
       pedOptionsTable.hide();
       privacyOptionsTable.show();
@@ -162,6 +166,13 @@ var ExportSelector = Class.create( {
       var idGenerationSetting = $$('input:checked[type=radio][name="ped-options"]')[0].value;
       var exportString = PedigreeExport.exportAsPED(editor.getGraph().DG, idGenerationSetting);
       var fileName = 'open-pedigree.ped';
+      var mimeType = 'text/plain';
+      // Uses FileSaver global
+      /* eslint-disable no-undef */
+      saveTextAs(exportString, fileName);
+    } else if (exportType == 'DADA2') {
+      var exportString = PedigreeExport.exportAsDADA2(editor.getGraph().DG);
+      var fileName = 'open-pedigree.dada2';
       var mimeType = 'text/plain';
       // Uses FileSaver global
       /* eslint-disable no-undef */

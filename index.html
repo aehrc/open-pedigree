@@ -5,7 +5,7 @@
     <title>Open Pedigree by PhenoTips&reg;</title>
 
     <!-- Load jquery before prototype, making it available via jQuery but not $ -->
-    <script type="text/javascript" src="public/vendor/jquery-3.4.1.min.js"></script>
+    <script type="text/javascript" src="public/vendor/jquery-3.7.1.min.js"></script>
 
     <!-- PrototypeJS and scriptaculous plugin -->
     <script type="text/javascript" src="public/vendor/prototype-1.7.3.js"></script>
@@ -16,6 +16,7 @@
     <!-- File download -->
     <script type="text/javascript" src="public/vendor/filesaver/Blob.js"></script>
     <script type="text/javascript" src="public/vendor/filesaver/FileSaver.js"></script>
+    <script type="text/javascript" src="public/vendor/URI.js"></script>
 
     <!-- XWiki REST API and widgets -->
     <script type="text/javascript" src="public/vendor/xwiki/xwiki-min.js"></script>
@@ -29,5 +30,12 @@
   </head>
 
   <body id='body'>
+  <script type="text/javascript">
+    var editor;
+
+    document.observe('dom:loaded',function() {
+      editor = OpenPedigree.initialiseEditor({});
+    });
+  </script>
   </body>
 </html>

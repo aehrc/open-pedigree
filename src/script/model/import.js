@@ -184,11 +184,20 @@ PedigreeImport.initFromPhenotipsInternal = function(inputG) {
  * ===============================================================================================
  */
 PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEvaluated, saveIDAsExternalID, affectedCodeOne, disorderNames) {
-  var inputLines = inputText.match(/[^\r\n]+/g);
-  if (inputLines.length == 0) {
+  let i;
+  var allInputLines = inputText.match(/[^\r\n]+/g);
+  if (allInputLines.length == 0) {
     throw 'Unable to import: no data';
   }
-
+  const inputLines = [];
+  for (i = 0; i < allInputLines.length; i++) {
+    const line = allInputLines[i].trim();
+    if (line.length === 0 || line[0] === '#'){
+      // empty line or comment
+      continue;
+    }
+    inputLines.push(line);
+  }
   // autodetect if data is in pre-makeped or post-makeped format
   var postMakeped = false;
   if (inputLines[0].indexOf('Ped:') > 0 && inputLines[0].indexOf('Per:') > 0) {
@@ -209,7 +218,8 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
   var nextID = postMakeped ? 1 : 0;
 
   // first pass: add all vertices and assign vertex IDs
-  for (var i = 0; i < inputLines.length; i++) {
+  for (i = 0; i < inputLines.length; i++) {
+
 
     inputLines[i] = inputLines[i].replace(/[^a-zA-Z0-9_.\-\s*]/g, ' ');
     inputLines[i] = inputLines[i].replace(/^\s+|\s+$/g, '');  // trim()
@@ -298,7 +308,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
   var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
 
   // second pass (once all vertex IDs are known): process edges
-  for (var i = 0; i < inputLines.length; i++) {
+  for (i = 0; i < inputLines.length; i++) {
     var parts = inputLines[i].split(/\s+/);
 
     var thisPersonName = parts[1];
@@ -365,6 +375,22 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
 
   return newG;
 };
+
+
+PedigreeImport.initFromPEDX = function(inputText, acceptOtherPhenotypes, markEvaluated, saveIDAsExternalID, affectedCodeOne, disorderNames) {
+  const parser = new DOMParser();
+  let doc = parser.parseFromString(inputText, "application/xml");
+  let errorNode = doc.querySelector("parsererror");
+  if (errorNode) {
+    throw 'Unable to import pedigree, parse failed - ' + errorNode.innerHTML;
+  }
+  const pedNode = doc.querySelector('ped');
+  if (!pedNode){
+    throw 'Unable to import pedigree, no <ped> tag with document';
+  }
+  const pedText = pedNode.innerHTML;
+  return PedigreeImport.initFromPED(pedText, acceptOtherPhenotypes, markEvaluated, saveIDAsExternalID, affectedCodeOne, disorderNames);
+}
 
 
 /* ===============================================================================================
@@ -993,6 +1019,226 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
 PedigreeImport.initFromGA4GH = function(inputText){
   return GA4GHFHIRConverter.initFromFHIR(inputText);
 };
+
+// ===============================================================================================
+
+/**
+ * Initialise from DADA2 format.
+ *
+ * The DADA2 questionnaire collects 2 pieces of information about members:
+ *   - life status
+ *      - Alive
+ *      - Deceased
+ *      - Unborn
+ *      - Stillborn
+ *      - Miscarriage
+ *      - Aborted
+ *      - Adopted
+ *   - Affected
+ *      - Has DADA2 Symptoms
+ *      - Has 1 Gene Change in ADA2
+ *      - Has 2 Gene Changes in ADA2
+ *      - Has Low ADA2 level
+ *      - Has No ADA2 (zero)
+ *      - Not Tested
+ *      - Don't Know
+ *  The format is based on PED, but there is a field for life status and adopted, and the phenotype
+ *  mapping includes 0=missing; 1= unaffected; 2=affected; 3=Carrier; 4=Pre-symptomatic;-9=missing
+ *
+ *  First entry is the proband.
+ *
+ *  (0) Family ID
+ *  (1) Individual ID
+ *  (2) Paternal ID
+ *  (3) Maternal ID
+ *  (4) Sex (1=male; 2=female; other=unknown)
+ *  (5) Affected (1= unaffected; 2=affected; 3=Carrier; 4=Pre-symptomatic;other=unaffected)
+ *  (6) Life Status (1=Alive; 2=Deceased; 3=Unborn; 4=Stillborn; 5=Miscarriage; 6=Aborted; other/blank=Alive)
+ *  (7) Adopted Outs (0=Not Adopted; 1=Adopted Out; other/blank=Not Adopted)
+ *
+ *  * @param inputText
+ */
+
+PedigreeImport.initFromDADA2 = function(inputText) {
+  let i;
+  var allInputLines = inputText.match(/[^\r\n]+/g);
+  if (allInputLines.length == 0) {
+    throw 'Unable to import: no data';
+  }
+  const inputLines = [];
+  for (i = 0; i < allInputLines.length; i++) {
+    const line = allInputLines[i].trim();
+    if (line.length === 0 || line[0] === '#'){
+      // empty line or comment
+      continue;
+    }
+    inputLines.push(line);
+  }
+  // autodetect if data is in pre-makeped or post-makeped format
+  var familyPrefix = '';
+
+  var newG = new BaseGraph();
+
+  var nameToId = {};
+
+  var phenotypeValues = {};  // set of all posible valuesin the phenotype column
+
+  var nextID = 0;
+
+  // first pass: add all vertices and assign vertex IDs
+  for (i = 0; i < inputLines.length; i++) {
+
+
+    inputLines[i] = inputLines[i].replace(/[^a-zA-Z0-9_.\-\s*]/g, ' ');
+    inputLines[i] = inputLines[i].replace(/^\s+|\s+$/g, '');  // trim()
+
+    var parts = inputLines[i].split(/\s+/);
+    //console.log("Parts: " + JSON.stringify(parts));
+
+    if (parts.length < 6) {
+      throw 'Input line has not enough columns: [' + inputLines[i] + ']';
+    }
+
+    if (familyPrefix == '') {
+      familyPrefix = parts[0];
+    } else {
+      if (parts[0] != familyPrefix) {
+        throw 'Unsupported feature: multiple families detected within the same pedigree';
+      }
+    }
+
+    var pedID = parts[1];
+    if (nameToId.hasOwnProperty(pedID)) {
+      throw 'Multiple persons with the same ID [' + pedID + ']';
+    }
+
+    var genderValue = parts[4];
+    var gender = 'U';
+    if (genderValue == 1) {
+      gender = 'M';
+    } else if (genderValue == 2) {
+      gender = 'F';
+    }
+    const properties = {'gender': gender};
+
+    var pedigreeID = newG._addVertex( nextID++, BaseGraph.TYPE.PERSON, properties, newG.defaultPersonNodeWidth );
+
+    nameToId[pedID] = pedigreeID;
+  }
+
+  var defaultEdgeWeight = 1;
+
+  var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
+
+  // second pass (once all vertex IDs are known): process edges
+  for (i = 0; i < inputLines.length; i++) {
+    var parts = inputLines[i].split(/\s+/);
+
+    var thisPersonName = parts[1];
+    var id = nameToId[thisPersonName];
+
+    //carrierStatus -'affected' or 'carrier' 'presymptomatic'
+    //2=affected; 3=Carrier; 4=Pre-symptomatic
+    const affectedValue = parts[5];
+    if (affectedValue == 2){
+      // affected
+      newG.properties[id]['carrierStatus'] = 'affected';
+      newG.properties[id]['disorders'] = ['affected'];
+    }
+    else if (affectedValue == 3){
+      newG.properties[id]['carrierStatus'] = 'carrier';
+    }
+    else if (affectedValue == 4){
+      newG.properties[id]['carrierStatus'] = 'presymptomatic';
+    } else if (affectedValue == 1){
+      newG.properties[id]['carrierStatus'] = '';
+    }
+    // Life Status (1=Alive; 2=Deceased; 3=Unborn; 4=Stillborn; 5=Miscarriage; 6=Aborted; other/blank=Alive)
+    if (parts.length > 6){
+      const lifeStatusValue = parts[6];
+      if (lifeStatusValue == 2){
+        console.log("Set lifeStatus of " + id + " deceased" );
+        newG.properties[id]['lifeStatus'] = 'deceased';
+      }
+      else if (lifeStatusValue == 3){
+        newG.properties[id]['lifeStatus'] = 'unborn';
+      }
+      else if (lifeStatusValue == 4){
+        newG.properties[id]['lifeStatus'] = 'stillborn';
+      }
+      else if (lifeStatusValue == 5){
+        newG.properties[id]['lifeStatus'] = 'miscarriage';
+      }
+      else if (lifeStatusValue == 6){
+        newG.properties[id]['lifeStatus'] = 'aborted';
+      }
+    }
+    if (parts.length > 7){
+      const adoptedValue = parts[7];
+      if (adoptedValue == 1){
+        newG.properties[id]['isAdopted'] = true;
+      }
+    }
+
+
+    // check if parents are given for this individual; if at least one parent is given,
+    // check if the corresponding relationship has already been created. If not, create it. If yes,
+    // add an edge from childhub to this person
+
+    var fatherID = parts[2];
+    var motherID = parts[3];
+
+    if (fatherID == 0 && motherID == 0) {
+      continue;
+    }
+
+    // .PED supports specifying only mohter of father. Pedigree editor requires both (for now).
+    // So create a virtual parent in case one of the parents is missing
+    if (fatherID == 0) {
+      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+    } else {
+      fatherID = nameToId[fatherID];
+      if (newG.properties[fatherID].gender == 'F') {
+        throw 'Unable to import pedigree: a person declared as female [id: ' + fatherID + '] is also declared as being a father for [id: '+thisPersonName+']';
+      }
+    }
+    if (motherID == 0) {
+      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+    } else {
+      motherID = nameToId[motherID];
+      if (newG.properties[motherID].gender == 'M') {
+        throw 'Unable to import pedigree: a person declared as male [id: ' + motherID + '] is also declared as being a mother for [id: '+thisPersonName+']';
+      }
+    }
+
+    // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
+
+    // if there is a relationship between motherID and fatherID the corresponding childhub is returned
+    // if there is no relationship, a new one is created together with the chldhub
+    var chhubID = relationshipTracker.createOrGetChildhub(motherID, fatherID);
+
+    newG.addEdge( chhubID, id, defaultEdgeWeight );
+  }
+
+  PedigreeImport.validateBaseGraph(newG);
+
+  return newG;
+};
+
+PedigreeImport.initFromDADA2X = function(inputText) {
+  const parser = new DOMParser();
+  let doc = parser.parseFromString(inputText, "application/xml");
+  let errorNode = doc.querySelector("parsererror");
+  if (errorNode) {
+    throw 'Unable to import pedigree, parse failed - ' + errorNode.innerHTML;
+  }
+  const dada2Node = doc.querySelector('dada2');
+  if (!dada2Node){
+    throw 'Unable to import pedigree, no <dada2> tag with document';
+  }
+  const dada2Text = dada2Node.innerHTML;
+  return PedigreeImport.initFromDADA2(dada2Text);
+}
 
 // ===============================================================================================
 

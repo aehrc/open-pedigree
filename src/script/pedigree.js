@@ -103,6 +103,7 @@ var PedigreeEditor = Class.create({
 
     // load proband data and load the graph after proband data is available
     this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+    this._closing = false;
 
     this._controller = new Controller();
 
@@ -148,8 +149,18 @@ var PedigreeEditor = Class.create({
       if (enableAutosave) {
         editor.getSaveLoadEngine().save(patientDataUrl);
       }
-      if (returnUrl) {
+      if (returnUrl === '#CloseWindow'){
+        console.log('Attempt to close the window');
+        window.close();
+      } else if (returnUrl) {
         window.location = returnUrl;
+      }
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!this._closing){
+        event.preventDefault(); // If you prevent default behavior in Mozilla Firefox prompt will always be shown
+        event.returnValue = 'Are you sure you want to leave?';
       }
     });
 
@@ -194,6 +205,9 @@ var PedigreeEditor = Class.create({
      */
   getNode: function(nodeID) {
     return this.getView().getNode(nodeID);
+  },
+  flagClosing: function(isClosing) {
+    this._closing = isClosing;
   },
 
   /**

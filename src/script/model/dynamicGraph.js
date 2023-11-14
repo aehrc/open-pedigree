@@ -1251,8 +1251,13 @@ DynamicPositionedGraph.prototype = {
 
     //this._debugPrintAll("before");
 
-    if (importType == 'ped') {
+    if (importType == 'ped' || importType == 'PED') {
       var baseGraph = PedigreeImport.initFromPED(importString, importOptions.acceptUnknownPhenotypes, importOptions.markEvaluated, importOptions.externalIdMark);
+      if (!this._recreateUsingBaseGraph(baseGraph)) {
+        return null;
+      }  // no changes
+    } else if (importType === 'pedx' || importType === 'PEDX') {
+      var baseGraph = PedigreeImport.initFromPEDX(importString, importOptions.acceptUnknownPhenotypes, importOptions.markEvaluated, importOptions.externalIdMark);
       if (!this._recreateUsingBaseGraph(baseGraph)) {
         return null;
       }  // no changes
@@ -1266,8 +1271,23 @@ DynamicPositionedGraph.prototype = {
       if (!this._recreateUsingBaseGraph(baseGraph)) {
         return null;
       }  // no changes
-    } else if (importType == 'GA4GH') {
+    } else if (importType === 'fhir_v1') {
+      var baseGraph = PedigreeImport.initFromFHIR(importString);
+      if (!this._recreateUsingBaseGraph(baseGraph)) {
+        return null;
+      }  // no changes
+    } else if (importType === 'GA4GH' || importType === 'fhir') {
       var baseGraph = PedigreeImport.initFromGA4GH(importString);
+      if (!this._recreateUsingBaseGraph(baseGraph)) {
+        return null;
+      }  // no changes
+    } else if (importType === 'DADA2') {
+      var baseGraph = PedigreeImport.initFromDADA2(importString);
+      if (!this._recreateUsingBaseGraph(baseGraph)) {
+        return null;
+      }  // no changes
+    } else if (importType === 'DADA2X') {
+      var baseGraph = PedigreeImport.initFromDADA2X(importString);
       if (!this._recreateUsingBaseGraph(baseGraph)) {
         return null;
       }  // no changes

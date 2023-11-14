@@ -208,9 +208,11 @@ var SaveLoadEngine = Class.create( {
         throw 'unable to create a pedigree from imported data';
       }
     } catch(err) {
+      console.log('Error importing pedigree:');
+      console.log(err);
       alert('Error importing pedigree: ' + err);
       document.fire('pedigree:load:finish');
-      return;
+      return false;
     }
 
     if (!noUndo) {
@@ -230,6 +232,7 @@ var SaveLoadEngine = Class.create( {
     }
 
     document.fire('pedigree:load:finish');
+    return true;
   },
 
   setSaveInProgress: function(status) {

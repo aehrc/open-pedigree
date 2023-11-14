@@ -602,6 +602,14 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   } else if (patientResource.gender === 'female') {
     properties.gender = 'F';
   }
+  if (patientResource.identifier) {
+    for (let i = 0; i < patientResource.identifier.length; i++) {
+      if (patientResource.identifier[i].system === 'https://github.com/phenotips/open-pedigree?externalID') {
+        properties.externalID = patientResource.identifier[i].value;
+        break;
+      }
+    }
+  }
 
   const dateTimeSplitter = /([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)(-(0[1-9]|1[0-2])(-(0[1-9]|[1-2][0-9]|3[0-1])(T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00)))?)?)?/;
   const nameUseOrder = ['anonymous', 'temp', 'expired_nickname', 'expired_', 'expired_usual', 'expired_official', 'maiden', 'old', 'nickname', '', 'usual', 'official'];
@@ -1201,6 +1209,14 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
     } else {
       patientResource.gender = 'unknown';
     }
+  }
+  if (nodeProperties.externalID) {
+    patientResource.identifier = [
+      {
+        "system": 'https://github.com/phenotips/open-pedigree?externalID',
+        "value": nodeProperties.externalID
+      }
+    ];
   }
   let unbornFlag = false;
   if (privacySetting === 'all') {

@@ -10,11 +10,15 @@ import '../public/vendor/phenotips/Widgets.css';
 import '../public/vendor/phenotips/DateTimePicker.css';
 import '../public/vendor/phenotips/Skin.css';
 import '../public/vendor/selectize/selectize.default.css';
-
-var editor;
-
-document.observe('dom:loaded',function() {
+import LocalStorageBackend from "./script/localStorageBackend";
 
 
-  editor = new PedigreeEditor();
-});
+const OpenPedigree = OpenPedigree || {};
+
+OpenPedigree.initialiseEditor = function(options){
+  return new PedigreeEditor(options);
+};
+
+OpenPedigree.localStorageBackend = LocalStorageBackend
+
+window.OpenPedigree = OpenPedigree;
