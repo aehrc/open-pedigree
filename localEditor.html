@@ -199,7 +199,7 @@
 
       var editorOptions = {
         // patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true' + (qData?('&qData='+qData):''),
-        patientDataUrl: 'local:pedigreeData?format='+format,
+        patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true',
         returnUrl: '#CloseWindow',
         backend: OpenPedigree.localStorageBackend,
         ...terminologyOptions};
