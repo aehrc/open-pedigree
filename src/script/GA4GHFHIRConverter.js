@@ -756,11 +756,13 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
   let nodeIndexToRef = {}; // maps node index to ref
   let containedResources = [];
 
-  let probandRef = this.processTreeNode(0, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
-    pedigreeRelationship, conditions, observations, nodeIndexToRef);
+  let probandRef = (pedigree.GG.isPerson(0))
+    ? this.processTreeNode(0, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
+      pedigreeRelationship, conditions, observations, nodeIndexToRef)
+    : generateUUID();
 
   // add any missing nodes, the recursion only goes up the tree
-  for (let i = 1; i <= pedigree.GG.getMaxRealVertexId(); i++) {
+  for (let i = (pedigree.GG.isPerson(0) ? 1 : 0); i <= pedigree.GG.getMaxRealVertexId(); i++) {
     if (!pedigree.GG.isPerson(i)) {
       continue;
     }
@@ -800,7 +802,7 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
     },
     'entry': []
   };
-  for (let probandCond of conditions[probandRef]) {
+  for (let probandCond of (conditions[probandRef] || [])) {
     reasonSection.entry.push({
       'type': 'Condition',
       'reference': this.getReference(probandCond.id)

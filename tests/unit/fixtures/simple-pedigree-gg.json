@@ -1,0 +1,7 @@
+[
+  {"id": 0, "prop": {"gender": "M", "fName": "John"}, "outedges": [{"to": 2}]},
+  {"id": 1, "prop": {"gender": "F", "fName": "Jane"}, "outedges": [{"to": 2}]},
+  {"id": 2, "rel": true, "hub": true, "prop": {}, "outedges": [{"to": 3}]},
+  {"id": 3, "chhub": true, "prop": {}, "outedges": [{"to": 4}]},
+  {"id": 4, "prop": {"gender": "U"}}
+]
