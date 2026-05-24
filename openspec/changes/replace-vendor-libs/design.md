@@ -22,9 +22,14 @@ The E2E test suite (7 Playwright tests, including PED and GA4GH export downloads
 
 ### D1: pdfkit — use the standalone browser build inside the npm package
 
-The `pdfkit` npm package ships a pre-compiled browser standalone at `pdfkit/js/pdfkit.standalone.js`. This is exactly what the current vendor file is — a frozen snapshot of that artifact. Importing `from 'pdfkit/js/pdfkit.standalone'` requires no webpack polyfills and keeps the import pattern identical to the current vendor alias. The vendor alias `vendor/pdfkit/pdfkit.standalone` → npm path `pdfkit/js/pdfkit.standalone` is a one-line change in `export.js`.
+The `pdfkit` npm package ships a pre-compiled browser standalone at `pdfkit/js/pdfkit.standalone.js`. This is exactly what the current vendor file is — a frozen snapshot of that artifact. Importing `from 'pdfkit/js/pdfkit.standalone'` keeps the import pattern identical to the current vendor alias. The vendor alias `vendor/pdfkit/pdfkit.standalone` → npm path `pdfkit/js/pdfkit.standalone` is a one-line change in `export.js`.
 
-**Alternative rejected:** Using the main `pdfkit` entry point with `resolve.fallback` polyfills for Node.js `stream`, `buffer`, `path` — adds significant webpack configuration complexity for no functional benefit.
+**Note (actual implementation):** `blob-stream` has a transitive dependency on `stream-browserify`, which uses `process.nextTick()` and `Buffer` — Node.js globals not available in the browser. This required:
+- `resolve.fallback` entries for `stream`, `util`, and `buffer` in `webpack.config.js`
+- `webpack.ProvidePlugin({ process: 'process/browser', Buffer: ['buffer', 'Buffer'] })` to inject these as browser globals
+- `stream-browserify`, `util`, `buffer`, and `process` installed as devDependencies
+
+The `pdfkit.standalone.js` path itself needs no polyfills; the added configuration is entirely for `blob-stream`.
 
 ### D2: blob-stream and svg-to-pdfkit — direct npm imports
 

@@ -48,7 +48,7 @@
 - [x] 5.7 Delete `public/vendor/selectize/` directory
 - [x] 5.8 Run `npm run build` — confirm exit 0
 - [x] 5.9 Run `npm run test:e2e` — confirm all 7 E2E tests pass
-- [ ] 5.10 Manually verify autocomplete in the browser: open the dev server, select a person node, type in a disorder/phenotype/gene field, confirm the dropdown appears
+- [x] 5.10 Manually verify autocomplete in the browser: open the dev server, select a person node, type in a disorder/phenotype/gene field, confirm the dropdown appears
 
 ## 6. Final Validation
 
@@ -57,4 +57,4 @@
 - [x] 6.3 Run `npm run build` — confirm `dist/pedigree.min.js` produced, exit 0
 - [x] 6.4 Run `npm test` — confirm all 30 unit tests pass
 - [x] 6.5 Run `npm run test:e2e` — confirm all 7 E2E tests pass
-- [ ] 6.6 Commit the completed migration
+- [x] 6.6 Commit the completed migration
