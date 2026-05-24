@@ -75,6 +75,9 @@ module.exports = {
     static: {
       directory: path.join(__dirname, '.'),
     },
+    devMiddleware: {
+      publicPath: '/dist/',
+    },
     port: 9000
   },
 
