@@ -47,7 +47,7 @@
     var editor;
 
     document.observe('dom:loaded',function() {
-      var ontologyServer = getParameterByName('ontologyServer') || 'https://genomics.ontoserver.csiro.au/fhir/';
+      var ontologyServer = getParameterByName('ontologyServer') || 'https://tx.ontoserver.csiro.au/fhir/';
 
       var mode = getParameterByName('mode');
       if (mode === 'SCT') {
@@ -55,16 +55,16 @@
                 'http://snomed.info/sct?fhir_vs=refset/32570581000036105', /[0-9]+/, 20);
         OpenPedigree.setFHIRTerminology('phenotype', ontologyServer, 'http://snomed.info/sct',
                 'http://ga4gh.org/fhir/ValueSet/phenotype', /[0-9]+/, 20);
-        OpenPedigree.setFHIRTerminology('gene', ontologyServer, 'http://www.genenames.org',
-                'http://www.genenames.org', /^HGNC:/, 20);
+        OpenPedigree.setFHIRTerminology('gene', ontologyServer, 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl',
+                'http://www.genenames.org', /[0-9]+/, 20);
       }
       else {
         OpenPedigree.setFHIRTerminology('disorder', ontologyServer, 'http://www.omim.org',
-                'http://www.omim.org', /[0-9]+/, 20);
+                'http://www.omim.org/vs', /[0-9]+/, 20);
         OpenPedigree.setFHIRTerminology('phenotype', ontologyServer, 'http://purl.obolibrary.org/obo/hp.owl',
                 'http://purl.obolibrary.org/obo/hp.owl?vs', /^(http:\/\/)|(HP:)/, 20);
-        OpenPedigree.setFHIRTerminology('gene', ontologyServer, 'http://www.genenames.org',
-                'http://www.genenames.org', /^HGNC:/, 20);
+        OpenPedigree.setFHIRTerminology('gene', ontologyServer, 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl',
+                'http://www.genenames.org', /[0-9]+/, 20);
       }
       console.log("creating editor");
 
