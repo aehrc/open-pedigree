@@ -1,3 +1,4 @@
+import { saveAs } from 'file-saver';
 import PedigreeExport from 'pedigree/model/export';
 
 // import {saveTextAs} from 'vendor/filesaver/FileSaver';

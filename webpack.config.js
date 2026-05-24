@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
@@ -17,6 +18,7 @@ module.exports = {
     '$$',
     '$',
     '$F',
+    { jquery: 'jQuery' },
   ],
 
   module: {
@@ -81,6 +83,13 @@ module.exports = {
     port: 9000
   },
 
+  plugins: [
+    new webpack.ProvidePlugin({
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
+    }),
+  ],
+
   optimization: {
     minimize: true,
     minimizer: [
@@ -98,6 +107,11 @@ module.exports = {
     alias: {
       'pedigree': path.resolve(__dirname, 'src/script/'),
       'vendor': path.resolve(__dirname, 'public/vendor/'),
-    }
+    },
+    fallback: {
+      stream: require.resolve('stream-browserify'),
+      util: require.resolve('util/'),
+      buffer: require.resolve('buffer/'),
+    },
   }
 };
