@@ -119,7 +119,7 @@ var ExportSelector = Class.create( {
       var mimeType = 'application/fhir+json';
     }
 
-    saveTextAs(exportString, fileName);
+    saveAs(new Blob([exportString], {type: mimeType}), fileName);
   },
 
   /**
