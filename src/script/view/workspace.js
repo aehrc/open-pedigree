@@ -202,7 +202,7 @@ var Workspace = Class.create({
       });
     };
     var _createMenuItem = function(data) {
-      var mi = new Element('span', {'id' : 'action-' + data.key, 'class' : 'menu-item ' + data.key}).insert(new Element('span', {'class' : 'fa fa-' + data.icon})).insert(' ').insert(data.label);
+      var mi = new Element('span', {'id' : 'action-' + data.key, 'class' : 'menu-item ' + data.key}).insert(new Element('span', {'class' : 'fas fa-' + data.icon})).insert(' ').insert(data.label);
       if (data.callback && typeof(this[data.callback]) == 'function') {
         mi.observe('click', function() {
           this[data.callback]();
@@ -255,7 +255,7 @@ var Workspace = Class.create({
     this.__controls.insert(this.__pan);
     ['up', 'right', 'down', 'left', 'home'].each(function (direction) {
       var faIconClass = (direction == 'home') ? 'fa-user' : 'fa-arrow-' + direction;
-      _this.__pan[direction] = new Element('span', {'class' : 'view-control-pan pan-' + direction + ' fa fa-fw ' + faIconClass, 'title' : 'Pan ' + direction});
+      _this.__pan[direction] = new Element('span', {'class' : 'view-control-pan pan-' + direction + ' fas fa-fw ' + faIconClass, 'title' : 'Pan ' + direction});
       _this.__pan.insert(_this.__pan[direction]);
       _this.__pan[direction].observe('click', function(event) {
         if (direction == 'home') {
@@ -277,8 +277,8 @@ var Workspace = Class.create({
     this.__controls.insert(this.__zoom);
     this.__zoom.track  = new Element('div', {'class' : 'zoom-track'});
     this.__zoom.handle = new Element('div', {'class' : 'zoom-handle', title : 'Drag to zoom'});
-    this.__zoom['in']  = new Element('div', {'class' : 'zoom-button zoom-in fa fa-fw fa-search-plus', title : 'Zoom in'});
-    this.__zoom['out'] = new Element('div', {'class' : 'zoom-button zoom-out fa fa-fw fa-search-minus', title : 'Zoom out'});
+    this.__zoom['in']  = new Element('div', {'class' : 'zoom-button zoom-in fas fa-fw fa-search-plus', title : 'Zoom in'});
+    this.__zoom['out'] = new Element('div', {'class' : 'zoom-button zoom-out fas fa-fw fa-search-minus', title : 'Zoom out'});
     this.__zoom.label  = new Element('div', {'class' : 'zoom-crt-value'});
     this.__zoom.insert(this.__zoom['in']);
     this.__zoom.insert(this.__zoom.track);

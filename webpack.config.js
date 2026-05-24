@@ -1,4 +1,3 @@
-const webpack = require('webpack');
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
 
@@ -8,6 +7,7 @@ module.exports = {
   output: {
     filename: 'pedigree.min.js',
     path: path.resolve(__dirname, 'dist'),
+    clean: false,
   },
 
   externals: [
@@ -33,32 +33,48 @@ module.exports = {
         test: /\.css$/,
         use: [
           'style-loader',
-          'css-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              url: {
+                // Absolute paths (e.g. /resources/icons/xwiki/...) are XWiki
+                // server-side resources; leave them unresolved for runtime.
+                filter: (url) => !url.startsWith('/'),
+              },
+            },
+          },
         ]
       },
       {
         test: /\.scss$/,
         use: [
           'style-loader',
-          'css-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              url: {
+                filter: (url) => !url.startsWith('/'),
+              },
+            },
+          },
           'sass-loader',
         ]
       },
       {
         test: /\.(png|svg|jpg|gif)$/,
-        use: [{
-         loader: 'file-loader',
-         options: {
-           outputPath: 'assets',
-           publicPath: 'dist/assets',
-         }
-       }]
+        type: 'asset/resource',
+        generator: {
+          filename: 'assets/[name][ext]',
+          publicPath: 'dist/assets/',
+        }
       }
     ]
   },
 
   devServer: {
-    contentBase: path.join(__dirname, '.'),
+    static: {
+      directory: path.join(__dirname, '.'),
+    },
     port: 9000
   },
 
@@ -76,9 +92,9 @@ module.exports = {
   },
 
   resolve: {
-  	alias: {
+    alias: {
       'pedigree': path.resolve(__dirname, 'src/script/'),
       'vendor': path.resolve(__dirname, 'public/vendor/'),
-  	}
+    }
   }
 };
