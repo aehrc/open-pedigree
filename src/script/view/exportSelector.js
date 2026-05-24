@@ -167,30 +167,24 @@ var ExportSelector = Class.create( {
       var exportString = PedigreeExport.exportAsPED(editor.getGraph().DG, idGenerationSetting);
       var fileName = 'open-pedigree.ped';
       var mimeType = 'text/plain';
-      // Uses FileSaver global
-      /* eslint-disable no-undef */
-      saveTextAs(exportString, fileName);
+      saveAs(new Blob([exportString], {type: mimeType}), fileName);
     } else if (exportType == 'DADA2') {
       var exportString = PedigreeExport.exportAsDADA2(editor.getGraph().DG);
       var fileName = 'open-pedigree.dada2';
       var mimeType = 'text/plain';
-      // Uses FileSaver global
-      /* eslint-disable no-undef */
-      saveTextAs(exportString, fileName);
+      saveAs(new Blob([exportString], {type: mimeType}), fileName);
     } else {
       var privacySetting = $$('input:checked[type=radio][name="privacy-options"]')[0].value;
       if (exportType == 'GA4GH') {
         var exportString = PedigreeExport.exportAsGA4GH(editor.getGraph().DG, privacySetting);
         var fileName = 'open-pedigree-GA4GH-fhir.json';
         var mimeType = 'application/fhir+json';
-        // Uses FileSaver global
-        /* eslint-disable no-undef */
-        saveTextAs(exportString, fileName);
+        saveAs(new Blob([exportString], {type: mimeType}), fileName);
       } else if (exportType == 'svg') {
         var exportString = PedigreeExport.exportAsSVG(editor.getGraph().DG, privacySetting);
         var fileName = 'open-pedigree.svg';
         var mimeType = 'image/svg+xml';
-        saveTextAs(exportString, fileName);
+        saveAs(new Blob([exportString], {type: mimeType}), fileName);
       } else if (exportType == 'pdf') {
         var pageSize = $$('select[name="pdf-page-size"]')[0].value;
         var layout = $$('select[name="pdf-page-orientation"]')[0].value;
