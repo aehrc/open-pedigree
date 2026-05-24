@@ -1,3 +1,4 @@
+import URI from 'urijs';
 import TemplateSelector from "./view/templateSelector";
 import PedigreeExport from "./model/export";
 

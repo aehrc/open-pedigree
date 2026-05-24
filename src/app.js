@@ -9,7 +9,8 @@ import '../public/vendor/xwiki/colibri.css';
 import '../public/vendor/phenotips/Widgets.css';
 import '../public/vendor/phenotips/DateTimePicker.css';
 import '../public/vendor/phenotips/Skin.css';
-import '../public/vendor/selectize/selectize.default.css';
+import '@selectize/selectize/dist/css/selectize.default.css';
+import '@selectize/selectize';
 import LocalStorageBackend from "./script/localStorageBackend";
 
 

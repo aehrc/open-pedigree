@@ -1,6 +1,6 @@
-import PDFDocument from 'vendor/pdfkit/pdfkit.standalone';
-import SVGtoPDF from 'vendor/pdfkit/svg-to-pdfkit';
-import blobStream from 'vendor/pdfkit/blob-stream';
+import PDFDocument from 'pdfkit/js/pdfkit.standalone';
+import SVGtoPDF from 'svg-to-pdfkit';
+import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
 var PedigreeExport = function () {
