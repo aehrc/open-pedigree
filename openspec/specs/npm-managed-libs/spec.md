@@ -1,5 +1,8 @@
-## ADDED Requirements
+# npm-managed-libs Specification
 
+## Purpose
+TBD - created by archiving change replace-vendor-libs. Update Purpose after archive.
+## Requirements
 ### Requirement: pdfkit, blob-stream, and svg-to-pdfkit managed via npm
 The packages `pdfkit`, `blob-stream`, and `svg-to-pdfkit` SHALL be listed in `package.json` dependencies. No corresponding files SHALL exist under `public/vendor/pdfkit/`. The `src/script/model/export.js` file SHALL import these packages using their npm package names, not the `vendor/` webpack alias.
 
@@ -82,3 +85,4 @@ The directory `public/vendor/font-awesome/` (Font Awesome 4.x CSS copy) SHALL NO
 #### Scenario: Icons still render after vendor copy removal
 - **WHEN** the editor is opened in a browser
 - **THEN** toolbar icons (pan, zoom, templates, export) are visually rendered and not blank
+
