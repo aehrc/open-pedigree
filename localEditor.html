@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <title>Open Pedigree by PhenoTips&reg;</title>
+    <link rel="icon" type="image/png" href="dist/assets/open-pedigree-icon.png">
 
     <!-- Load jquery before prototype, making it available via jQuery but not $ -->
     <script type="text/javascript" src="public/vendor/jquery-3.7.1.min.js"></script>
@@ -152,18 +153,21 @@
         terminologyOptions = {
           'disorderOptions': {
             'type': 'FHIR',
+            'codeSystem': disorderSystem,
             'validIdRegex': disorderRegex,
             'fhirBaseUrl': ontologyServer,
             'valueSet': disorderValueset
           },
           'phenotypeOptions': {
             'type': 'FHIR',
+            'codeSystem': phenotypeSystem,
             'validIdRegex': phenotypeRegex,
             'fhirBaseUrl': ontologyServer,
             'valueSet': phenotypeValueset
           },
           'geneOptions': {
             'type': 'FHIR',
+            'codeSystem': geneSystem,
             'validIdRegex': geneRegex,
             'fhirBaseUrl': ontologyServer,
             'valueSet': geneValueset

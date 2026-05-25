@@ -48,11 +48,11 @@ export default class AbstractAjaxTerminology extends AbstractTerminology {
           onError(err);
         }
       },
-      onError: (error: any) => {
+      onFailure: (error: any) => {
         console.error('[LOAD ' + this._type + ' term: id = ' + this.desanitizeID(id) + '] Error: ' + error);
         onError(error);
       },
-      onComplete: onComplete ? onComplete : {},
+      onComplete: onComplete,
       ...extraAjaxOptions,
     };
     new Ajax.Request(queryURL, ajaxOptions);
@@ -77,11 +77,11 @@ export default class AbstractAjaxTerminology extends AbstractTerminology {
           onError(err);
         }
       },
-      onError: (error: any) => {
+      onFailure: (error: any) => {
         console.log('Error searching for ' + this.getType() + ' with searchTerm "' + searchTerm + '": ' + error);
         onError(error);
       },
-      onComplete: onComplete ? onComplete : {},
+      onComplete: onComplete,
       ...extraAjaxOptions,
     };
     new Ajax.Request(queryURL, ajaxOptions);

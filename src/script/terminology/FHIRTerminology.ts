@@ -30,8 +30,9 @@ export default class FHIRTerminology extends AbstractAjaxTerminology {
   }
 
   getLookupURL(id: any): any {
+    const base = this._fhirBaseUrl.replace(/\/$/, '');
     return (
-      this._fhirBaseUrl +
+      base +
       '/CodeSystem/$lookup?_format=json' +
       '&system=' +
       encodeURI(this.getCodeSystem()) +
@@ -53,8 +54,9 @@ export default class FHIRTerminology extends AbstractAjaxTerminology {
   }
 
   getSearchURL(searchTerm: any): any {
+    const base = this._fhirBaseUrl.replace(/\/$/, '');
     return (
-      this._fhirBaseUrl +
+      base +
       '/ValueSet/$expand?_format=json&url=' +
       encodeURI(this._valueSet) +
       '&count=' +

@@ -454,7 +454,9 @@ export default class NodeMenu {
   show(node: any, x: any, y: any): any {
     this._onscreen = true;
     this.targetNode = node;
+    this._updating = true;
     this._setCrtData(node.getSummary());
+    delete this._updating;
     this.menuBox.show();
     this.reposition(x, y);
     document.observe('mousedown', this._onClickOutside);
@@ -605,7 +607,7 @@ export default class NodeMenu {
               ids.push(value.id);
             }
           });
-          (target[0] as any).selectize.clearOptions();
+          (target[0] as any).selectize.clearOptions(true);
           var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
           for (var disorder of currentDisorders){
             (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
@@ -626,7 +628,7 @@ export default class NodeMenu {
               ids.push(value.id);
             }
           });
-          (target[0] as any).selectize.clearOptions();
+          (target[0] as any).selectize.clearOptions(true);
           var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
           for (var phenotype of currentPhenotypes){
             (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
@@ -641,7 +643,7 @@ export default class NodeMenu {
       if (target && target[0] && (target[0] as any).selectize) {
         if (Array.isArray(values)) {
           // Genes are just a straight array of strings
-          (target[0] as any).selectize.clearOptions();
+          (target[0] as any).selectize.clearOptions(true);
           var currentGenes = editor.getGeneLegend().getCurrentTerms();
           for (var gene of currentGenes){
             console.log("Adding options " + gene.getID() + "=>" + gene.getName());
