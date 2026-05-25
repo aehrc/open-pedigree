@@ -54,7 +54,7 @@ export default class View {
 
   getNode(nodeId: any): any {
     if (!this._nodeMap.hasOwnProperty(nodeId)) {
-      throw 'ERROR';
+      return null;
     }
     return this._nodeMap[nodeId];
   }

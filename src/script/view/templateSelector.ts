@@ -1,4 +1,5 @@
 import PedigreeTemplates from 'pedigree/view/templates';
+import { NativeModal } from 'pedigree/view/nativeModal';
 
 /**
  * The UI Element for browsing and selecting pre-defined Pedigree templates
@@ -15,32 +16,33 @@ export default class TemplateSelector {
 
   constructor(isStartupTemplateSelector?: any) {
     this._isStartupTemplateSelector = isStartupTemplateSelector;
-    this.mainDiv = new (Element as any)('div', {'class': 'template-picture-container'});
-    this.mainDiv.update('Loading list of templates...');
+    this.mainDiv = document.createElement('div');
+    this.mainDiv.className = 'template-picture-container';
+    this.mainDiv.textContent = 'Loading list of templates...';
     const closeShortcut = isStartupTemplateSelector ? [] : ['Esc'];
-    this.dialog = new PhenoTips.widgets.ModalPopup(this.mainDiv, {close: {method : this.hide.bind(this), keys : closeShortcut}}, {extraClassName: 'pedigree-template-chooser', title: 'Please select a pedigree template', displayCloseButton: !isStartupTemplateSelector, verticalPosition: 'top'});
+    this.dialog = new NativeModal(this.mainDiv, {close: {method : this.hide.bind(this), keys : closeShortcut}}, {extraClassName: 'pedigree-template-chooser', title: 'Please select a pedigree template', displayCloseButton: !isStartupTemplateSelector, verticalPosition: 'top'});
     isStartupTemplateSelector && this.dialog.show();
 
-    this.mainDiv.update();
+    this.mainDiv.replaceChildren();
 
     for (let i = 0; i < PedigreeTemplates.length; ++i) {
-      const pictureBox = new (Element as any)('div', {'class': 'picture-box'});
-      pictureBox.update('Loading...');
-      this.mainDiv.insert(pictureBox);
+      const pictureBox = document.createElement('div');
+      pictureBox.className = 'picture-box';
+      pictureBox.textContent = 'Loading...';
+      this.mainDiv.appendChild(pictureBox);
       const template = PedigreeTemplates[i];
-      pictureBox.innerHTML = template.image;
-      pictureBox.pedigreeData = JSON.stringify(template.data);
-      pictureBox.description  = template.description;
-      pictureBox.title        = pictureBox.description;
+      (pictureBox as any).pedigreeData = JSON.stringify(template.data);
+      (pictureBox as any).description  = template.description;
+      pictureBox.title = (pictureBox as any).description;
 
       // TODO: render images with JavaScript instead
       if (window.SVGSVGElement &&
                 document.implementation.hasFeature('http://www.w3.org/TR/SVG11/feature#Image', '1.1')) {
-        pictureBox.update(template.image);
+        pictureBox.innerHTML = template.image;
       } else {
-        pictureBox.innerHTML = '<table bgcolor=\'#FFFAFA\'><tr><td><br>&nbsp;' + pictureBox.description + '&nbsp;<br><br></td></tr></table>';
+        pictureBox.innerHTML = '<table bgcolor=\'#FFFAFA\'><tr><td><br>&nbsp;' + (pictureBox as any).description + '&nbsp;<br><br></td></tr></table>';
       }
-      pictureBox.observe('click', this._onTemplateSelected.bindAsEventListener(this, pictureBox));
+      pictureBox.addEventListener('click', (event: any) => this._onTemplateSelected(event, pictureBox));
     }
   }
 
@@ -62,7 +64,6 @@ export default class TemplateSelector {
    * @private
    */
   _onTemplateSelected(event: any, pictureBox: any): void {
-    //console.log("observe onTemplateSelected");
     this.dialog.close();
     editor.getSaveLoadEngine().createGraphFromSerializedData(pictureBox.pedigreeData, false /* add to undo stack */, true /*center around 0*/);
   }

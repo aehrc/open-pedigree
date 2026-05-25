@@ -30,7 +30,7 @@ export default class GeneLegend extends Legend {
     if (!this._objectColors.hasOwnProperty(geneID)) {
       const color = this._generateColor(geneID);
       this._objectColors[geneID] = color;
-      document.fire('gene:color', {'id' : geneID, color: color});
+      document.dispatchEvent(new CustomEvent('gene:color', { detail: {'id' : geneID, color: color} }));
     }
 
     return super._generateElement(geneID, name);
@@ -52,8 +52,8 @@ export default class GeneLegend extends Legend {
     let usedColors = Object.values(this._objectColors),
       // green palette
       prefColors: any[] = ['#81a270', '#c4e8c4', '#56a270', '#b3b16f', '#4a775a', '#65caa3'];
-    usedColors.each( function(color: any) {
-      prefColors = prefColors.without(color);
+    usedColors.forEach( function(color: any) {
+      prefColors = prefColors.filter((c: any) => c !== color);
     });
     if(prefColors.length > 0) {
       return prefColors[0];

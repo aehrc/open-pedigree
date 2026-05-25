@@ -28,16 +28,16 @@ export default class Disorder {
   load(callWhenReady: any): void {
     const baseOMIMServiceURL = Disorder.getOMIMServiceURL();
     const queryURL = baseOMIMServiceURL + '&q=id:' + this._disorderID;
-    new Ajax.Request(queryURL, {
-      method: 'GET',
-      onSuccess: this.onDataReady.bind(this),
-      onComplete: callWhenReady ? callWhenReady : {},
-    });
+    fetch(queryURL, { method: 'GET' })
+      .then(response => response.text())
+      .then(text => this.onDataReady(text))
+      .catch(err => console.log('[LOAD DISORDER] Fetch error: ' + err))
+      .finally(() => { if (typeof callWhenReady === 'function') callWhenReady(); });
   }
 
-  onDataReady(response: any): void {
+  onDataReady(responseText: any): void {
     try {
-      const parsed = JSON.parse(response.responseText);
+      const parsed = JSON.parse(responseText);
       console.log('LOADED DISORDER: disorder id = ' + this._disorderID + ', name = ' + parsed.rows[0].name);
       this._name = parsed.rows[0].name;
     } catch (err) {
@@ -61,6 +61,6 @@ export default class Disorder {
   }
 
   static getOMIMServiceURL(): any {
-    return new XWiki.Document('OmimService', 'PhenoTips').getURL('get', 'outputSyntax=plain');
+    return (window as any).editor ? (window as any).editor.getOmimServiceUrl() : '';
   }
 }

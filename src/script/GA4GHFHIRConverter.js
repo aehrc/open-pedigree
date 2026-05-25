@@ -107,7 +107,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   let nodeDataLookup = {};
   for (const patientResource of patientResources){
     const node = this.extractDataFromPatient(patientResource, containedResourcesLookup, twinTracker);
-    node.nodeId = nodeData.size();
+    node.nodeId = nodeData.length;
     nodeData.push(node);
     nodeDataLookup[this.getReference(node.properties.id)] = node;
   }
@@ -634,7 +634,7 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
           maxLNameUse = nameUse;
         }
       }
-      if (humanName.given && humanName.given.size() > 0) {
+      if (humanName.given && humanName.given.length > 0) {
         if (nameUse > maxFNameUse) {
           properties.fName = humanName.given.join(' ');
           maxFNameUse = nameUse;

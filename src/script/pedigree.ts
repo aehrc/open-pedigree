@@ -30,6 +30,8 @@ import BioportalTerminology from './terminology/BioportalTerminology';
 
 export default class PedigreeEditor {
   DEBUG_MODE: any;
+  _omimServiceUrl: string;
+  _hpoServiceUrl: string;
   _graphModel: any;
   _workspace: any;
   _nodeMenu: any;
@@ -68,6 +70,8 @@ export default class PedigreeEditor {
     }
 
     this.DEBUG_MODE = Boolean(options.DEBUG_MODE);
+    this._omimServiceUrl = options.omimServiceUrl || '';
+    this._hpoServiceUrl  = options.hpoServiceUrl  || '';
 
     (window as any).editor = this;
 
@@ -113,43 +117,43 @@ export default class PedigreeEditor {
 
     this._controller = new Controller();
 
-    var undoButton = $('action-undo');
-    undoButton && undoButton.on('click', function(event: any) {
-      document.fire('pedigree:undo');
+    var undoButton = document.getElementById('action-undo');
+    undoButton && undoButton.addEventListener('click', function(event: any) {
+      document.dispatchEvent(new CustomEvent('pedigree:undo'));
     });
-    var redoButton = $('action-redo');
-    redoButton && redoButton.on('click', function(event: any) {
-      document.fire('pedigree:redo');
-    });
-
-    var clearButton = $('action-clear');
-    clearButton && clearButton.on('click', function(event: any) {
-      document.fire('pedigree:graph:clear');
+    var redoButton = document.getElementById('action-redo');
+    redoButton && redoButton.addEventListener('click', function(event: any) {
+      document.dispatchEvent(new CustomEvent('pedigree:redo'));
     });
 
-    var saveButton = $('action-save');
-    saveButton && saveButton.on('click', function(event: any) {
+    var clearButton = document.getElementById('action-clear');
+    clearButton && clearButton.addEventListener('click', function(event: any) {
+      document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
+    });
+
+    var saveButton = document.getElementById('action-save');
+    saveButton && saveButton.addEventListener('click', function(event: any) {
       editor.getView().unmarkAll();
       if (patientDataUrl) {
         editor.getSaveLoadEngine().save(patientDataUrl);
       }
     });
 
-    var templatesButton = $('action-templates');
-    templatesButton && templatesButton.on('click', function(event: any) {
+    var templatesButton = document.getElementById('action-templates');
+    templatesButton && templatesButton.addEventListener('click', function(event: any) {
       editor.getTemplateSelector().show();
     });
-    var importButton = $('action-import');
-    importButton && importButton.on('click', function(event: any) {
+    var importButton = document.getElementById('action-import');
+    importButton && importButton.addEventListener('click', function(event: any) {
       editor.getImportSelector().show();
     });
-    var exportButton = $('action-export');
-    exportButton && exportButton.on('click', function(event: any) {
+    var exportButton = document.getElementById('action-export');
+    exportButton && exportButton.addEventListener('click', function(event: any) {
       editor.getExportSelector().show();
     });
 
-    var closeButton = $('action-close');
-    closeButton && closeButton.on('click', function(event: any) {
+    var closeButton = document.getElementById('action-close');
+    closeButton && closeButton.addEventListener('click', function(event: any) {
       if (enableAutosave) {
         editor.getSaveLoadEngine().save(patientDataUrl);
       }
@@ -168,8 +172,8 @@ export default class PedigreeEditor {
       }
     });
 
-    var unsupportedBrowserButton = $('action-readonlymessage');
-    unsupportedBrowserButton && unsupportedBrowserButton.on('click', function(event: any) {
+    var unsupportedBrowserButton = document.getElementById('action-readonlymessage');
+    unsupportedBrowserButton && unsupportedBrowserButton.addEventListener('click', function(event: any) {
       alert('Your browser does not support all the features required for ' +
                   'Pedigree Editor, so pedigree is displayed in read-only mode (and may have quirks).\n\n' +
                   'Supported browsers include Firefox v3.5+, Internet Explorer v9+, ' +
@@ -178,19 +182,19 @@ export default class PedigreeEditor {
 
     if (enableAutosave) {
       const autosave = this.autosave(patientDataUrl);
-      document.observe('pedigree:graph:clear',               autosave);
-      document.observe('pedigree:undo',                      autosave);
-      document.observe('pedigree:redo',                      autosave);
-      document.observe('pedigree:node:remove',               autosave);
-      document.observe('pedigree:node:setproperty',          autosave);
-      document.observe('pedigree:node:modify',               autosave);
-      document.observe('pedigree:person:drag:newparent',     autosave);
-      document.observe('pedigree:person:drag:newpartner',    autosave);
-      document.observe('pedigree:person:drag:newsibling',    autosave);
-      document.observe('pedigree:person:newparent',          autosave);
-      document.observe('pedigree:person:newsibling',         autosave);
-      document.observe('pedigree:person:newpartnerandchild', autosave);
-      document.observe('pedigree:partnership:newchild',      autosave);
+      document.addEventListener('pedigree:graph:clear',               autosave);
+      document.addEventListener('pedigree:undo',                      autosave);
+      document.addEventListener('pedigree:redo',                      autosave);
+      document.addEventListener('pedigree:node:remove',               autosave);
+      document.addEventListener('pedigree:node:setproperty',          autosave);
+      document.addEventListener('pedigree:node:modify',               autosave);
+      document.addEventListener('pedigree:person:drag:newparent',     autosave);
+      document.addEventListener('pedigree:person:drag:newpartner',    autosave);
+      document.addEventListener('pedigree:person:drag:newsibling',    autosave);
+      document.addEventListener('pedigree:person:newparent',          autosave);
+      document.addEventListener('pedigree:person:newsibling',         autosave);
+      document.addEventListener('pedigree:person:newpartnerandchild', autosave);
+      document.addEventListener('pedigree:partnership:newchild',      autosave);
     }
   }
 
@@ -621,6 +625,14 @@ export default class PedigreeEditor {
     return this._partnershipMenu;
   }
 
+  getOmimServiceUrl(): string {
+    return this._omimServiceUrl;
+  }
+
+  getHpoServiceUrl(): string {
+    return this._hpoServiceUrl;
+  }
+
   convertGraphCoordToCanvasCoord(x: any, y: any): any {
     var scale = PedigreeEditorParameters.attributes.layoutScale;
     return { x: x * scale.xscale,
@@ -633,14 +645,14 @@ export default class PedigreeEditor {
     const defaultTermOptions: any = {
       'disorder': {
         'type' : 'CTSS',
-        'ctssBaseUrl' : new XWiki.Document('OmimService', 'PhenoTips').getURL('get', 'outputSyntax=plain'),
+        'ctssBaseUrl' : this._omimServiceUrl,
         'valueColumn' : 'id',
         'textColumn' : 'name'
       },
       'phenotype': {
         'type' : 'CTSS',
         'validIdRegex' : /^HP:(\d)+$/i,
-        'ctssBaseUrl' : new XWiki.Document('SolrService', 'PhenoTips').getURL('get'),
+        'ctssBaseUrl' : this._hpoServiceUrl,
         'valueColumn' : 'id',
         'textColumn' : 'name'
       },

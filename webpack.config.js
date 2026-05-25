@@ -12,12 +12,6 @@ module.exports = {
   },
 
   externals: [
-    'XWiki', // XWiki JS library
-    'Class', // PrototypeJS
-    'Prototype',
-    '$$',
-    '$',
-    '$F',
     { jquery: 'jQuery' },
   ],
 

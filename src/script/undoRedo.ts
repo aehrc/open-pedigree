@@ -30,7 +30,7 @@ export default class ActionStack {
     if (nextState.eventToGetToThisState) {
       const memo = nextState.eventToGetToThisState.memo;
       memo['noUndoRedo'] = true;
-      document.fire(nextState.eventToGetToThisState.eventName, memo);
+      document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
       this._currentState++;
       return;
     }
@@ -49,7 +49,7 @@ export default class ActionStack {
     if (currentState.eventToUndo) {
       const memo = currentState.eventToUndo.memo;
       memo['noUndoRedo'] = true;
-      document.fire(currentState.eventToUndo.eventName, memo);
+      document.dispatchEvent(new CustomEvent(currentState.eventToUndo.eventName, { detail: memo }));
       this._currentState--;
       return;
     }

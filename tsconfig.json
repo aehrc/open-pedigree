@@ -8,11 +8,9 @@
     "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
-      "pedigree/*": ["src/script/*"],
-      "vendor/*": ["public/vendor/*"]
+      "pedigree/*": ["./src/script/*"],
+      "vendor/*": ["./public/vendor/*"]
     }
   },
   "include": ["src/**/*", "src/types/**/*.d.ts"],

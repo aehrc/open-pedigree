@@ -26,16 +26,16 @@ export default class HPOTerm {
   load(callWhenReady: any): void {
     const baseServiceURL = HPOTerm.getServiceURL();
     const queryURL = baseServiceURL + '&q=id%3A' + HPOTerm.desanitizeID(this._hpoID).replace(':', '%5C%3A');
-    new Ajax.Request(queryURL, {
-      method: 'GET',
-      onSuccess: this.onDataReady.bind(this),
-      onComplete: callWhenReady ? callWhenReady : {},
-    });
+    fetch(queryURL, { method: 'GET' })
+      .then(response => response.text())
+      .then(text => this.onDataReady(text))
+      .catch(err => console.log('[LOAD HPO TERM] Fetch error: ' + err))
+      .finally(() => { if (typeof callWhenReady === 'function') callWhenReady(); });
   }
 
-  onDataReady(response: any): void {
+  onDataReady(responseText: any): void {
     try {
-      const parsed = JSON.parse(response.responseText);
+      const parsed = JSON.parse(responseText);
       console.log('LOADED HPO TERM: id = ' + HPOTerm.desanitizeID(this._hpoID) + ', name = ' + parsed.rows[0].name);
       this._name = parsed.rows[0].name;
     } catch (err) {
@@ -63,6 +63,7 @@ export default class HPOTerm {
   }
 
   static getServiceURL(): any {
-    return new XWiki.Document('SolrService', 'PhenoTips').getURL('get') + '?';
+    const base = (window as any).editor ? (window as any).editor.getHpoServiceUrl() : '';
+    return base ? base + '?' : '';
   }
 }

@@ -49,7 +49,7 @@ export default class DisorderLegend extends Legend {
     if (!this._objectColors.hasOwnProperty(disorderID)) {
       const color = this._generateColor(disorderID);
       this._objectColors[disorderID] = color;
-      document.fire('disorder:color', {'id' : disorderID, color: color});
+      document.dispatchEvent(new CustomEvent('disorder:color', { detail: {'id' : disorderID, color: color} }));
     }
 
     return super._generateElement(disorderID, name);
@@ -87,8 +87,8 @@ export default class DisorderLegend extends Legend {
       // [original yellow/blue] prefColors = ["#FEE090", '#E0F8F8', '#8ebbd6', '#4575B4', '#fca860', '#9a4500', '#81a270'];
       // [green]                prefColors = ['#81a270', '#c4e8c4', '#56a270', '#b3b16f', '#4a775a', '#65caa3'];
       prefColors: any[] = ['#E0F8F8', '#92c0db', '#4575B4', '#949ab8', '#FEE090', '#bf6632', '#fca860', '#9a4500', '#d12943', '#00a2bf'];
-    usedColors.each( function(color: any) {
-      prefColors = prefColors.without(color);
+    usedColors.forEach( function(color: any) {
+      prefColors = prefColors.filter((c: any) => c !== color);
     });
     if (disorderID === 'affected') {
       if (usedColors.indexOf('#FEE090') > -1 ) {

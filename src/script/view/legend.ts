@@ -26,34 +26,37 @@ export default class Legend {
     this._cache = {};
     this._terminology = terminology;
 
-    let legendContainer = $('legend-container');
+    let legendContainer = document.getElementById('legend-container');
     if (!legendContainer) {
       console.debug('Create legend container');
-      legendContainer = new (Element as any)('div', {'class': 'legend-container', 'id': 'legend-container'});
-      editor.getWorkspace().getWorkArea().insert(legendContainer);
+      legendContainer = document.createElement('div');
+      legendContainer.className = 'legend-container';
+      legendContainer.id = 'legend-container';
+      editor.getWorkspace().getWorkArea().appendChild(legendContainer);
     }
 
-    this._legendBox = new (Element as any)('div', {'class' : 'legend-box', id: 'legend-box'});
-    this._legendBox.hide();
-    legendContainer.insert(this._legendBox);
+    this._legendBox = document.createElement('div');
+    this._legendBox.className = 'legend-box';
+    this._legendBox.id = 'legend-box';
+    this._legendBox.style.display = 'none';
+    legendContainer.appendChild(this._legendBox);
 
-    const legendTitle = new (Element as any)('h2', {'class': 'legend-title'}).update(title);
-    this._legendBox.insert(legendTitle);
+    const legendTitle = document.createElement('h2');
+    legendTitle.className = 'legend-title';
+    legendTitle.textContent = title;
+    this._legendBox.appendChild(legendTitle);
 
-    this._list = new (Element as any)('ul', {'class' : 'disorder-list'});
-    this._legendBox.insert(this._list);
+    this._list = document.createElement('ul');
+    this._list.className = 'disorder-list';
+    this._legendBox.appendChild(this._list);
 
-    this._legendBox.observe('mouseover', function() {
-      const menuBox = $$('.menu-box');
-      if (menuBox){
-        menuBox.invoke('setOpacity', .1);
-      }
+    this._legendBox.addEventListener('mouseover', function() {
+      const menuBoxes = Array.from(document.querySelectorAll('.menu-box')) as HTMLElement[];
+      menuBoxes.forEach(el => el.style.opacity = '0.1');
     });
-    this._legendBox.observe('mouseout', function() {
-      const menuBox = $$('.menu-box');
-      if (menuBox){
-        menuBox.invoke('setOpacity', 1);
-      }
+    this._legendBox.addEventListener('mouseout', function() {
+      const menuBoxes = Array.from(document.querySelectorAll('.menu-box')) as HTMLElement[];
+      menuBoxes.forEach(el => el.style.opacity = '1');
     });
   }
 
@@ -86,8 +89,10 @@ export default class Legend {
   }
 
   _updateTermName(id: any): void {
-    const name = this._legendBox.down('li#' + this._getPrefix(id) + '-' + id + ' .disorder-name');
-    name.update(this._cache[id].getName());
+    const name = this._legendBox.querySelector('li#' + this._getPrefix(id) + '-' + id + ' .disorder-name');
+    if (name) {
+      name.textContent = this._cache[id].getName();
+    }
   }
 
   getCurrentTerms(): any[] {
@@ -140,12 +145,12 @@ export default class Legend {
    */
   addCase(id: any, name: any, nodeID: any): void {
     if(Object.keys(this._affectedNodes).length === 0) {
-      this._legendBox.show();
+      this._legendBox.style.display = '';
     }
     if(!this._hasAffectedNodes(id)) {
       this._affectedNodes[id] = [nodeID];
       const listElement = this._generateElement(id, name);
-      this._list.insert(listElement);
+      this._list.appendChild(listElement);
     } else {
       this._affectedNodes[id].push(nodeID);
     }
@@ -161,14 +166,14 @@ export default class Legend {
    */
   removeCase(id: any, nodeID: any): void {
     if (this._hasAffectedNodes(id)) {
-      this._affectedNodes[id] = this._affectedNodes[id].without(nodeID);
+      this._affectedNodes[id] = this._affectedNodes[id].filter((n: any) => n !== nodeID);
       if(this._affectedNodes[id].length === 0) {
         delete this._affectedNodes[id];
         delete this._objectColors[id];
         const htmlElement = this._getListElementForObjectWithID(id);
         htmlElement.remove();
         if(Object.keys(this._affectedNodes).length === 0) {
-          this._legendBox.hide();
+          this._legendBox.style.display = 'none';
         }
       } else {
         this._updateCaseNumbersForObject(id);
@@ -181,7 +186,7 @@ export default class Legend {
   }
 
   _getListElementForObjectWithID(id: any): any {
-    return $(this._getPrefix(id) + '-' + id);
+    return document.getElementById(this._getPrefix(id) + '-' + id);
   }
 
   /**
@@ -192,10 +197,10 @@ export default class Legend {
    * @private
    */
   _updateCaseNumbersForObject(id: any): void {
-    const label = this._legendBox.down('li#' + this._getPrefix() + '-' + id + ' .disorder-cases');
+    const label = this._legendBox.querySelector('li#' + this._getPrefix() + '-' + id + ' .disorder-cases');
     if (label) {
       const cases = this._affectedNodes.hasOwnProperty(id) ? this._affectedNodes[id].length : 0;
-      label.update(cases + '&nbsp;case' + ((cases - 1) && 's' || ''));
+      label.innerHTML = cases + '&nbsp;case' + ((cases - 1) && 's' || '');
     }
   }
 
@@ -209,25 +214,38 @@ export default class Legend {
    */
   _generateElement(id: any, name: any): any {
     const color = this.getObjectColor(id);
-    const item = new (Element as any)('li', {'class' : 'disorder', 'id' : this._getPrefix() + '-' + id}).update(new (Element as any)('span', {'class' : 'disorder-name'}).update(name));
-    const bubble = new (Element as any)('span', {'class' : 'disorder-color'});
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'disorder-name';
+    nameSpan.textContent = name;
+    const item = document.createElement('li');
+    item.className = 'disorder';
+    item.id = this._getPrefix() + '-' + id;
+    item.appendChild(nameSpan);
+    const bubble = document.createElement('span');
+    bubble.className = 'disorder-color';
     bubble.style.backgroundColor = color;
-    item.insert({'top' : bubble});
-    const countLabel = new (Element as any)('span', {'class': 'disorder-cases'});
-    const countLabelContainer = new (Element as any)('span', {'class': 'disorder-cases-container'}).insert('(').insert(countLabel).insert(')');
-    item.insert(' ').insert(countLabelContainer);
+    item.prepend(bubble);
+    const countLabel = document.createElement('span');
+    countLabel.className = 'disorder-cases';
+    const countLabelContainer = document.createElement('span');
+    countLabelContainer.className = 'disorder-cases-container';
+    countLabelContainer.appendChild(document.createTextNode('('));
+    countLabelContainer.appendChild(countLabel);
+    countLabelContainer.appendChild(document.createTextNode(')'));
+    item.appendChild(document.createTextNode(' '));
+    item.appendChild(countLabelContainer);
     const me = this;
-    item.observe('mouseover', function() {
-      //item.setStyle({'text-decoration':'underline', 'cursor' : 'default'});
-      item.down('.disorder-name').setStyle({'background': color, 'cursor' : 'default'});
+    item.addEventListener('mouseover', function() {
+      var nameEl = item.querySelector('.disorder-name') as HTMLElement;
+      if (nameEl) { nameEl.style.background = color; nameEl.style.cursor = 'default'; }
       me._affectedNodes[id] && me._affectedNodes[id].forEach(function(nodeID: any) {
         const node = editor.getNode(nodeID);
         node && node.getGraphics().highlight();
       });
     });
-    item.observe('mouseout', function() {
-      //item.setStyle({'text-decoration':'none'});
-      item.down('.disorder-name').setStyle({'background':'', 'cursor' : 'default'});
+    item.addEventListener('mouseout', function() {
+      var nameEl = item.querySelector('.disorder-name') as HTMLElement;
+      if (nameEl) { nameEl.style.background = ''; nameEl.style.cursor = 'default'; }
       me._affectedNodes[id] && me._affectedNodes[id].forEach(function(nodeID: any) {
         const node = editor.getNode(nodeID);
         node && node.getGraphics().unHighlight();

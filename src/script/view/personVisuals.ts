@@ -193,7 +193,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     }
 
     this._nameLabel && this._nameLabel.remove();
-    if(text.strip() != '') {
+    if(text.trim() != '') {
       this._nameLabel = editor.getPaper().text(this.getX(), this.getY() + PedigreeEditorParameters.attributes.radius, text).attr(PedigreeEditorParameters.attributes.nameLabels);
     } else {
       this._nameLabel = null;
@@ -789,7 +789,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
 
     const text = '';
 
-    if (text.strip() != '') {
+    if (text.trim() != '') {
       this._childlessStatusLabel = editor.getPaper().text(this.getX(), this.getBottomY() + 18, '(' + text.slice(0, 15) + ')');
       this._childlessStatusLabel.attr({ 'font-size': 18, 'font-family': 'Cambria' });
       this._childlessStatusLabel.toBack();

@@ -159,7 +159,7 @@ export default class PartnershipHoverbox extends AbstractHoverbox {
     if(isDrag && curHoveredId) {
       if(handleType == 'child') {
         var event = { 'personID': curHoveredId, 'parentID': this.getNode().getID() };
-        document.fire('pedigree:person:drag:newparent', event);
+        document.dispatchEvent(new CustomEvent('pedigree:person:drag:newparent', { detail: event }));
       }
     } else if (!isDrag && handleType == 'child') {
       var position = editor.getWorkspace().canvasToDiv(this.getNodeX(), (this.getNodeY() + PedigreeEditorParameters.attributes.partnershipHandleLength + 15));

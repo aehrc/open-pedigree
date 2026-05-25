@@ -119,7 +119,7 @@ export const ChildlessBehaviorVisuals = {
 
     const text = '';
 
-    if (text.strip() != '') {
+    if (text.trim() != '') {
       this._childlessStatusLabel = editor.getPaper().text(this.getX(), this.getBottomY() + 18, '(' + text.slice(0, 15) + ')');
       this._childlessStatusLabel.attr({ 'font-size': 18, 'font-family': 'Cambria' });
       this._childlessStatusLabel.toBack();

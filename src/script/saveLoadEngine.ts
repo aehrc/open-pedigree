@@ -50,7 +50,7 @@ function uriAsRegex(uri: any): any {
 }
 
 function canvasToSvg(element: any): any {
-  var bbox = element.down().getBBox();
+  var bbox = element.firstElementChild.getBBox();
 
   return element.innerHTML
     .replace(/xmlns:xlink=".*?"/, '')
@@ -68,51 +68,47 @@ export default class SaveLoadEngine {
 
   _defaultSaveFunction(args: any): void {
     var me = this;
-
-    new Ajax.Request(args.patientDataUrl, {
+    args.setSaveInProgress(true);
+    fetch(args.patientDataUrl, {
       method: 'POST',
-      onCreate: function() {
-        args.setSaveInProgress(true);
-      },
-      onComplete: function() {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ 'property#data': args.jsonData, 'property#image': args.svgData })
+    })
+      .catch(err => console.log('[SAVE] Error: ' + err))
+      .finally(() => {
         args.setSaveInProgress(false);
         me._saveInProgress = false;
-      },
-      onSuccess: function() {},
-      parameters: {'property#data': args.jsonData, 'property#image': args.svgData }
-    });
+      });
   }
 
   _defaultLoadFunction(args: any): void {
-    var _this = this;
     var didLoadData = false;
 
-    new Ajax.Request(args.patientDataUrl, {
-      method: 'GET',
-      onCreate: function() {
-        document.fire('pedigree:load:start');
-      },
-      onSuccess: function(response: any) {
-        if (response && response.responseXML) {
-          var rawdata  = getSubSelectorTextFromXML(response.responseXML, 'property', 'name', 'data', 'value');
+    document.dispatchEvent(new CustomEvent('pedigree:load:start'));
+    fetch(args.patientDataUrl, { method: 'GET' })
+      .then(response => response.text())
+      .then(text => {
+        try {
+          var parser = new DOMParser();
+          var responseXML = parser.parseFromString(text, 'application/xml');
+          var rawdata = getSubSelectorTextFromXML(responseXML, 'property', 'name', 'data', 'value');
           var jsonData = unescapeRestData(rawdata);
           if (jsonData.trim()) {
             console.log('[LOAD] recived JSON: ' + JSON.stringify(jsonData));
-
             args.onSuccess(jsonData);
-
             jsonData = editor.getVersionUpdater().updateToCurrentVersion(jsonData);
-
             didLoadData = true;
           }
+        } catch (err) {
+          console.log('[LOAD] Error parsing response: ' + err);
         }
-      },
-      onComplete: function() {
+      })
+      .catch(err => console.log('[LOAD] Fetch error: ' + err))
+      .finally(() => {
         if (!didLoadData) {
           new TemplateSelector(true);
         }
-      }
-    });
+      });
   }
 
   constructor(options: any) {
@@ -129,15 +125,15 @@ export default class SaveLoadEngine {
 
   createGraphFromSerializedData(JSONString: any, noUndo?: any, centerAround0?: any): void {
     console.log('---- load: parsing data ----', JSONString);
-    document.fire('pedigree:load:start');
+    document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
     try {
       var changeSet = editor.getGraph().fromJSON(JSONString);
     } catch(err) {
       console.log('ERROR loading the graph: ', err);
       alert('Error loading the graph');
-      document.fire('pedigree:graph:clear');
-      document.fire('pedigree:load:finish');
+      document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
+      document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
       return;
     }
 
@@ -153,12 +149,12 @@ export default class SaveLoadEngine {
       editor.getActionStack().addState(null, null, JSONString);
     }
 
-    document.fire('pedigree:load:finish');
+    document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
   }
 
   createGraphFromImportData(importString: any, importType: any, importOptions: any, noUndo?: any, centerAround0?: any): any {
     console.log('---- import: parsing data ----');
-    document.fire('pedigree:load:start');
+    document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
     try {
       var changeSet = editor.getGraph().fromImport(importString, importType, importOptions);
@@ -169,7 +165,7 @@ export default class SaveLoadEngine {
       console.log('Error importing pedigree:');
       console.log(err);
       alert('Error importing pedigree: ' + err);
-      document.fire('pedigree:load:finish');
+      document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
       return false;
     }
 
@@ -190,7 +186,7 @@ export default class SaveLoadEngine {
       editor.getActionStack().addState(null, null, JSONString);
     }
 
-    document.fire('pedigree:load:finish');
+    document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
     return true;
   }
 

@@ -571,7 +571,7 @@ export default class Person extends AbstractPerson {
   removeDisorder(disorderID: any): void {
     if (this.hasDisorder(disorderID)) {
       editor.getDisorderLegend().removeCase(disorderID, this.getID());
-      this._disorders = this.getDisorders().without(disorderID);
+      this._disorders = this.getDisorders().filter((d: any) => d !== disorderID);
       this.getGraphics().updateDisorderShapes();
     } else {
       if (disorderID !== 'affected') {
