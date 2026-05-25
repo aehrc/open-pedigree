@@ -7,6 +7,7 @@ export default defineConfig({
     include: ['tests/unit/**/*.test.js'],
   },
   resolve: {
+    extensions: ['.ts', '.js'],
     alias: {
       'pedigree': path.resolve(__dirname, 'src/script/'),
       'vendor': path.resolve(__dirname, 'public/vendor/'),

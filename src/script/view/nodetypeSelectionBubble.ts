@@ -1,0 +1,443 @@
+/**
+ * The UI element ("bubble") that contains options for the creation of a new node.
+ *
+ * @class NodetypeSelectionBubble
+ * @constructor
+ */
+
+export default class NodetypeSelectionBubble {
+  _siblingMode: any;
+  element: any;
+  expandedOptionsContainer: any;
+  numPersonsInGroup: any;
+  numTwinNodes: any;
+  _node: any;
+
+  //The skeleton for the bubble contents
+  buttonsDefs: any[] = [
+    {
+      key: 'M',
+      type: 'person',
+      label: 'Male',
+      tip  : 'Create a person of male gender',
+      symbol: '▢',
+      cssclass: '',
+      callback : 'CreateChild',
+      params: { parameters: {'gender': 'M'} },
+      inSiblingMode: true
+    }, {
+      key: 'F',
+      type: 'person',
+      label: 'Female',
+      tip  : 'Create a person of female gender',
+      symbol: '◯',
+      cssclass: '',
+      callback : 'CreateChild',
+      params: { parameters: {'gender': 'F'} },
+      inSiblingMode: true
+    }, {
+      key: 'U',
+      type: 'person',
+      label: 'Unknown',
+      tip  : 'Create a person of unknown gender',
+      symbol: '◇',
+      cssclass: '',
+      callback : 'CreateChild',
+      params: { parameters: {'gender': 'U'} },
+      inSiblingMode: true
+    }, {
+      key: 'T',
+      type: 'person',
+      label: 'Twins',
+      tip  : 'Create twins (expandable to triplets or more)',
+      symbol: '⋀',
+      cssclass: '',
+      callback : 'CreateChild',
+      params: { 'twins': true, 'parameters': {'gender': 'U'} },
+      expandsTo: 'expandTwins',
+      inSiblingMode: true
+    },
+    {
+      key: 'm',
+      type: 'person',
+      label: 'Multiple',
+      tip  : 'Create a node representing multiple siblings',
+      symbol: '〈n〉',
+      cssclass: '',
+      callback : 'CreateChild',
+      params: { 'group': true },
+      expandsTo: 'expandPersonGroup',
+      inSiblingMode: true
+    }, {
+      type: 'separator'
+    }, {
+      key: 'n',
+      type: 'marker',
+      label: 'No children',
+      tip  : 'Mark as childless by choice',
+      symbol: '┴',
+      cssclass: '',
+      callback : 'setProperty',
+      params: { setChildlessStatus: 'childless' },
+      inSiblingMode: false
+    }, {
+      key: 'i',
+      type: 'marker',
+      label: 'Infertile',
+      tip  : 'Mark as infertile',
+      symbol: '╧',
+      cssclass: '',
+      callback : 'setProperty',
+      params: { setChildlessStatus: 'infertile' },
+      inSiblingMode: false
+    }
+  ];
+
+  constructor(siblingMode: any) {
+    this._siblingMode = siblingMode;
+
+    this.element = new (Element as any)('div', {'class' : 'callout'});
+    this.element.insert(new (Element as any)('span', {'class' : 'callout-handle'}));
+
+    var container = new (Element as any)('div', {'class' : 'node-type-options'});
+    this.expandedOptionsContainer = new (Element as any)('div', {'class' : 'node-type-options-extended'});
+    this.element.insert(container);
+    this.element.insert(this.expandedOptionsContainer);
+
+    var _this = this;
+    this.buttonsDefs.each(function(def: any) {
+      if (!siblingMode || (def.hasOwnProperty('inSiblingMode') && def.inSiblingMode)) {
+        container.insert(def.type == 'separator' ? _this._generateSeparator() : _this._createOption(def));
+      }
+    });
+    this.element.hide();
+    editor.getWorkspace().getWorkArea().insert(this.element);
+
+    (this as any)._onClickOutside = this._onClickOutside.bindAsEventListener(this);
+
+    this.resetParameters();
+  }
+
+  resetParameters(): any {
+    this.numPersonsInGroup = 1;
+    this.numTwinNodes      = 2;
+  }
+
+  /**
+     * Creates a button in the bubble corresponding do the definition from the skeleton
+     *
+     * @method _createOption
+     * @param data The definition object from the bubble skeleton
+     * @return {HTMLElement} The span containing the button
+     * @private
+     */
+  _createOption(data: any): any {
+    if(!data) {
+      return null;
+    }
+    var expandablePrefix = (typeof (this as any)[data.expandsTo] == 'function') ? 'expandable-' : '';
+    var o = new (Element as any)('a', {
+      'class' : data.cssclass + ' ' + expandablePrefix + 'node-type-option ' + (data.type || '') + '-type-option node-type-' + data.key,
+      'title' : data.tip,
+      'href' : '#'
+    }).update(data.symbol); // TODO: eliminate symbol, do ".update(data.label)", add style (icons);
+    var _this = this;
+    o.observe('click', function(event: any) {
+      event.stop();
+      if (!_this._node) {
+        return;
+      }
+      console.log('observe nodetype click: ' + data.callback);
+      if (data.callback == 'setProperty') {
+        var fireEvent: any = { 'nodeID': _this._node.getID(), 'properties': data.params };
+        document.fire('pedigree:node:setproperty', fireEvent);
+      } else if (data.callback == 'CreateChild') {
+        _this.handleCreateAction(data);
+      }
+      _this.hide();
+    });
+    var container = new (Element as any)('span');
+    container.insert(o);
+    expandablePrefix && container.insert(this.generateExpandArrow(data));
+    return container;
+  }
+
+  handleCreateAction(data: any): any {
+    var id       = this._node.getID();
+    var nodeType = this._node.getType();
+    if (nodeType == 'Person') {
+      var event: any = { 'personID': id, 'childParams': data.params.parameters, 'preferLeft': false };
+      if (data.params.twins) {
+        event['twins'] = this.numTwinNodes;
+      }
+      if (data.params.group) {
+        event['groupSize'] = this.numPersonsInGroup;
+      }
+
+      if (this._siblingMode) {
+        document.fire('pedigree:person:newsibling', event);
+      } else {
+        document.fire('pedigree:person:newpartnerandchild', event);
+      }
+    } else if (nodeType == 'Partnership') {
+      var event: any = { 'partnershipID': id, 'childParams': data.params.parameters };
+      if (data.params.twins) {
+        event['twins'] = this.numTwinNodes;
+      }
+      if (data.params.group) {
+        event['groupSize'] = this.numPersonsInGroup;
+      }
+      document.fire('pedigree:partnership:newchild', event);
+    }
+    this.hide();
+  }
+
+  /**
+     * Creates an arrow button that expands or shrinks the bubble
+     *
+     * @method generateExpandArrow
+     * @param data The definition object from the bubble skeleton
+     * @return {HTMLElement} The span containing the button
+     */
+  generateExpandArrow(data: any): any {
+    var expandArrow = new (Element as any)('span', {
+      'class' : 'expand-arrow collapsed',
+      'title' : 'show more options',
+      'href' : '#'
+    }).update('▾');
+
+    (expandArrow as any).expand = function(this: any) {
+      $$('.expand-arrow').forEach(function(arrow: any) {
+        arrow.collapse();
+      });
+      (this as any)[data.expandsTo](data);
+      expandArrow.update('▴');
+      expandArrow.removeClassName('collapsed');
+    }.bind(this);
+
+    (expandArrow as any).collapse = function(this: any) {
+      this.expandedOptionsContainer.update('');
+      expandArrow.update('▾');
+      expandArrow.addClassName('collapsed');
+    }.bind(this);
+
+    expandArrow.observe('click', function() {
+      console.log('observe2');
+      if(expandArrow.hasClassName('collapsed')) {
+        (expandArrow as any).expand();
+      } else {
+        (expandArrow as any).collapse();
+      }
+    });
+    return expandArrow;
+  }
+
+  /**
+     * Creates a line to separate buttons in the bubble
+     *
+     * @method _generateSeparator
+     * @return {HTMLElement}
+     * @private
+     */
+  _generateSeparator(): any {
+    return new (Element as any)('span', {'class' : 'separator'}).update(' | ');
+  }
+
+  /**
+     * Repositions the bubble to the given coordinates coordinates
+     *
+     * @method _positionAt
+     * @param {Number} x The x coordinate in the viewport
+     * @param {Number} y The y coordinate in the viewport
+     * @private
+     */
+  _positionAt(x: any, y: any): any {
+    y = Math.round(y);
+    if (y + this.element.getHeight() > editor.getWorkspace().getWorkArea().getHeight()) {
+      this.element.addClassName('upside');
+      y = Math.round(y - this.element.getHeight());
+    }
+    this.element.style.top = y + 'px';
+    var dx = Math.round(this.element.getWidth()/2);
+    if (x - dx + this.element.getWidth() > editor.getWorkspace().getWorkArea().getWidth()) {
+      dx = Math.round(this.element.getWidth() - (editor.getWorkspace().getWorkArea().getWidth() - x));
+    } else if (dx > x) {
+      dx = Math.round(x);
+    }
+    this.element.down('.callout-handle').style.left = dx + 'px';
+    this.element.style.left = Math.round(x - dx) + 'px';
+  }
+
+  /**
+     * Displays the bubble for the specified node
+     *
+     * @method show
+     * @param {AbstractNode} node The node for which the bubble is displayed
+     * @param {Number} x The x coordinate in the viewport
+     * @param {Number} y The y coordinate in the viewport
+     */
+  show(node: any, x: any, y: any): any {
+    this._node = node;
+    if (!this._node) {
+      return;
+    }
+    //console.log("show1");
+    this._node.onWidgetShow();
+    // TODO decide which options to display, depending on the source node's status
+    this.element.show();
+    this.expandedOptionsContainer.update('');
+    this._positionAt(x, y);
+    document.observe('mousedown', this._onClickOutside);
+  }
+
+  /**
+     * Hides the bubble from the viewport
+     *
+     * @method hide
+     */
+  hide(): any {
+    //console.log("hide1");
+    document.stopObserving('mousedown', this._onClickOutside);
+    $$('.expand-arrow').forEach(function(arrow: any) {
+      arrow.collapse();
+    });
+    if (this._node) {
+      this._node.onWidgetHide();
+      delete this._node;
+      // reset the state
+      this.element.select('.node-type-option').invoke('show');
+      this.element.removeClassName('upside');
+    }
+    this.element.hide();
+    this.resetParameters();  // reset number of twins/number of persons
+  }
+
+  /**
+     * Hides the bubble if the user clicks outside
+     *
+     * @method _onClickOutside
+     * @param {Event} event
+     * @private
+     */
+  _onClickOutside(event: any): any {
+    //console.log("observe clickoutside nodetype");
+    if (!event.findElement('.callout')) {
+      this.hide();
+    }
+  }
+
+  /**
+     * Decrement the number of nodes to be created
+     *
+     * @method _decrementNumNodes
+     * @return {Number} The resulting number of nodes to be created
+     * @private
+     */
+  _decrementNumNodes(): any {
+    return this.numPersonsInGroup > 1 ? --this.numPersonsInGroup : this.numPersonsInGroup;
+  }
+
+  /**
+     * Increment the number of nodes to be created
+     *
+     * @method _incrementNumNodes
+     * @return {Number} The resulting number of nodes to be created
+     * @private
+     */
+  _incrementNumNodes(): any {
+    return this.numPersonsInGroup < 9 ? ++this.numPersonsInGroup : this.numPersonsInGroup;
+  }
+
+  /**
+     * Decrement the number of twins to be created
+     *
+     * @method _decrementNumTwins
+     * @return {Number} The resulting number of twins to be created
+     * @private
+     */
+  _decrementNumTwins(): any {
+    return this.numTwinNodes > 2 ? --this.numTwinNodes : this.numTwinNodes;
+  }
+
+  /**
+     * Increment the number of twins to be created
+     *
+     * @method _incrementNumTwins
+     * @return {Number} The resulting number of twins to be created
+     * @private
+     */
+  _incrementNumTwins(): any {
+    return this.numTwinNodes < 9 ? ++this.numTwinNodes : this.numTwinNodes;
+  }
+
+  /**
+     * Expand the bubble and show additional options for creation of PersonGroup nodes
+     *
+     * @method expandPersonGroup
+     */
+  expandPersonGroup(personGroupMenuInfo: any): any {
+    var me = this;
+    var generateIcon = function(){
+      var iconText = (me.numPersonsInGroup > 1) ? String(me.numPersonsInGroup) : 'n';
+      return '<svg version="1.1" viewBox="0.0 0.0 100.0 100.0" width=50 height=50 fill="none" stroke="none" stroke-linecap="square" stroke-miterlimit="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><clipPath id="p.0"><path d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z" clip-rule="nonzero"></path></clipPath><g clip-path="url(#p.0)"><path fill="#000000" fill-opacity="0.0" d="m0 0l960.0 0l0 720.0l-960.0 0z" fill-rule="nonzero"></path><path fill="#cfe2f3" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path stroke="#000000" stroke-width="2.0" stroke-linejoin="round" stroke-linecap="butt" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path fill="#000000" fill-opacity="0.0" d="m20.661417 22.068241l58.204727 0l0 48.000004l-58.204727 0z" fill-rule="nonzero"></path></g><desc>Number of children</desc><text x="35" y="60" font-family="Verdana" font-size="40" fill="black">'
+                    + iconText + '</text></svg>';
+
+    };
+    var createBtn = new (Element as any)('input', {'type': 'button', 'value': 'create', 'class': 'button'});
+    var svgContainer = new (Element as any)('span').update(generateIcon());
+    var minusBtn = new (Element as any)('span', {
+      'class': 'minus-button value-control-button'
+    }).update('-');
+    var plusBtn = new (Element as any)('span', {
+      'class': 'plus-button value-control-button'
+    }).update('+');
+    minusBtn.observe('click', function() {
+      me._decrementNumNodes(); svgContainer.update(generateIcon());
+    });
+    plusBtn.observe ('click', function() {
+      me._incrementNumNodes(); svgContainer.update(generateIcon());
+    });
+    createBtn.observe('click', function() {
+      //console.log("observeCreate1");
+      me.handleCreateAction(personGroupMenuInfo);
+    });
+    this.expandedOptionsContainer.insert(minusBtn);
+    this.expandedOptionsContainer.insert(svgContainer);
+    this.expandedOptionsContainer.insert(plusBtn);
+    this.expandedOptionsContainer.insert(createBtn);
+  }
+
+  /**
+     * Expand the bubble and show additional options for creation of twin nodes
+     *
+     * @method expandTwins
+     */
+  expandTwins(twinMenuInfo: any): any {
+    var me = this;
+    var generateIcon = function(){
+      return '<svg version="1.1" viewBox="0.0 0.0 100.0 100.0" width=50 height=50 fill="none" stroke="none" stroke-linecap="square" stroke-miterlimit="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><clipPath id="p.0"><path d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z" clip-rule="nonzero"></path></clipPath><g clip-path="url(#p.0)"><path fill="#000000" fill-opacity="0.0" d="m0 0l960.0 0l0 720.0l-960.0 0z" fill-rule="nonzero"></path><path fill="#cfe2f3" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path stroke="#000000" stroke-width="2.0" stroke-linejoin="round" stroke-linecap="butt" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path fill="#000000" fill-opacity="0.0" d="m20.661417 22.068241l58.204727 0l0 48.000004l-58.204727 0z" fill-rule="nonzero"></path></g><desc>Number of children</desc><text x="35" y="60" font-family="Verdana" font-size="40" fill="black">'
+                + me.numTwinNodes + '</text></svg>';
+    };
+    var createBtn = new (Element as any)('input', {'type': 'button', 'value': 'create', 'class': 'button'});
+    var svgContainer = new (Element as any)('span').update(generateIcon());
+    var minusBtn = new (Element as any)('span', {
+      'class': 'minus-button value-control-button'
+    }).update('-');
+    var plusBtn = new (Element as any)('span', {
+      'class': 'plus-button value-control-button'
+    }).update('+');
+    minusBtn.observe('click', function() {
+      me._decrementNumTwins(); svgContainer.update(generateIcon());
+    });
+    plusBtn.observe('click',  function() {
+      me._incrementNumTwins(); svgContainer.update(generateIcon());
+    });
+    createBtn.observe('click', function() {
+      me.handleCreateAction(twinMenuInfo);
+    });
+    this.expandedOptionsContainer.insert(minusBtn);
+    this.expandedOptionsContainer.insert(svgContainer);
+    this.expandedOptionsContainer.insert(plusBtn);
+    this.expandedOptionsContainer.insert(createBtn);
+  }
+}

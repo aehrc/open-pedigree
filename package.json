@@ -9,7 +9,8 @@
     "start-docker": "webpack-dev-server --mode=production --host=0.0.0.0",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
@@ -45,6 +46,8 @@
     "stream-browserify": "^3.0.0",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "^5.6.0",
+    "ts-loader": "^9.5.7",
+    "typescript": "^6.0.3",
     "util": "^0.12.5",
     "vitest": "^4.1.7",
     "webpack": "^5.107.1",

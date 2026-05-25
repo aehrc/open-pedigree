@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "pedigree/*": ["src/script/*"],
+      "vendor/*": ["public/vendor/*"]
+    }
+  },
+  "include": ["src/**/*", "src/types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
