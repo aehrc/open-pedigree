@@ -8,7 +8,8 @@
     "start": "webpack-dev-server --mode=development",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
@@ -27,11 +28,11 @@
   "homepage": "https://github.com/phenotips/open-pedigree#readme",
   "devDependencies": {
     "@babel/core": "^7.29.0",
-    "@playwright/test": "^1.60.0",
-    "@vitest/coverage-v8": "^4.1.7",
     "@babel/preset-env": "^7.29.5",
     "@eslint/js": "^9.39.4",
     "@fortawesome/fontawesome-free": "^6.7.2",
+    "@playwright/test": "^1.60.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "babel-loader": "^9.2.1",
     "buffer": "^6.0.3",
     "css-loader": "^7.1.4",
@@ -45,6 +46,8 @@
     "stream-browserify": "^3.0.0",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "^5.6.0",
+    "ts-loader": "^9.5.7",
+    "typescript": "^5.9.3",
     "util": "^0.12.5",
     "vitest": "^4.1.7",
     "webpack": "^5.107.1",

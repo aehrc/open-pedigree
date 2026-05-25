@@ -8,6 +8,7 @@ export default defineConfig({
     setupFiles: ['tests/unit/setup.js'],
   },
   resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
     alias: {
       'pedigree': path.resolve(__dirname, 'src/script/'),
       'vendor': path.resolve(__dirname, 'public/vendor/'),
