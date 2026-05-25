@@ -83,7 +83,7 @@ export default class View {
      */
     getNode(nodeId: any): any {
         if (!this._nodeMap.hasOwnProperty(nodeId)) {
-            throw 'ERROR';
+            return null;
         }
         return this._nodeMap[nodeId];
     }
@@ -426,7 +426,7 @@ export default class View {
         var me = this;
         var validTargets = this.getValidDragTargets(sourceNode.getID(), hoverType);
 
-        validTargets.each(function(nodeID: any) {
+        validTargets.forEach(function(nodeID: any) {
             me._currentGrownNodes.push(nodeID);
 
             var node = me.getNode(nodeID);
@@ -458,7 +458,7 @@ export default class View {
         this.hoverModeZones.remove();
 
         var me = this;
-        this._currentGrownNodes.each(function(nodeID: any) {
+        this._currentGrownNodes.forEach(function(nodeID: any) {
             var node = me.getNode(nodeID);
             node.getGraphics().shrink();
             node.getGraphics().getHoverBox().setHighlighted(false);

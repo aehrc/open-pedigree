@@ -42,30 +42,25 @@ export default class Disorder {
     load(callWhenReady: any): any {
         var baseOMIMServiceURL = Disorder.getOMIMServiceURL();
         var queryURL           = baseOMIMServiceURL + '&q=id:' + this._disorderID;
-        //console.log("queryURL: " + queryURL);
-        new Ajax.Request(queryURL, {
-            method: 'GET',
-            onSuccess: this.onDataReady.bind(this),
-            onFailure: this.onDataFail.bind(this),
-            //onComplete: complete.bind(this)
-            onComplete: callWhenReady
-        });
+        fetch(queryURL, { method: 'GET' })
+            .then(response => response.text())
+            .then(text => this.onDataReady(text))
+            .catch(err => {
+                console.log("Failed to load DISORDER TERM: id = '" + Disorder.desanitizeID(this._disorderID) + "' setting name to ID");
+                this._name = Disorder.desanitizeID(this._disorderID);
+            })
+            .finally(() => { if (typeof callWhenReady === 'function') callWhenReady(); });
     }
 
-    onDataReady(response: any): any {
+    onDataReady(responseText: any): any {
         try {
-            var parsed = JSON.parse(response.responseText);
+            var parsed = JSON.parse(responseText);
             //console.log(JSON.stringify(parsed));
             console.log('LOADED DISORDER: disorder id = ' + this._disorderID + ', name = ' + parsed.rows[0].name);
             this._name = parsed.rows[0].name;
         } catch (err) {
             console.log('[LOAD DISORDER] Error: ' +  err);
         }
-    }
-
-    onDataFail(error: any): any {
-        console.log("Failed to load DISORDER TERM: id = '" + Disorder.desanitizeID(this._disorderID) + "' setting name to ID");
-        this._name = Disorder.desanitizeID(this._disorderID);
     }
 
     /*
@@ -88,6 +83,6 @@ export default class Disorder {
     }
 
     static getOMIMServiceURL(): any {
-        return new XWiki.Document('OmimService', 'PhenoTips').getURL('get', 'outputSyntax=plain');
+        return (window as any).editor ? (window as any).editor.getOmimServiceUrl() : '';
     }
 }

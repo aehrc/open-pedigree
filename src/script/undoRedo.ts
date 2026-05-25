@@ -30,7 +30,7 @@ export default class ActionStack {
         if (nextState.eventToGetToThisState) {
             var memo = nextState.eventToGetToThisState.memo;
             memo['noUndoRedo'] = true;  // so that this event is not added to the undo/redo stack again
-            document.fire( nextState.eventToGetToThisState.eventName, memo );
+            document.dispatchEvent(new CustomEvent( nextState.eventToGetToThisState.eventName, { detail: memo } ));
             this._currentState++;
             return;
         }
@@ -56,7 +56,7 @@ export default class ActionStack {
         if (currentState.eventToUndo) {
             var memo = currentState.eventToUndo.memo;
             memo['noUndoRedo'] = true; // so that this event is not added to the undo/redo stack again
-            document.fire( currentState.eventToUndo.eventName, memo );
+            document.dispatchEvent(new CustomEvent( currentState.eventToUndo.eventName, { detail: memo } ));
             this._currentState--;
             return;
         }

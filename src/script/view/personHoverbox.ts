@@ -216,24 +216,24 @@ export default class PersonHoverbox extends AbstractHoverbox {
                 this.removeHandles();
                 this.removeButtons();
                 var event: any = { 'personID': this.getNode().getID(), 'parentID': curHoveredId };
-                document.fire('pedigree:person:drag:newparent', event);
+                document.dispatchEvent(new CustomEvent('pedigree:person:drag:newparent', { detail: event }));
             } else if(handleType == 'partnerR' || handleType == 'partnerL') {
                 this.removeHandles();
                 var event2: any = { 'personID': this.getNode().getID(), 'partnerID': curHoveredId };
-                document.fire('pedigree:person:drag:newpartner', event2);
+                document.dispatchEvent(new CustomEvent('pedigree:person:drag:newpartner', { detail: event2 }));
             } else if(handleType == 'child') {
                 var event3: any = { 'personID': curHoveredId, 'parentID': this.getNode().getID() };
-                document.fire('pedigree:person:drag:newparent', event3);
+                document.dispatchEvent(new CustomEvent('pedigree:person:drag:newparent', { detail: event3 }));
             } else if(handleType == 'sibling') {
                 var event4: any = { 'sibling2ID': curHoveredId, 'sibling1ID': this.getNode().getID() };
-                document.fire('pedigree:person:drag:newsibling', event4);
+                document.dispatchEvent(new CustomEvent('pedigree:person:drag:newsibling', { detail: event4 }));
             }
         } else if (!isDrag) {
             if(handleType == 'partnerR' || handleType == 'partnerL') {
                 this.removeHandles();
                 var preferLeft = (this.getNode().getGender() == 'F') || (handleType == 'partnerL');
                 var event5: any = { 'personID': this.getNode().getID(), 'preferLeft': preferLeft };
-                document.fire('pedigree:person:newpartnerandchild', event5);
+                document.dispatchEvent(new CustomEvent('pedigree:person:newpartnerandchild', { detail: event5 }));
             } else if(handleType == 'child') {
                 var position = editor.getWorkspace().canvasToDiv(this.getNodeX(), (this.getNodeY() + PedigreeEditorParameters.attributes.personHandleLength + 15));
                 editor.getNodetypeSelectionBubble().show(this.getNode(), position.x, position.y);
@@ -246,7 +246,7 @@ export default class PersonHoverbox extends AbstractHoverbox {
                 this.removeHandles();
                 this.removeButtons();
                 var event6: any = { 'personID': this.getNode().getID() };
-                document.fire('pedigree:person:newparent', event6);
+                document.dispatchEvent(new CustomEvent('pedigree:person:newparent', { detail: event6 }));
             }
         }
         this.animateHideHoverZone();

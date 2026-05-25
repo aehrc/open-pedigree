@@ -28,13 +28,16 @@ export default class Workspace {
 
     constructor() {
         var me = this;
-        this.canvas = new (Element as any)('div', {'id' : 'canvas'});
-        this.workArea = new (Element as any)('div', {'id' : 'work-area'}).update(this.canvas);
-        $('body').update(this.workArea);
-        var screenDimensions = document.viewport.getDimensions();
+        this.canvas = document.createElement('div');
+        this.canvas.id = 'canvas';
+        this.workArea = document.createElement('div');
+        this.workArea.id = 'work-area';
+        this.workArea.appendChild(this.canvas);
+        document.body.appendChild(this.workArea);
+        var screenDimensions = { width: window.innerWidth, height: window.innerHeight };
         this.generateTopMenu();
         this.width = screenDimensions.width;
-        this.height = screenDimensions.height - this.canvas.cumulativeOffset().top - 4;
+        this.height = screenDimensions.height - this.canvas.getBoundingClientRect().top - 4;
         this._paper = Raphael('canvas',this.width, this.height);
         this.viewBoxX = 0;
         this.viewBoxY = 0;
@@ -43,12 +46,13 @@ export default class Workspace {
         this.background = this.getPaper().rect(0,0, this.width, this.height).attr({fill: 'blue', stroke: 'none', opacity: 0}).toBack();
         this.background.node.setAttribute('class', 'panning-background');
 
-        this.workArea.insert(new (Element as any)('div', {'id': 'attribution'})
-            .insert('&copy; 2019 ')
-            .insert(new (Element as any)('a', {'href': 'https://gene42.com'}).update('Gene42 Inc.')));
+        var attribution = document.createElement('div');
+        attribution.id = 'attribution';
+        attribution.innerHTML = '&copy; 2019 <a href="https://gene42.com">Gene42 Inc.</a>';
+        this.workArea.appendChild(attribution);
 
         this.adjustSizeToScreen = this._adjustSizeToScreen.bind(this);
-        (Event as any).observe(window, 'resize', me.adjustSizeToScreen);
+        window.addEventListener('resize', me.adjustSizeToScreen);
         this.generateViewControls();
 
         //Initialize pan by dragging
@@ -99,9 +103,9 @@ export default class Workspace {
                 } // Mozilla
 
                 if (delta > 0) {
-                    $$('.zoom-out')[0].click();
+                    me.__zoom['out'].click();
                 } else {
-                    $$('.zoom-in')[0].click();
+                    me.__zoom['in'].click();
                 }
             };
 
@@ -159,12 +163,16 @@ export default class Workspace {
      * @method generateTopMenu
      */
     generateTopMenu(): any {
-        var menu = new (Element as any)('div', {'id' : 'editor-menu'});
+        var menu = document.createElement('div');
+        menu.id = 'editor-menu';
 
-        menu.insert(new (Element as any)('a', {'class': 'title', 'href': 'https://github.com/phenotips/open-pedigree'})
-            .update('Open Pedigree'));
+        var titleLink = document.createElement('a');
+        titleLink.className = 'title';
+        titleLink.href = 'https://github.com/phenotips/open-pedigree';
+        titleLink.textContent = 'Open Pedigree';
+        menu.appendChild(titleLink);
 
-        this.getWorkArea().insert({before : menu});
+        this.getWorkArea().insertAdjacentElement('beforebegin', menu);
         var submenus = [] as any[];
 
         if (editor.isUnsupportedBrowser()) {
@@ -207,29 +215,43 @@ export default class Workspace {
                 ]
             }];
         }
-        var _createSubmenu = function(data: any) {
-            var submenu = new (Element as any)('div', {'class' : data.name + '-actions action-group'});
-            menu.insert(submenu);
-            data.items.each(function (item: any) {
-                submenu.insert(_createMenuItem(item));
-            });
-        };
         var _createMenuItem = function(data: any) {
-            var mi = new (Element as any)('span', {'id' : 'action-' + data.key, 'class' : 'menu-item ' + data.key}).insert(new (Element as any)('span', {'class' : 'fas fa-' + data.icon})).insert(' ').insert(data.label);
+            var mi = document.createElement('span');
+            mi.id = 'action-' + data.key;
+            mi.className = 'menu-item ' + data.key;
+            var icon = document.createElement('span');
+            icon.className = 'fas fa-' + data.icon;
+            mi.appendChild(icon);
+            mi.appendChild(document.createTextNode(' '));
+            mi.appendChild(document.createTextNode(data.label));
             if (data.callback && typeof((this as any)[data.callback]) == 'function') {
-                mi.observe('click', function() {
+                mi.addEventListener('click', function() {
                     (this as any)[data.callback]();
                 });
             }
             return mi;
         };
-        submenus.each(_createSubmenu);
+        var _createSubmenu = function(data: any) {
+            var submenu = document.createElement('div');
+            submenu.className = data.name + '-actions action-group';
+            menu.appendChild(submenu);
+            data.items.forEach(function (item: any) {
+                submenu.appendChild(_createMenuItem(item));
+            });
+        };
+        submenus.forEach(_createSubmenu);
 
-        menu.insert(new (Element as any)('div', {'class': 'powered-by'})
-            .insert('Powered by ')
-            .insert(new (Element as any)('a', {'href': 'https://phenotips.org/'})
-                .update('PhenoTips')
-                .insert(new (Element as any)('sup').update('&reg;'))));
+        var poweredBy = document.createElement('div');
+        poweredBy.className = 'powered-by';
+        poweredBy.appendChild(document.createTextNode('Powered by '));
+        var phenotipsLink = document.createElement('a');
+        phenotipsLink.href = 'https://phenotips.org/';
+        phenotipsLink.textContent = 'PhenoTips';
+        var sup = document.createElement('sup');
+        sup.innerHTML = '&reg;';
+        phenotipsLink.appendChild(sup);
+        poweredBy.appendChild(phenotipsLink);
+        menu.appendChild(poweredBy);
     }
 
     /**
@@ -262,15 +284,20 @@ export default class Workspace {
      */
     generateViewControls(): any {
         var _this = this;
-        this.__controls = new (Element as any)('div', {'class' : 'view-controls'});
+        this.__controls = document.createElement('div');
+        this.__controls.className = 'view-controls';
         // Pan controls
-        this.__pan = new (Element as any)('div', {'class' : 'view-controls-pan', title : 'Pan'});
-        this.__controls.insert(this.__pan);
-        ['up', 'right', 'down', 'left', 'home'].each(function (direction: any) {
+        this.__pan = document.createElement('div');
+        this.__pan.className = 'view-controls-pan';
+        this.__pan.title = 'Pan';
+        this.__controls.appendChild(this.__pan);
+        ['up', 'right', 'down', 'left', 'home'].forEach(function (direction: any) {
             var faIconClass = (direction == 'home') ? 'fa-user' : 'fa-arrow-' + direction;
-            _this.__pan[direction] = new (Element as any)('span', {'class' : 'view-control-pan pan-' + direction + ' fas fa-fw ' + faIconClass, 'title' : 'Pan ' + direction});
-            _this.__pan.insert(_this.__pan[direction]);
-            _this.__pan[direction].observe('click', function(event: any) {
+            _this.__pan[direction] = document.createElement('span');
+            _this.__pan[direction].className = 'view-control-pan pan-' + direction + ' fas fa-fw ' + faIconClass;
+            _this.__pan[direction].title = 'Pan ' + direction;
+            _this.__pan.appendChild(_this.__pan[direction]);
+            _this.__pan[direction].addEventListener('click', function(event: any) {
                 if (direction == 'home') {
                     _this.centerAroundNode(0);
                 } else if(direction == 'up') {
@@ -286,57 +313,56 @@ export default class Workspace {
         });
         // Zoom controls
         var trackLength = 200;
-        this.__zoom = new (Element as any)('div', {'class' : 'view-controls-zoom', title : 'Zoom'});
-        this.__controls.insert(this.__zoom);
-        this.__zoom.track  = new (Element as any)('div', {'class' : 'zoom-track'});
-        this.__zoom.handle = new (Element as any)('div', {'class' : 'zoom-handle', title : 'Drag to zoom'});
-        this.__zoom['in']  = new (Element as any)('div', {'class' : 'zoom-button zoom-in fas fa-fw fa-search-plus', title : 'Zoom in'});
-        this.__zoom['out'] = new (Element as any)('div', {'class' : 'zoom-button zoom-out fas fa-fw fa-search-minus', title : 'Zoom out'});
-        this.__zoom.label  = new (Element as any)('div', {'class' : 'zoom-crt-value'});
-        this.__zoom.insert(this.__zoom['in']);
-        this.__zoom.insert(this.__zoom.track);
-        this.__zoom.track.insert(this.__zoom.handle);
-        this.__zoom.track.style.height = trackLength + 'px';
-        this.__zoom.insert(this.__zoom.out);
-        this.__zoom.insert(this.__zoom.label);
-        // Scriptaculous slider
-        // see also http://madrobby.github.com/scriptaculous/slider/
-        //
-        // Here a non-linear scale is used: slider positions form [0 to 0.9] correspond to
-        // zoom coefficients from 1.25x to 0.25x, and zoom positions from (0.9 to 1]
-        // correspond to single deepest zoom level 0.15x
-        this.zoomSlider = new (Control as any).Slider(this.__zoom.handle, this.__zoom.track, {
-            axis:'vertical',
-            minimum: 0,
-            maximum: trackLength,
-            increment : 1,
-            alignY: 6,
-            onSlide : function (value: any) {
-                // Called whenever the Slider is moved by dragging.
-                // The called function gets the slider value (or array if slider has multiple handles) as its parameter.
-                if (value <= 0.9) {
-                    _this.zoom(-value/0.9 + 1.25);
-                } else {
-                    _this.zoom(0.15);
-                }
-            },
-            onChange : function (value: any) {
-                // Called whenever the Slider has finished moving or has had its value changed via the setSlider Value function.
-                // The called function gets the slider value (or array if slider has multiple handles) as its parameter.
-                if (value <= 0.9) {
-                    _this.zoom(-value/0.9 + 1.25);
-                } else {
-                    _this.zoom(0.15);
-                }
+        this.__zoom = document.createElement('div');
+        this.__zoom.className = 'view-controls-zoom';
+        this.__zoom.title = 'Zoom';
+        this.__controls.appendChild(this.__zoom);
+        this.__zoom['in']  = document.createElement('div');
+        this.__zoom['in'].className = 'zoom-button zoom-in fas fa-fw fa-search-plus';
+        this.__zoom['in'].title = 'Zoom in';
+        this.__zoom['out'] = document.createElement('div');
+        this.__zoom['out'].className = 'zoom-button zoom-out fas fa-fw fa-search-minus';
+        this.__zoom['out'].title = 'Zoom out';
+        this.__zoom.label  = document.createElement('div');
+        this.__zoom.label.className = 'zoom-crt-value';
+        // Native range input replaces Scriptaculous Control.Slider.
+        // Non-linear scale: slider positions [0, 0.9] → zoom coefficients [1.25x, 0.25x];
+        // slider positions (0.9, 1] → deepest zoom level 0.15x. Range uses 0-1000 integers (÷1000).
+        var rangeInput = document.createElement('input');
+        rangeInput.type = 'range';
+        rangeInput.className = 'zoom-slider';
+        rangeInput.min = '0';
+        rangeInput.max = '1000';
+        rangeInput.step = '1';
+        rangeInput.title = 'Drag to zoom';
+        var applyZoomValue = function(v: number) {
+            if (v <= 0.9) {
+                _this.zoom(-v / 0.9 + 1.25);
+            } else {
+                _this.zoom(0.15);
             }
+        };
+        rangeInput.addEventListener('input', function() {
+            applyZoomValue(parseInt(rangeInput.value) / 1000);
         });
+        // Wrapper with setValue API to keep existing zoom button call sites unchanged
+        this.zoomSlider = {
+            setValue: function(v: number) {
+                rangeInput.value = String(Math.round(Math.max(0, Math.min(1, v)) * 1000));
+                applyZoomValue(v);
+            }
+        };
+        this.__zoom.appendChild(this.__zoom['in']);
+        this.__zoom.appendChild(rangeInput);
+        this.__zoom.appendChild(this.__zoom['out']);
+        this.__zoom.appendChild(this.__zoom.label);
         if (editor.isUnsupportedBrowser()) {
             this.zoomSlider.setValue(0.25 * 0.9); // 0.25 * 0.9 corresponds to zoomCoefficient of 1, i.e. 1:1
             // - for best chance of decent looks on non-SVG browsers like IE8
         } else {
             this.zoomSlider.setValue(0.5 * 0.9);  // 0.5 * 0.9 corresponds to zoomCoefficient of 0.75x
         }
-        this.__zoom['in'].observe('click', function(event: any) {
+        this.__zoom['in'].addEventListener('click', function(event: any) {
             if (_this.zoomCoefficient < 0.25) {
                 _this.zoomSlider.setValue(0.9);
             }   // zoom in from the any value below 0.25x goes to 0.25x (which is 0.9 on the slider)
@@ -344,7 +370,7 @@ export default class Workspace {
                 _this.zoomSlider.setValue(-(_this.zoomCoefficient - 1)*0.9);
             }     // +0.25x
         });
-        this.__zoom['out'].observe('click', function(event: any) {
+        this.__zoom['out'].addEventListener('click', function(event: any) {
             if (_this.zoomCoefficient <= 0.25) {
                 _this.zoomSlider.setValue(1);
             }     // zoom out from 0.25x goes to the final slider position
@@ -353,7 +379,7 @@ export default class Workspace {
             }   // -0.25x
         });
         // Insert all controls in the document
-        this.getWorkArea().insert(this.__controls);
+        this.getWorkArea().appendChild(this.__controls);
     }
 
     /* To work around a bug in Raphael or Raphaelzpd (?) which creates differently sized lines
@@ -415,9 +441,10 @@ export default class Workspace {
      * @return {{x: number, y: number}} Object with coordinates
      */
     viewportToDiv(absX: any, absY: any): any {
+        var rect = this.canvas.getBoundingClientRect();
         return {
-            x : + absX - this.canvas.cumulativeOffset().left,
-            y : absY - this.canvas.cumulativeOffset().top
+            x : absX - rect.left,
+            y : absY - rect.top
         };
     }
 
@@ -499,15 +526,15 @@ export default class Workspace {
             this.panTo(x - xOffset/2 - xCenterShift, y - yOffset/2 - yCenterShift, instant);
         }
     }
+
     /**
      * Adjusts the canvas size to the current viewport dimensions.
      *
      * @method adjustSizeToScreen
      */
     _adjustSizeToScreen(): any {
-        var screenDimensions = document.viewport.getDimensions();
-        this.width = screenDimensions.width;
-        this.height = screenDimensions.height - this.canvas.cumulativeOffset().top - 4;
+        this.width = window.innerWidth;
+        this.height = window.innerHeight - this.canvas.getBoundingClientRect().top - 4;
         this.getPaper().setSize(this.width, this.height);
         this.getPaper().setViewBox(this.viewBoxX, this.viewBoxY, this.width/this.zoomCoefficient, this.height/this.zoomCoefficient);
         this.background && this.background.attr({'width': this.width, 'height': this.height});

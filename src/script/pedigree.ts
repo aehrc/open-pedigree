@@ -54,6 +54,9 @@ export default class PedigreeEditor {
     _saveLoadEngine: any;
     _controller: any;
 
+    _omimServiceUrl: any;
+    _hpoServiceUrl: any;
+
     constructor(options: any) {
         options = options || {};
 
@@ -63,8 +66,8 @@ export default class PedigreeEditor {
         // URL to redirect the browser to on cancel/close
         var returnUrl = options.returnUrl || 'https://github.com/phenotips/open-pedigree';
         this.DEBUG_MODE = Boolean(options.DEBUG_MODE);
-
-        (Ajax as any).Response.prototype._getHeaderJSON = Prototype.emptyFunction;
+        this._omimServiceUrl = options.omimServiceUrl || '';
+        this._hpoServiceUrl  = options.hpoServiceUrl  || '';
 
         if (!TerminologyManager.hasType(DisorderTermType)){
             // initialise default disorder terminology
@@ -113,43 +116,43 @@ export default class PedigreeEditor {
         this._controller = new Controller();
 
         //attach actions to buttons on the top bar
-        var undoButton = $('action-undo');
-        undoButton && undoButton.on('click', function(event: any) {
-            document.fire('pedigree:undo');
+        var undoButton = document.getElementById('action-undo');
+        undoButton && undoButton.addEventListener('click', function(event: any) {
+            document.dispatchEvent(new CustomEvent('pedigree:undo'));
         });
-        var redoButton = $('action-redo');
-        redoButton && redoButton.on('click', function(event: any) {
-            document.fire('pedigree:redo');
-        });
-
-        var clearButton = $('action-clear');
-        clearButton && clearButton.on('click', function(event: any) {
-            document.fire('pedigree:graph:clear');
+        var redoButton = document.getElementById('action-redo');
+        redoButton && redoButton.addEventListener('click', function(event: any) {
+            document.dispatchEvent(new CustomEvent('pedigree:redo'));
         });
 
-        var saveButton = $('action-save');
-        saveButton && saveButton.on('click', function(event: any) {
+        var clearButton = document.getElementById('action-clear');
+        clearButton && clearButton.addEventListener('click', function(event: any) {
+            document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
+        });
+
+        var saveButton = document.getElementById('action-save');
+        saveButton && saveButton.addEventListener('click', function(event: any) {
             editor.getView().unmarkAll();
             if (patientDataUrl) {
                 editor.getSaveLoadEngine().save(patientDataUrl);
             }
         });
 
-        var templatesButton = $('action-templates');
-        templatesButton && templatesButton.on('click', function(event: any) {
+        var templatesButton = document.getElementById('action-templates');
+        templatesButton && templatesButton.addEventListener('click', function(event: any) {
             editor.getTemplateSelector().show();
         });
-        var importButton = $('action-import');
-        importButton && importButton.on('click', function(event: any) {
+        var importButton = document.getElementById('action-import');
+        importButton && importButton.addEventListener('click', function(event: any) {
             editor.getImportSelector().show();
         });
-        var exportButton = $('action-export');
-        exportButton && exportButton.on('click', function(event: any) {
+        var exportButton = document.getElementById('action-export');
+        exportButton && exportButton.addEventListener('click', function(event: any) {
             editor.getExportSelector().show();
         });
 
-        var closeButton = $('action-close');
-        closeButton && closeButton.on('click', function(event: any) {
+        var closeButton = document.getElementById('action-close');
+        closeButton && closeButton.addEventListener('click', function(event: any) {
             if (returnUrl === '#CloseWindow'){
                 console.log('Attempt to close the window');
                 window.close();
@@ -159,8 +162,8 @@ export default class PedigreeEditor {
             }
         });
 
-        var unsupportedBrowserButton = $('action-readonlymessage');
-        unsupportedBrowserButton && unsupportedBrowserButton.on('click', function(event: any) {
+        var unsupportedBrowserButton = document.getElementById('action-readonlymessage');
+        unsupportedBrowserButton && unsupportedBrowserButton.addEventListener('click', function(event: any) {
             alert('Your browser does not support all the features required for ' +
                         'Pedigree Editor, so pedigree is displayed in read-only mode (and may have quirks).\n\n' +
                         'Supported browsers include Firefox v3.5+, Internet Explorer v9+, ' +
@@ -170,6 +173,14 @@ export default class PedigreeEditor {
 
     reloadPatient(): any {
         this._saveLoadEngine.load(this._patientDataUrl, this._saveLoadEngine);
+    }
+
+    getOmimServiceUrl(): any {
+        return this._omimServiceUrl;
+    }
+
+    getHpoServiceUrl(): any {
+        return this._hpoServiceUrl;
     }
 
     /**

@@ -44,20 +44,20 @@ export default class AbstractTerm {
     }
 
     load(callWhenReady: any): any {
+        var me = this;
         var queryURL = TerminologyManager.getLookupURL(this._type, this._id);
-        var extraAjaxOptions = TerminologyManager.getLookupAjaxOptions(this._type, this._id);
-        var baseAjaxOptions = {
-            method: 'GET',
-            requestHeaders: {
-                'X-Requested-With': null,
-                'X-Prototype-Version': null
-            },
-            onSuccess: this.onDataReady.bind(this),
-            onFailure: this.onDataFail.bind(this),
-            onComplete: callWhenReady
-        };
         //console.log("QueryURL: " + queryURL);
-        new Ajax.Request(queryURL, {...baseAjaxOptions, ...extraAjaxOptions});
+        fetch(queryURL, { method: 'GET' })
+            .then(function(response: any) { return response.text(); })
+            .then(function(responseText: string) {
+                me.onDataReady({ responseText: responseText });
+            })
+            .catch(function(error: any) {
+                me.onDataFail(error);
+            })
+            .finally(function() {
+                callWhenReady && callWhenReady();
+            });
     }
 
     onDataReady(response: any): any {

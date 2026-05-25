@@ -41,30 +41,25 @@ export default class HPOTerm {
     load(callWhenReady: any): any {
         var baseServiceURL = HPOTerm.getServiceURL();
         var queryURL       = baseServiceURL + '&q=id%3A' + HPOTerm.desanitizeID(this._hpoID).replace(':','%5C%3A');
-        //console.log("QueryURL: " + queryURL);
-        new Ajax.Request(queryURL, {
-            method: 'GET',
-            onSuccess: this.onDataReady.bind(this),
-            onFailure: this.onDataFail.bind(this),
-            //onComplete: complete.bind(this)
-            onComplete: callWhenReady
-        });
+        fetch(queryURL, { method: 'GET' })
+            .then(response => response.text())
+            .then(text => this.onDataReady(text))
+            .catch(err => {
+                console.log("Failed to load HPO TERM: id = '" + HPOTerm.desanitizeID(this._hpoID) + "' setting name to ID");
+                this._name = HPOTerm.desanitizeID(this._hpoID);
+            })
+            .finally(() => { if (typeof callWhenReady === 'function') callWhenReady(); });
     }
 
-    onDataReady(response: any): any {
+    onDataReady(responseText: any): any {
         try {
-            var parsed = JSON.parse(response.responseText);
+            var parsed = JSON.parse(responseText);
             //console.log(JSON.stringify(parsed));
             console.log('LOADED HPO TERM: id = ' + HPOTerm.desanitizeID(this._hpoID) + ', name = ' + parsed.rows[0].name);
             this._name = parsed.rows[0].name;
         } catch (err) {
             console.log('[LOAD HPO TERM] Error: ' +  err);
         }
-    }
-
-    onDataFail(error: any): any {
-        console.log("Failed to load HPO TERM: id = '" + HPOTerm.desanitizeID(this._hpoID) + "' setting name to ID");
-        this._name = HPOTerm.desanitizeID(this._hpoID);
     }
 
     /*
@@ -91,6 +86,7 @@ export default class HPOTerm {
     }
 
     static getServiceURL(): any {
-        return new XWiki.Document('SolrService', 'PhenoTips').getURL('get') + '?';
+        const base = (window as any).editor ? (window as any).editor.getHpoServiceUrl() : '';
+        return base ? base + '?' : '';
     }
 }

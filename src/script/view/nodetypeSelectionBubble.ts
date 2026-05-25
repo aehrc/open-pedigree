@@ -97,22 +97,27 @@ export default class NodetypeSelectionBubble {
     constructor(siblingMode: any) {
         this._siblingMode = siblingMode;
 
-        this.element = new (Element as any)('div', {'class' : 'callout'});
-        this.element.insert(new (Element as any)('span', {'class' : 'callout-handle'}));
+        this.element = document.createElement('div');
+        this.element.className = 'callout';
+        var handle = document.createElement('span');
+        handle.className = 'callout-handle';
+        this.element.appendChild(handle);
 
-        var container = new (Element as any)('div', {'class' : 'node-type-options'});
-        this.expandedOptionsContainer = new (Element as any)('div', {'class' : 'node-type-options-extended'});
-        this.element.insert(container);
-        this.element.insert(this.expandedOptionsContainer);
+        var container = document.createElement('div');
+        container.className = 'node-type-options';
+        this.expandedOptionsContainer = document.createElement('div');
+        this.expandedOptionsContainer.className = 'node-type-options-extended';
+        this.element.appendChild(container);
+        this.element.appendChild(this.expandedOptionsContainer);
 
         var _this = this;
-        this.buttonsDefs.each(function(def: any) {
+        this.buttonsDefs.forEach(function(def: any) {
             if (!siblingMode || (def.hasOwnProperty('inSiblingMode') && def.inSiblingMode)) {
-                container.insert(def.type == 'separator' ? _this._generateSeparator() : _this._createOption(def));
+                container.appendChild(def.type == 'separator' ? _this._generateSeparator() : _this._createOption(def));
             }
         });
-        this.element.hide();
-        editor.getWorkspace().getWorkArea().insert(this.element);
+        this.element.style.display = 'none';
+        editor.getWorkspace().getWorkArea().appendChild(this.element);
 
         this._onClickOutside = this._onClickOutsideImpl.bind(this);
 
@@ -137,29 +142,32 @@ export default class NodetypeSelectionBubble {
             return null;
         }
         var expandablePrefix = (typeof (this as any)[data.expandsTo] == 'function') ? 'expandable-' : '';
-        var o = new (Element as any)('a', {
-            'class' : data.cssclass + ' ' + expandablePrefix + 'node-type-option ' + (data.type || '') + '-type-option node-type-' + data.key,
-            'title' : data.tip,
-            'href' : '#'
-        }).update(data.symbol); // TODO: eliminate symbol, do ".update(data.label)", add style (icons);
+        var o = document.createElement('a');
+        o.className = data.cssclass + ' ' + expandablePrefix + 'node-type-option ' + (data.type || '') + '-type-option node-type-' + data.key;
+        o.title = data.tip;
+        o.href = '#';
+        o.textContent = data.symbol; // TODO: eliminate symbol, do ".textContent = data.label", add style (icons)
         var _this = this;
-        o.observe('click', function(event: any) {
-            event.stop();
+        o.addEventListener('click', function(event: any) {
+            event.preventDefault();
+            event.stopPropagation();
             if (!_this._node) {
                 return;
             }
             console.log('observe nodetype click: ' + data.callback);
             if (data.callback == 'setProperty') {
                 var evt = { 'nodeID': _this._node.getID(), 'properties': data.params };
-                document.fire('pedigree:node:setproperty', evt);
+                document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: evt }));
             } else if (data.callback == 'CreateChild') {
                 _this.handleCreateAction(data);
             }
             _this.hide();
         });
-        var container = new (Element as any)('span');
-        container.insert(o);
-        expandablePrefix && container.insert(this.generateExpandArrow(data));
+        var container = document.createElement('span');
+        container.appendChild(o);
+        if (expandablePrefix) {
+            container.appendChild(this.generateExpandArrow(data));
+        }
         return container;
     }
 
@@ -176,9 +184,9 @@ export default class NodetypeSelectionBubble {
             }
 
             if (this._siblingMode) {
-                document.fire('pedigree:person:newsibling', evt);
+                document.dispatchEvent(new CustomEvent('pedigree:person:newsibling', { detail: evt }));
             } else {
-                document.fire('pedigree:person:newpartnerandchild', evt);
+                document.dispatchEvent(new CustomEvent('pedigree:person:newpartnerandchild', { detail: evt }));
             }
         } else if (nodeType == 'Partnership') {
             var evt2 = { 'partnershipID': id, 'childParams': data.params.parameters } as any;
@@ -188,7 +196,7 @@ export default class NodetypeSelectionBubble {
             if (data.params.group) {
                 evt2['groupSize'] = this.numPersonsInGroup;
             }
-            document.fire('pedigree:partnership:newchild', evt2);
+            document.dispatchEvent(new CustomEvent('pedigree:partnership:newchild', { detail: evt2 }));
         }
         this.hide();
     }
@@ -201,30 +209,29 @@ export default class NodetypeSelectionBubble {
      * @return {HTMLElement} The span containing the button
      */
     generateExpandArrow(data: any): any {
-        var expandArrow = new (Element as any)('span', {
-            'class' : 'expand-arrow collapsed',
-            'title' : 'show more options',
-            'href' : '#'
-        }).update('▾');
+        var expandArrow = document.createElement('span');
+        expandArrow.className = 'expand-arrow collapsed';
+        expandArrow.title = 'show more options';
+        expandArrow.textContent = '▾';
 
         (expandArrow as any).expand = function(this: any) {
-            $$('.expand-arrow').forEach(function(arrow: any) {
+            Array.from(document.querySelectorAll('.expand-arrow')).forEach(function(arrow: any) {
                 arrow.collapse();
             });
             (this as any)[data.expandsTo](data);
-            expandArrow.update('▴');
-            (Element as any).removeClassName(expandArrow, 'collapsed');
+            expandArrow.textContent = '▴';
+            expandArrow.classList.remove('collapsed');
         }.bind(this);
 
         (expandArrow as any).collapse = function(this: any) {
-            this.expandedOptionsContainer.update('');
-            expandArrow.update('▾');
-            (Element as any).addClassName(expandArrow, 'collapsed');
+            this.expandedOptionsContainer.replaceChildren();
+            expandArrow.textContent = '▾';
+            expandArrow.classList.add('collapsed');
         }.bind(this);
 
-        expandArrow.observe('click', function() {
+        expandArrow.addEventListener('click', function() {
             console.log('observe2');
-            if(expandArrow.hasClassName('collapsed')) {
+            if(expandArrow.classList.contains('collapsed')) {
                 (expandArrow as any).expand();
             } else {
                 (expandArrow as any).collapse();
@@ -241,7 +248,10 @@ export default class NodetypeSelectionBubble {
      * @private
      */
     _generateSeparator(): any {
-        return new (Element as any)('span', {'class' : 'separator'}).update(' | ');
+        var sep = document.createElement('span');
+        sep.className = 'separator';
+        sep.textContent = ' | ';
+        return sep;
     }
 
     /**
@@ -254,18 +264,19 @@ export default class NodetypeSelectionBubble {
      */
     _positionAt(x: any, y: any): any {
         y = Math.round(y);
-        if (y + this.element.getHeight() > editor.getWorkspace().getWorkArea().getHeight()) {
-            this.element.addClassName('upside');
-            y = Math.round(y - this.element.getHeight());
+        var workArea = editor.getWorkspace().getWorkArea();
+        if (y + this.element.offsetHeight > workArea.offsetHeight) {
+            this.element.classList.add('upside');
+            y = Math.round(y - this.element.offsetHeight);
         }
         this.element.style.top = y + 'px';
-        var dx = Math.round(this.element.getWidth()/2);
-        if (x - dx + this.element.getWidth() > editor.getWorkspace().getWorkArea().getWidth()) {
-            dx = Math.round(this.element.getWidth() - (editor.getWorkspace().getWorkArea().getWidth() - x));
+        var dx = Math.round(this.element.offsetWidth / 2);
+        if (x - dx + this.element.offsetWidth > workArea.offsetWidth) {
+            dx = Math.round(this.element.offsetWidth - (workArea.offsetWidth - x));
         } else if (dx > x) {
             dx = Math.round(x);
         }
-        this.element.down('.callout-handle').style.left = dx + 'px';
+        this.element.querySelector('.callout-handle').style.left = dx + 'px';
         this.element.style.left = Math.round(x - dx) + 'px';
     }
 
@@ -283,10 +294,10 @@ export default class NodetypeSelectionBubble {
             return;
         }
         this._node.onWidgetShow();
-        this.element.show();
-        this.expandedOptionsContainer.update('');
+        this.element.style.display = '';
+        this.expandedOptionsContainer.replaceChildren();
         this._positionAt(x, y);
-        document.observe('mousedown', this._onClickOutside);
+        document.addEventListener('mousedown', this._onClickOutside);
     }
 
     /**
@@ -295,30 +306,30 @@ export default class NodetypeSelectionBubble {
      * @method hide
      */
     hide(): any {
-        document.stopObserving('mousedown', this._onClickOutside);
-        $$('.expand-arrow').forEach(function(arrow: any) {
+        document.removeEventListener('mousedown', this._onClickOutside);
+        Array.from(document.querySelectorAll('.expand-arrow')).forEach(function(arrow: any) {
             arrow.collapse();
         });
         if (this._node) {
             this._node.onWidgetHide();
             delete this._node;
             // reset the state
-            this.element.select('.node-type-option').invoke('show');
-            this.element.removeClassName('upside');
+            Array.from(this.element.querySelectorAll('.node-type-option')).forEach((el: any) => el.style.display = '');
+            this.element.classList.remove('upside');
         }
-        this.element.hide();
+        this.element.style.display = 'none';
         this.resetParameters();  // reset number of twins/number of persons
     }
 
     /**
      * Hides the bubble if the user clicks outside
      *
-     * @method _onClickOutside
+     * @method _onClickOutsideImpl
      * @param {Event} event
      * @private
      */
     _onClickOutsideImpl(event: any): any {
-        if (!event.findElement('.callout')) {
+        if (!event.target.closest('.callout')) {
             this.hide();
         }
     }
@@ -378,29 +389,32 @@ export default class NodetypeSelectionBubble {
             var iconText = (me.numPersonsInGroup > 1) ? String(me.numPersonsInGroup) : 'n';
             return '<svg version="1.1" viewBox="0.0 0.0 100.0 100.0" width=50 height=50 fill="none" stroke="none" stroke-linecap="square" stroke-miterlimit="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><clipPath id="p.0"><path d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z" clip-rule="nonzero"></path></clipPath><g clip-path="url(#p.0)"><path fill="#000000" fill-opacity="0.0" d="m0 0l960.0 0l0 720.0l-960.0 0z" fill-rule="nonzero"></path><path fill="#cfe2f3" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path stroke="#000000" stroke-width="2.0" stroke-linejoin="round" stroke-linecap="butt" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path fill="#000000" fill-opacity="0.0" d="m20.661417 22.068241l58.204727 0l0 48.000004l-58.204727 0z" fill-rule="nonzero"></path></g><desc>Number of children</desc><text x="35" y="60" font-family="Verdana" font-size="40" fill="black">'
                     + iconText + '</text></svg>';
-
         };
-        var createBtn = new (Element as any)('input', {'type': 'button', 'value': 'create', 'class': 'button'});
-        var svgContainer = new (Element as any)('span').update(generateIcon());
-        var minusBtn = new (Element as any)('span', {
-            'class': 'minus-button value-control-button'
-        }).update('-');
-        var plusBtn = new (Element as any)('span', {
-            'class': 'plus-button value-control-button'
-        }).update('+');
-        minusBtn.observe('click', function() {
-            me._decrementNumNodes(); svgContainer.update(generateIcon());
+        var createBtn = document.createElement('input');
+        createBtn.type = 'button';
+        createBtn.value = 'create';
+        createBtn.className = 'button';
+        var svgContainer = document.createElement('span');
+        svgContainer.innerHTML = generateIcon();
+        var minusBtn = document.createElement('span');
+        minusBtn.className = 'minus-button value-control-button';
+        minusBtn.textContent = '-';
+        var plusBtn = document.createElement('span');
+        plusBtn.className = 'plus-button value-control-button';
+        plusBtn.textContent = '+';
+        minusBtn.addEventListener('click', function() {
+            me._decrementNumNodes(); svgContainer.innerHTML = generateIcon();
         });
-        plusBtn.observe ('click', function() {
-            me._incrementNumNodes(); svgContainer.update(generateIcon());
+        plusBtn.addEventListener('click', function() {
+            me._incrementNumNodes(); svgContainer.innerHTML = generateIcon();
         });
-        createBtn.observe('click', function() {
+        createBtn.addEventListener('click', function() {
             me.handleCreateAction(personGroupMenuInfo);
         });
-        this.expandedOptionsContainer.insert(minusBtn);
-        this.expandedOptionsContainer.insert(svgContainer);
-        this.expandedOptionsContainer.insert(plusBtn);
-        this.expandedOptionsContainer.insert(createBtn);
+        this.expandedOptionsContainer.appendChild(minusBtn);
+        this.expandedOptionsContainer.appendChild(svgContainer);
+        this.expandedOptionsContainer.appendChild(plusBtn);
+        this.expandedOptionsContainer.appendChild(createBtn);
     }
 
     /**
@@ -414,26 +428,30 @@ export default class NodetypeSelectionBubble {
             return '<svg version="1.1" viewBox="0.0 0.0 100.0 100.0" width=50 height=50 fill="none" stroke="none" stroke-linecap="square" stroke-miterlimit="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><clipPath id="p.0"><path d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z" clip-rule="nonzero"></path></clipPath><g clip-path="url(#p.0)"><path fill="#000000" fill-opacity="0.0" d="m0 0l960.0 0l0 720.0l-960.0 0z" fill-rule="nonzero"></path><path fill="#cfe2f3" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path stroke="#000000" stroke-width="2.0" stroke-linejoin="round" stroke-linecap="butt" d="m1.2283465 49.97113l48.53543 -48.535435l48.53543 48.535435l-48.53543 48.53543z" fill-rule="nonzero"></path><path fill="#000000" fill-opacity="0.0" d="m20.661417 22.068241l58.204727 0l0 48.000004l-58.204727 0z" fill-rule="nonzero"></path></g><desc>Number of children</desc><text x="35" y="60" font-family="Verdana" font-size="40" fill="black">'
                 + me.numTwinNodes + '</text></svg>';
         };
-        var createBtn = new (Element as any)('input', {'type': 'button', 'value': 'create', 'class': 'button'});
-        var svgContainer = new (Element as any)('span').update(generateIcon());
-        var minusBtn = new (Element as any)('span', {
-            'class': 'minus-button value-control-button'
-        }).update('-');
-        var plusBtn = new (Element as any)('span', {
-            'class': 'plus-button value-control-button'
-        }).update('+');
-        minusBtn.observe('click', function() {
-            me._decrementNumTwins(); svgContainer.update(generateIcon());
+        var createBtn = document.createElement('input');
+        createBtn.type = 'button';
+        createBtn.value = 'create';
+        createBtn.className = 'button';
+        var svgContainer = document.createElement('span');
+        svgContainer.innerHTML = generateIcon();
+        var minusBtn = document.createElement('span');
+        minusBtn.className = 'minus-button value-control-button';
+        minusBtn.textContent = '-';
+        var plusBtn = document.createElement('span');
+        plusBtn.className = 'plus-button value-control-button';
+        plusBtn.textContent = '+';
+        minusBtn.addEventListener('click', function() {
+            me._decrementNumTwins(); svgContainer.innerHTML = generateIcon();
         });
-        plusBtn.observe('click',  function() {
-            me._incrementNumTwins(); svgContainer.update(generateIcon());
+        plusBtn.addEventListener('click',  function() {
+            me._incrementNumTwins(); svgContainer.innerHTML = generateIcon();
         });
-        createBtn.observe('click', function() {
+        createBtn.addEventListener('click', function() {
             me.handleCreateAction(twinMenuInfo);
         });
-        this.expandedOptionsContainer.insert(minusBtn);
-        this.expandedOptionsContainer.insert(svgContainer);
-        this.expandedOptionsContainer.insert(plusBtn);
-        this.expandedOptionsContainer.insert(createBtn);
+        this.expandedOptionsContainer.appendChild(minusBtn);
+        this.expandedOptionsContainer.appendChild(svgContainer);
+        this.expandedOptionsContainer.appendChild(plusBtn);
+        this.expandedOptionsContainer.appendChild(createBtn);
     }
 }

@@ -8,6 +8,7 @@ import {DisorderTermType} from 'pedigree/terminology/disorderTerm';
 import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import DisorderLegend from 'pedigree/view/disorderLegend';
+import flatpickr from 'flatpickr';
 
 /**
  * NodeMenu is a UI Element containing options for AbstractNode elements
@@ -56,27 +57,36 @@ export default class NodeMenu {
         'radio' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
             var columnClass = data.columns ? 'field-values-' + data.columns + '-columns' : 'field-values';
-            var values = new (Element as any)('div', {'class' : columnClass});
-            result.inputsContainer.insert(values);
+            var values = document.createElement('div');
+            values.className = columnClass;
+            result.inputsContainer.appendChild(values);
             var _this = this;
             var _generateRadioButton = function(v: any) {
-                var radioLabel = new (Element as any)('label', {'class' : data.name + '_' + v.actual}).update(v.displayed);
-                var radioButton = new (Element as any)('input', {type: 'radio', name: data.name, value: v.actual});
-                radioLabel.insert({'top': radioButton});
+                var radioLabel = document.createElement('label');
+                radioLabel.className = data.name + '_' + v.actual;
+                radioLabel.textContent = v.displayed;
+                var radioButton = document.createElement('input');
+                radioButton.type = 'radio';
+                radioButton.name = data.name;
+                radioButton.value = v.actual;
+                radioLabel.prepend(radioButton);
                 (radioButton as any)._getValue = function(this: any) {
                     return [this.value];
                 }.bind(radioButton);
-                values.insert(radioLabel);
+                values.appendChild(radioLabel);
                 _this._attachFieldEventListeners(radioButton, ['click']);
             };
-            data.values.each(_generateRadioButton);
+            data.values.forEach(_generateRadioButton);
 
             return result;
         },
         'checkbox' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var checkbox = new (Element as any)('input', {type: 'checkbox', name: data.name, value: '1'});
-            result.down('label').insert({'top': checkbox});
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = data.name;
+            checkbox.value = '1';
+            result.querySelector('label').prepend(checkbox);
             (checkbox as any)._getValue = function(this: any) {
                 return [this.checked];
             }.bind(checkbox);
@@ -85,12 +95,15 @@ export default class NodeMenu {
         },
         'text' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var text = new (Element as any)('input', {type: 'text', name: data.name});
+            var text = document.createElement('input');
+            text.type = 'text';
+            text.name = data.name;
             if (data.tip) {
                 (text as any).placeholder = data.tip;
             }
-            result.inputsContainer.insert(text);
-            text.wrap('span');
+            var textSpan = document.createElement('span');
+            textSpan.appendChild(text);
+            result.inputsContainer.appendChild(textSpan);
             (text as any)._getValue = function(this: any) {
                 return [this.value];
             }.bind(text);
@@ -99,10 +112,10 @@ export default class NodeMenu {
         },
         'textarea' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var properties = {name: data.name} as any;
-            properties['class'] = 'textarea-'+data.rows+'-rows'; // for compatibility with older browsers not accepting {class: ...}
-            var text = new (Element as any)('textarea', properties);
-            result.inputsContainer.insert(text);
+            var text = document.createElement('textarea');
+            text.name = data.name;
+            text.className = 'textarea-' + data.rows + '-rows';
+            result.inputsContainer.appendChild(text);
             (text as any)._getValue = function(this: any) {
                 return [this.value];
             }.bind(text);
@@ -111,18 +124,38 @@ export default class NodeMenu {
         },
         'date-picker' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var datePicker = new (Element as any)('input', {type: 'text', 'class': 'xwiki-date', name: data.name, 'title': data.format, alt : '' });
-            result.insert(datePicker);
+            var datePicker = document.createElement('input');
+            datePicker.type = 'text';
+            datePicker.className = 'xwiki-date';
+            datePicker.name = data.name;
+            datePicker.title = data.format || 'dd MMM yyyy';
+            (datePicker as any).alt = '';
+            result.appendChild(datePicker);
+            flatpickr(datePicker as any, {
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+                position: 'above',
+                onChange: function(selectedDates: any, dateStr: string) {
+                    (datePicker as any).alt = dateStr;
+                    datePicker.dispatchEvent(new CustomEvent('xwiki:date:changed'));
+                }
+            });
             (datePicker as any)._getValue = function(this: any) {
-                return [this.alt && (Date as any).parseISO_8601(this.alt)];
+                var iso = (this as any).alt;
+                if (!iso) return [null];
+                var d = new Date(iso);
+                return [isNaN(d.getTime()) ? null : d];
             }.bind(datePicker);
             this._attachFieldEventListeners(datePicker, ['xwiki:date:changed']);
             return result;
         },
         'disease-picker' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var diseasePicker = new (Element as any)('select', {multiple: 'multiple', 'class': 'suggest-omim', name: data.name});
-            result.insert(diseasePicker);
+            var diseasePicker = document.createElement('select');
+            diseasePicker.multiple = true;
+            diseasePicker.className = 'suggest-omim';
+            diseasePicker.name = data.name;
+            result.appendChild(diseasePicker);
             (diseasePicker as any)._getValue = function(this: any) {
                 var target = jQuery(this);
                 if (target && target[0] && (target[0] as any).selectize) {
@@ -139,8 +172,11 @@ export default class NodeMenu {
         },
         'hpo-picker' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var hpoPicker = new (Element as any)('select', {multiple: 'multiple', 'class': 'suggest-hpo', name: data.name});
-            result.insert(hpoPicker);
+            var hpoPicker = document.createElement('select');
+            hpoPicker.multiple = true;
+            hpoPicker.className = 'suggest-hpo';
+            hpoPicker.name = data.name;
+            result.appendChild(hpoPicker);
             (hpoPicker as any)._getValue = function(this: any) {
                 var target = jQuery(this);
                 if (target && target[0] && (target[0] as any).selectize) {
@@ -157,8 +193,11 @@ export default class NodeMenu {
         },
         'gene-picker' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var genePicker = new (Element as any)('select', {multiple: 'multiple', 'class': 'suggest-genes', name: data.name});
-            result.insert(genePicker);
+            var genePicker = document.createElement('select');
+            genePicker.multiple = true;
+            genePicker.className = 'suggest-genes';
+            genePicker.name = data.name;
+            result.appendChild(genePicker);
             (genePicker as any)._getValue = function(this: any) {
                 var target = jQuery(this);
                 if (target && target[0] && (target[0] as any).selectize) {
@@ -175,22 +214,26 @@ export default class NodeMenu {
         },
         'select' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            var select = new (Element as any)('select', {'name' : data.name});
-            result.inputsContainer.insert(select);
-            select.wrap('span');
+            var select = document.createElement('select');
+            select.name = data.name;
+            var selectSpan = document.createElement('span');
+            selectSpan.appendChild(select);
+            result.inputsContainer.appendChild(selectSpan);
             var _generateSelectOption = function(v: any) {
-                var option = new (Element as any)('option', {'value' : v.actual}).update(v.displayed);
-                select.insert(option);
+                var option = document.createElement('option');
+                option.value = v.actual;
+                option.textContent = v.displayed;
+                select.appendChild(option);
             };
             if(data.nullValue) {
                 _generateSelectOption({'actual' : '', displayed : '-'});
             }
             if (data.values) {
-                data.values.each(_generateSelectOption);
+                data.values.forEach(_generateSelectOption);
             } else if (data.range) {
-                $A($R(data.range.start, data.range.end)).each(function(i: any) {
+                for (var i = data.range.start; i <= data.range.end; i++) {
                     _generateSelectOption({'actual': i, 'displayed' : i + ' ' + data.range.item[+(i!=1)]});
-                });
+                }
             }
             (select as any)._getValue = function(this: any) {
                 return [(this.selectedIndex >= 0) && this.options[this.selectedIndex].value || ''];
@@ -200,43 +243,58 @@ export default class NodeMenu {
         },
         'hidden' : function(this: any, data: any) {
             var result = this._generateEmptyField(data);
-            result.addClassName('hidden');
-            var input = new (Element as any)('input', {type: 'hidden', name: data.name, value: ''});
-            result.update(input);
+            result.classList.add('hidden');
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = data.name;
+            input.value = '';
+            result.replaceChildren(input);
             return result;
         }
     };
 
     _setFieldValue: any = {
         'radio' : function(container: any, value: any) {
-            var target = container.down('input[type=radio][value=' + value + ']');
+            var target = container.querySelector('input[type=radio][value="' + value + '"]');
             if (target) {
                 target.checked = true;
             }
         },
         'checkbox' : function(container: any, value: any) {
-            var checkbox = container.down('input[type=checkbox]');
+            var checkbox = container.querySelector('input[type=checkbox]');
             if (checkbox) {
                 checkbox.checked = value;
             }
         },
         'text' : function(container: any, value: any) {
-            var target = container.down('input[type=text]');
+            var target = container.querySelector('input[type=text]');
             if (target) {
                 target.value = value;
             }
         },
         'textarea' : function(container: any, value: any) {
-            var target = container.down('textarea');
+            var target = container.querySelector('textarea');
             if (target) {
                 target.value = value;
             }
         },
         'date-picker' : function(container: any, value: any) {
-            var target = container.down('input[type=text].xwiki-date');
+            var target = container.querySelector('input[type=text].xwiki-date');
             if (target) {
-                target.value = value && value.toFormattedString({'format_mask' : target.title}) || '';
-                target.alt = value && value.toISO8601() || '';
+                var iso = '';
+                if (value) {
+                    var d = (value instanceof Date) ? value : new Date(value);
+                    if (!isNaN(d.getTime())) {
+                        iso = d.toISOString().slice(0, 10);
+                    }
+                }
+                target.alt = iso;
+                var fp = (target as any)._flatpickr;
+                if (fp) {
+                    fp.setDate(iso, false);
+                } else {
+                    target.value = iso;
+                }
             }
         },
         'disease-picker' : function(container: any, values: any) {
@@ -298,13 +356,13 @@ export default class NodeMenu {
             }
         },
         'select' : function(container: any, value: any) {
-            var target = container.down('select option[value=' + value + ']');
+            var target = container.querySelector('select option[value="' + value + '"]');
             if (target) {
                 target.selected = 'selected';
             }
         },
         'hidden' : function(container: any, value: any) {
-            var target = container.down('input[type=hidden]');
+            var target = container.querySelector('input[type=hidden]');
             if (target) {
                 target.value = value;
             }
@@ -314,20 +372,20 @@ export default class NodeMenu {
     _setFieldInactive: any = {
         'radio' : function(this: any, container: any, inactive: any) {
             if (inactive === true) {
-                container.addClassName('hidden');
+                container.classList.add('hidden');
             } else {
-                container.removeClassName('hidden');
-                container.select('input[type=radio]').each(function(item: any) {
+                container.classList.remove('hidden');
+                Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
                     if (inactive && Object.prototype.toString.call(inactive) === '[object Array]') {
                         item.disabled = (inactive.indexOf(item.value) >= 0);
                         if (item.disabled) {
-                            item.up().addClassName('hidden');
+                            item.parentElement.classList.add('hidden');
                         } else {
-                            item.up().removeClassName('hidden');
+                            item.parentElement.classList.remove('hidden');
                         }
                     } else if (!inactive) {
                         item.disabled = false;
-                        item.up().removeClassName('hidden');
+                        item.parentElement.classList.remove('hidden');
                     }
                 });
             }
@@ -364,10 +422,10 @@ export default class NodeMenu {
     _setFieldDisabled: any = {
         'radio' : function(container: any, disabled: any) {
             if (disabled === true) {
-                container.addClassName('hidden');
+                container.classList.add('hidden');
             } else {
-                container.removeClassName('hidden');
-                container.select('input[type=radio]').each(function(item: any) {
+                container.classList.remove('hidden');
+                Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
                     if (disabled && Object.prototype.toString.call(disabled) === '[object Array]') {
                         item.disabled = (disabled.indexOf(item.value) >= 0);
                     }
@@ -378,13 +436,13 @@ export default class NodeMenu {
             }
         },
         'checkbox' : function(container: any, disabled: any) {
-            var target = container.down('input[type=checkbox]');
+            var target = container.querySelector('input[type=checkbox]');
             if (target) {
                 target.disabled = disabled;
             }
         },
         'text' : function(container: any, disabled: any) {
-            var target = container.down('input[type=text]');
+            var target = container.querySelector('input[type=text]');
             if (target) {
                 target.disabled = disabled;
             }
@@ -413,30 +471,41 @@ export default class NodeMenu {
     };
 
     constructor(data: any, tabs: any, otherCSSClass: any) {
-        this.canvas = editor.getWorkspace().canvas || $('body');
+        this.canvas = editor.getWorkspace().canvas || document.body;
         var cssClass = 'menu-box';
         if (otherCSSClass) {
             cssClass += ' ' + otherCSSClass;
         }
-        this.menuBox = new (Element as any)('div', {'class' : cssClass});
+        this.menuBox = document.createElement('div');
+        this.menuBox.className = cssClass;
 
-        this.closeButton = new (Element as any)('span', {'class' : 'close-button'}).update('×');
-        this.menuBox.insert({'top': this.closeButton});
-        this.closeButton.observe('click', this.hide.bindAsEventListener(this));
+        this.closeButton = document.createElement('span');
+        this.closeButton.className = 'close-button';
+        this.closeButton.textContent = '×';
+        this.menuBox.prepend(this.closeButton);
+        this.closeButton.addEventListener('click', this.hide.bind(this));
 
-        this.form = new (Element as any)('form', {'method' : 'get', 'action' : '', 'class': 'tabs-content'});
+        this.form = document.createElement('form');
+        this.form.method = 'get';
+        this.form.action = '';
+        this.form.className = 'tabs-content';
 
         this.tabs = {};
         this.tabHeaders = {};
         if (tabs && tabs.length > 0) {
-            this.tabTop = new (Element as any)('dl', {'class':'tabs'});
+            this.tabTop = document.createElement('dl');
+            this.tabTop.className = 'tabs';
             for (var i = 0; i < tabs.length; i++) {
                 var tabName = tabs[i];
                 var activeClass = (i == 0) ? 'active' : '';
-                this.tabs[tabName] = new (Element as any)('div', {'id': 'tab_' + tabName, 'class': 'content ' + activeClass});
-                this.form.insert(this.tabs[tabName]);
+                this.tabs[tabName] = document.createElement('div');
+                this.tabs[tabName].id = 'tab_' + tabName;
+                this.tabs[tabName].className = 'content ' + activeClass;
+                this.form.appendChild(this.tabs[tabName]);
 
-                this.tabHeaders[tabName] = new (Element as any)('dd', {'class': activeClass}).insert('<a>' + tabName + '</a>');
+                this.tabHeaders[tabName] = document.createElement('dd');
+                this.tabHeaders[tabName].className = activeClass;
+                this.tabHeaders[tabName].innerHTML = '<a>' + tabName + '</a>';
                 var _this = this;
                 var switchTab = function(tabName: any) {
                     return function() {
@@ -454,46 +523,43 @@ export default class NodeMenu {
                         _this.reposition();
                     };
                 };
-                this.tabHeaders[tabName].observe('click', switchTab(tabName));
-                this.tabTop.insert(this.tabHeaders[tabName]);
+                this.tabHeaders[tabName].addEventListener('click', switchTab(tabName));
+                this.tabTop.appendChild(this.tabHeaders[tabName]);
             }
-            var div = new (Element as any)('div', {'class': 'tabholder'}).insert(this.tabTop).insert(this.form);
-            this.menuBox.insert({'bottom' : div});
+            var div = document.createElement('div');
+            div.className = 'tabholder';
+            div.appendChild(this.tabTop);
+            div.appendChild(this.form);
+            this.menuBox.appendChild(div);
         } else {
-            this.singleTab = new (Element as any)('div', {'class': 'tabholder'}).insert(this.form);
-            this.menuBox.insert({'bottom' : this.singleTab});
-            this.closeButton.addClassName('close-button-old');
-            this.form.addClassName('content');
+            this.singleTab = document.createElement('div');
+            this.singleTab.className = 'tabholder';
+            this.singleTab.appendChild(this.form);
+            this.menuBox.appendChild(this.singleTab);
+            this.closeButton.classList.add('close-button-old');
+            this.form.classList.add('content');
         }
 
         this.fieldMap = {};
         // Generate fields
         var _this2 = this;
-        data.each(function(d: any) {
+        data.forEach(function(d: any) {
             if (typeof (_this2._generateField[d.type]) == 'function') {
                 var insertLocation = _this2.form;
                 if (d.tab && _this2.tabs.hasOwnProperty(d.tab)) {
                     insertLocation = _this2.tabs[d.tab];
                 }
-                insertLocation.insert(_this2._generateField[d.type].call(_this2, d));
+                insertLocation.appendChild(_this2._generateField[d.type].call(_this2, d));
             }
         });
 
         // Insert in document
         this.hide();
-        editor.getWorkspace().getWorkArea().insert(this.menuBox);
+        editor.getWorkspace().getWorkArea().appendChild(this.menuBox);
 
         this._onClickOutside = this._onClickOutsideImpl.bind(this);
 
-        // Attach pickers
-        // date
-        var crtYear = new Date().getFullYear();
-        (window as any).dateTimePicker = new (XWiki as any).widgets.DateTimePicker({
-            year_range: [crtYear - 99, crtYear + 1],
-            after_navigate : function(this: any, date: any) {
-                this._selector.updateSelectedDate({day: date.getDate(), month: date.getMonth(), year : date.getYear() + 1900}, false);
-            }
-        });
+        // Date pickers are initialised per-field in _generateField['date-picker'] using flatpickr.
 
         var _createSuggest = function(input: any, termType: any, getLegend: any, selectizeOptions?: any) {
             var jqnode = jQuery(input);
@@ -516,34 +582,27 @@ export default class NodeMenu {
                             console.log(item.text());
                             legend.addToCache(TerminologyManager.sanitizeID(termType, v), name);
                         }
-                        (Event as any).fire(input, 'xwiki:customchange');
+                        input.dispatchEvent(new CustomEvent('xwiki:customchange'));
                     },
                     load: function (query: any, callback: any) {
                         if (query.length < 2) return callback();
                         var queryURL = TerminologyManager.getSearchURL(termType, query);
                         var extraAjaxOptions = TerminologyManager.getSearchAjaxOptions(termType, query);
-                        var baseAjaxOptions = {
-                            method: 'GET',
-                            contentType: 'application/json; charset=utf-8',
-                            requestHeaders: {
-                                'X-Requested-With': null,
-                                'X-Prototype-Version': null
-                            },
-                            onSuccess: function(response: any){
+                        fetch(queryURL, { method: (extraAjaxOptions && extraAjaxOptions.method) || 'GET' })
+                            .then(response => response.text())
+                            .then(text => {
                                 try {
-                                    var result = TerminologyManager.processSearchResponse(termType, response);
+                                    var result = TerminologyManager.processSearchResponse(termType, { responseText: text });
                                     callback(result);
                                 } catch (err) {
-                                    console.log('Error searching for disorders: ' +  err);
+                                    console.log('Error searching for disorders: ' + err);
                                     callback();
                                 }
-                            },
-                            onFailure: function(error: any){
-                                console.log('Error searching for disorders: ' +  error);
+                            })
+                            .catch(err => {
+                                console.log('Error searching for disorders: ' + err);
                                 callback();
-                            }
-                        };
-                        new Ajax.Request(queryURL, {...baseAjaxOptions, ...extraAjaxOptions});
+                            });
                     },
                     ...selectizeOptions
                 });
@@ -552,71 +611,80 @@ export default class NodeMenu {
         };
 
         // disease
-        this.form.select('select.suggest-omim').each(function(item: any) {
-            if (!item.hasClassName('initialized')) {
+        Array.from(this.form.querySelectorAll('select.suggest-omim')).forEach(function(item: any) {
+            if (!item.classList.contains('initialized')) {
                 _createSuggest(item, DisorderTermType, editor.getDisorderLegend);
-                item.addClassName('initialized');
+                item.classList.add('initialized');
             }
         });
 
         // genes
-        this.form.select('select.suggest-genes').each(function(item: any) {
-            if (!item.hasClassName('initialized')) {
+        Array.from(this.form.querySelectorAll('select.suggest-genes')).forEach(function(item: any) {
+            if (!item.classList.contains('initialized')) {
                 _createSuggest(item, GeneTermType, editor.getGeneLegend);
-                item.addClassName('initialized');
+                item.classList.add('initialized');
             }
         });
 
         // HPO terms
-        this.form.select('select.suggest-hpo').each(function(item: any) {
-            if (!item.hasClassName('initialized')) {
+        Array.from(this.form.querySelectorAll('select.suggest-hpo')).forEach(function(item: any) {
+            if (!item.classList.contains('initialized')) {
                 _createSuggest(item, PhenotypeTermType, editor.getHPOLegend);
-                item.addClassName('initialized');
+                item.classList.add('initialized');
             }
         });
 
         // Update disorder colors
         this._updateDisorderColor = function(this: any, id: any, color: any) {
-            this.menuBox.select('.field-disorders li input[value="' + id + '"]').each(function(item: any) {
-                var colorBubble = item.up('li').down('.disorder-color');
+            Array.from(this.menuBox.querySelectorAll('.field-disorders li input[value="' + id + '"]')).forEach(function(item: any) {
+                var li = item.closest('li');
+                var colorBubble = li.querySelector('.disorder-color');
                 if (!colorBubble) {
-                    colorBubble = new (Element as any)('span', {'class' : 'disorder-color'});
-                    item.up('li').insert({top : colorBubble});
+                    colorBubble = document.createElement('span');
+                    colorBubble.className = 'disorder-color';
+                    li.prepend(colorBubble);
                 }
-                colorBubble.setStyle({background : color});
+                colorBubble.style.background = color;
             });
         }.bind(this);
-        document.observe('disorder:color', function(event: any) {
-            if (!event.memo || !event.memo.id || !event.memo.color) {
+        document.addEventListener('disorder:color', function(event: any) {
+            if (!event.detail || !event.detail.id || !event.detail.color) {
                 return;
             }
-            _this2._updateDisorderColor(event.memo.id, event.memo.color);
+            _this2._updateDisorderColor(event.detail.id, event.detail.color);
         });
 
         // Update gene colors
         this._updateGeneColor = function(this: any, id: any, color: any) {
-            this.menuBox.select('.field-candidate_genes li input[value="' + id + '"]').each(function(item: any) {
-                var colorBubble = item.up('li').down('.disorder-color');
+            Array.from(this.menuBox.querySelectorAll('.field-candidate_genes li input[value="' + id + '"]')).forEach(function(item: any) {
+                var li = item.closest('li');
+                var colorBubble = li.querySelector('.disorder-color');
                 if (!colorBubble) {
-                    colorBubble = new (Element as any)('span', {'class' : 'disorder-color'});
-                    item.up('li').insert({top : colorBubble});
+                    colorBubble = document.createElement('span');
+                    colorBubble.className = 'disorder-color';
+                    li.prepend(colorBubble);
                 }
-                colorBubble.setStyle({background : color});
+                colorBubble.style.background = color;
             });
         }.bind(this);
-        document.observe('gene:color', function(event: any) {
-            if (!event.memo || !event.memo.id || !event.memo.color) {
+        document.addEventListener('gene:color', function(event: any) {
+            if (!event.detail || !event.detail.id || !event.detail.color) {
                 return;
             }
-            _this2._updateGeneColor(event.memo.id, event.memo.color);
+            _this2._updateGeneColor(event.detail.id, event.detail.color);
         });
     }
 
     _generateEmptyField(data: any): any {
-        var result = new (Element as any)('div', {'class' : 'field-box field-' + data.name});
-        var label = new (Element as any)('label', {'class' : 'field-name'}).update(data.label);
-        (result as any).inputsContainer = new (Element as any)('div', {'class' : 'field-inputs'});
-        result.insert(label).insert((result as any).inputsContainer);
+        var result = document.createElement('div');
+        result.className = 'field-box field-' + data.name;
+        var label = document.createElement('label');
+        label.className = 'field-name';
+        label.textContent = data.label;
+        (result as any).inputsContainer = document.createElement('div');
+        (result as any).inputsContainer.className = 'field-inputs';
+        result.appendChild(label);
+        result.appendChild((result as any).inputsContainer);
         this.fieldMap[data.name] = {
             'type' : data.type,
             'element' : result,
@@ -630,8 +698,8 @@ export default class NodeMenu {
 
     _attachFieldEventListeners(field: any, eventNames: any, values?: any): any {
         var _this = this;
-        eventNames.each(function(eventName: any) {
-            field.observe(eventName, function(event: any) {
+        eventNames.forEach(function(eventName: any) {
+            field.addEventListener(eventName, function(event: any) {
                 if (_this._updating) {
                     return;
                 } // otherwise a field change triggers an update which triggers field change etc
@@ -659,14 +727,14 @@ export default class NodeMenu {
                     var properties = {} as any;
                     properties[method] = _this.fieldMap[field.name].crtValue;
                     var evt = { 'nodeID': target.getID(), 'properties': properties };
-                    document.fire('pedigree:node:setproperty', evt);
+                    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: evt }));
                 } else {
                     var properties2 = {} as any;
                     properties2[method] = _this.fieldMap[field.name].crtValue;
                     var evt2 = { 'nodeID': target.getID(), 'modifications': properties2 };
-                    document.fire('pedigree:node:modify', evt2);
+                    document.dispatchEvent(new CustomEvent('pedigree:node:modify', { detail: evt2 }));
                 }
-                field.fire('pedigree:change');
+                field.dispatchEvent(new Event('pedigree:change'));
             });
         });
     }
@@ -686,25 +754,25 @@ export default class NodeMenu {
         this._updating = true;
         this._setCrtData(node.getSummary());
         delete this._updating;
-        this.menuBox.show();
+        this.menuBox.style.display = '';
         this.reposition(x, y);
-        document.observe('mousedown', this._onClickOutside);
+        document.addEventListener('mousedown', this._onClickOutside);
     }
 
     hide(): any {
         this.hideSuggestPicker();
         this._onscreen = false;
-        document.stopObserving('mousedown', this._onClickOutside);
+        document.removeEventListener('mousedown', this._onClickOutside);
         if (this.targetNode) {
             this.targetNode.onWidgetHide();
             delete this.targetNode;
         }
-        this.menuBox.hide();
+        this.menuBox.style.display = 'none';
         this._clearCrtData();
     }
 
     hideSuggestPicker(): any {
-        this.form.select('select.suggest').each(function(item: any) {
+        Array.from(this.form.querySelectorAll('select.suggest')).forEach(function(item: any) {
             if (item._suggest) {
                 item._suggest.clearSuggestions();
             }
@@ -716,7 +784,8 @@ export default class NodeMenu {
     }
 
     _onClickOutsideImpl(event: any): any {
-        if (!event.findElement('.menu-box') && !event.findElement('.calendar_date_select') && !event.findElement('.suggestItems')) {
+        var target = event.target as Element;
+        if (target && !target.closest('.menu-box') && !target.closest('.calendar_date_select') && !target.closest('.flatpickr-calendar') && !target.closest('.suggestItems')) {
             this.hide();
         }
     }
@@ -724,8 +793,8 @@ export default class NodeMenu {
     reposition(x?: any, y?: any): any {
         x = Math.floor(x);
         if (x !== undefined && isFinite(x)) {
-            if (this.canvas && x + this.menuBox.getWidth() > (this.canvas.getWidth() + 10)) {
-                var delta = x + this.menuBox.getWidth() - this.canvas.getWidth();
+            if (this.canvas && x + this.menuBox.offsetWidth > (this.canvas.offsetWidth + 10)) {
+                var delta = x + this.menuBox.offsetWidth - this.canvas.offsetWidth;
                 editor.getWorkspace().panByX(delta, true);
                 x -= delta;
             }
@@ -747,17 +816,17 @@ export default class NodeMenu {
         }
 
         // Make sure the menu fits inside the screen
-        if (this.canvas && this.menuBox.getHeight() >= (this.canvas.getHeight() - 1)) {
+        if (this.canvas && this.menuBox.offsetHeight >= (this.canvas.offsetHeight - 1)) {
             // menu is too big to fit the screen
             top    = '0';
-            height = (this.canvas.getHeight() - 1) + 'px';
-        } else if (this.canvas.getHeight() < y + this.menuBox.getHeight() + 1) {
+            height = (this.canvas.offsetHeight - 1) + 'px';
+        } else if (this.canvas.offsetHeight < y + this.menuBox.offsetHeight + 1) {
             // menu fits the screen, but have to move it higher for that
-            var diff = y + this.menuBox.getHeight() - this.canvas.getHeight() + 1;
+            var diff = y + this.menuBox.offsetHeight - this.canvas.offsetHeight + 1;
             var position = (y - diff);
             if (position < 0) {
                 top    = '0';
-                height = (this.canvas.getHeight() - 1) + 'px';
+                height = (this.canvas.offsetHeight - 1) + 'px';
             } else {
                 top    = position + 'px';
                 height = '';
@@ -774,7 +843,7 @@ export default class NodeMenu {
 
     _clearCrtData(): any {
         var _this = this;
-        Object.keys(this.fieldMap).each(function (name: any) {
+        Object.keys(this.fieldMap).forEach(function (name: any) {
             _this.fieldMap[name].crtValue = _this.fieldMap[name]['default'];
             _this._setFieldValue[_this.fieldMap[name].type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].crtValue);
             _this.fieldMap[name].inactive = false;
@@ -783,7 +852,7 @@ export default class NodeMenu {
 
     _setCrtData(data: any): any {
         var _this = this;
-        Object.keys(this.fieldMap).each(function (name: any) {
+        Object.keys(this.fieldMap).forEach(function (name: any) {
             _this.fieldMap[name].crtValue = data && data[name] && typeof(data[name].value) != 'undefined' ? data[name].value : _this.fieldMap[name].crtValue || _this.fieldMap[name]['default'];
             _this.fieldMap[name].inactive = (data && data[name] && (typeof(data[name].inactive) == 'boolean' || typeof(data[name].inactive) == 'object')) ? data[name].inactive : _this.fieldMap[name].inactive;
             _this.fieldMap[name].disabled = (data && data[name] && (typeof(data[name].disabled) == 'boolean' || typeof(data[name].disabled) == 'object')) ? data[name].disabled : _this.fieldMap[name].disabled;
@@ -795,9 +864,9 @@ export default class NodeMenu {
 
     _toggleFieldVisibility(container: any, doHide: any): any {
         if (doHide) {
-            container.addClassName('hidden');
+            container.classList.add('hidden');
         } else {
-            container.removeClassName('hidden');
+            container.classList.remove('hidden');
         }
     }
 }

@@ -80,8 +80,8 @@ export default class DisorderLegend extends Legend {
      * @private
      */
     _updateDisorderName(disorderID: any): any {
-        var name = this._legendBox.down('li#' + this._getPrefix() + '-' + disorderID + ' .disorder-name');
-        name.update(this.getTerm(disorderID).getName());
+        var name = this._legendBox.querySelector('li#' + this._getPrefix() + '-' + disorderID + ' .disorder-name');
+        name.textContent = this.getTerm(disorderID).getName();
     }
 
     /**
@@ -96,7 +96,7 @@ export default class DisorderLegend extends Legend {
         if (!this._objectColors.hasOwnProperty(disorderID)) {
             var color = this._generateColor(disorderID);
             this._objectColors[disorderID] = color;
-            document.fire('disorder:color', {'id' : disorderID, color: color});
+            document.dispatchEvent(new CustomEvent('disorder:color', { detail: {'id' : disorderID, color: color} }));
         }
 
         return super._generateElement(disorderID, name);

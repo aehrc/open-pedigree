@@ -11,20 +11,19 @@ import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 export default class Controller {
 
     constructor() {
-        document.observe('pedigree:graph:clear',               this.handleClearGraph);
-        document.observe('pedigree:undo',                      this.handleUndo);
-        document.observe('pedigree:redo',                      this.handleRedo);
-        document.observe('pedigree:node:remove',               this.handleRemove);
-        document.observe('pedigree:node:setproperty',          this.handleSetProperty);
-        document.observe('pedigree:node:modify',               this.handleModification);
-        document.observe('pedigree:person:drag:newparent',     this.handlePersonDragToNewParent);
-        document.observe('pedigree:person:drag:newpartner',    this.handlePersonDragToNewPartner);
-        document.observe('pedigree:person:drag:newsibling',    this.handlePersonDragToNewSibling);
-        document.observe('pedigree:person:newparent',          this.handlePersonNewParents);
-        document.observe('pedigree:person:newsibling',         this.handlePersonNewSibling);
-        document.observe('pedigree:person:newpartnerandchild', this.handlePersonNewPartnerAndChild);
-        document.observe('pedigree:partnership:newchild',      this.handleRelationshipNewChild);
-        document.observe('pedigree:reload',                    this.handleReload);
+        document.addEventListener('pedigree:graph:clear',               (e) => this.handleClearGraph(e));
+        document.addEventListener('pedigree:undo',                      (e) => this.handleUndo(e));
+        document.addEventListener('pedigree:redo',                      (e) => this.handleRedo(e));
+        document.addEventListener('pedigree:node:remove',               (e) => this.handleRemove(e));
+        document.addEventListener('pedigree:node:setproperty',          (e) => this.handleSetProperty(e));
+        document.addEventListener('pedigree:node:modify',               (e) => this.handleModification(e));
+        document.addEventListener('pedigree:person:drag:newparent',     (e) => this.handlePersonDragToNewParent(e));
+        document.addEventListener('pedigree:person:drag:newpartner',    (e) => this.handlePersonDragToNewPartner(e));
+        document.addEventListener('pedigree:person:drag:newsibling',    (e) => this.handlePersonDragToNewSibling(e));
+        document.addEventListener('pedigree:person:newparent',          (e) => this.handlePersonNewParents(e));
+        document.addEventListener('pedigree:person:newsibling',         (e) => this.handlePersonNewSibling(e));
+        document.addEventListener('pedigree:person:newpartnerandchild', (e) => this.handlePersonNewPartnerAndChild(e));
+        document.addEventListener('pedigree:partnership:newchild',      (e) => this.handleRelationshipNewChild(e));
     }
 
     handleUndo(event: any): any {
@@ -45,13 +44,13 @@ export default class Controller {
 
         editor.getWorkspace().centerAroundNode(0, false);
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
     }
 
     handleRemove(event: any): any {
-        var nodeID = event.memo.nodeID;
+        var nodeID = event.detail.nodeID;
 
         // get the list of affected nodes
         var disconnectedList = editor.getGraph().getDisconnectedSetIfNodeRemoved(nodeID);
@@ -65,7 +64,7 @@ export default class Controller {
                 var changeSet2 = editor.getGraph().improvePosition();
                 editor.getView().applyChanges(changeSet2, true);
 
-                if (!event.memo.noUndoRedo) {
+                if (!event.detail.noUndoRedo) {
                     editor.getActionStack().addState( event );
                 }
             } catch(err) {
@@ -74,7 +73,7 @@ export default class Controller {
 
         // if there is only one node or this removal is done as part of an undo/redo action
         // => just remove without asking any questions or highlighting any nodes
-        if (disconnectedList.length <= 1 || event.memo.hasOwnProperty('noUndoRedo')) {
+        if (disconnectedList.length <= 1 || event.detail.hasOwnProperty('noUndoRedo')) {
             removeSelected();
             return;
         }
@@ -102,9 +101,9 @@ export default class Controller {
     }
 
     handleSetProperty(event: any): any {
-        var nodeID     = event.memo.nodeID;
-        var properties = event.memo.properties;
-        var undoEvent  = {'eventName': event.eventName, 'memo': {'nodeID': nodeID, 'properties': cloneObject(event.memo.properties)}};
+        var nodeID     = event.detail.nodeID;
+        var properties = event.detail.properties;
+        var undoEvent  = {'eventName': event.type, 'memo': {'nodeID': nodeID, 'properties': cloneObject(event.detail.properties)}};
 
         var node    = editor.getView().getNode(nodeID);
         var changed = false;
@@ -263,15 +262,15 @@ export default class Controller {
         editor.getNodeMenu().update();  // for example, user selected a wrong gender in the nodeMenu, which
         // gets reverted back - need to select the correct one in the nodeMenu as well
 
-        if (!event.memo.noUndoRedo && changedValue) {
+        if (!event.detail.noUndoRedo && changedValue) {
             editor.getActionStack().addState( event, undoEvent );
         }
     }
 
     handleModification(event: any): any {
         try {
-            var nodeID        = event.memo.nodeID;
-            var modifications = event.memo.modifications;
+            var nodeID        = event.detail.nodeID;
+            var modifications = event.detail.modifications;
 
             var node = editor.getView().getNode(nodeID);
 
@@ -295,7 +294,7 @@ export default class Controller {
                 }
             }
 
-            if (!event.memo.noUndoRedo) {
+            if (!event.detail.noUndoRedo) {
                 editor.getActionStack().addState( event );
             }
 
@@ -305,8 +304,8 @@ export default class Controller {
 
     handlePersonDragToNewParent(event: any): any {
 
-        var personID = event.memo.personID;
-        var parentID = event.memo.parentID;
+        var personID = event.detail.personID;
+        var parentID = event.detail.parentID;
         if (!editor.getGraph().isPerson(personID) || !editor.getGraph().isValidID(parentID)) {
             return;
         }
@@ -323,7 +322,7 @@ export default class Controller {
                 editor.getWorkspace().centerAroundNode(personID, true);
             }
 
-            if (!event.memo.noUndoRedo) {
+            if (!event.detail.noUndoRedo) {
                 editor.getActionStack().addState( event );
             }
 
@@ -333,7 +332,7 @@ export default class Controller {
 
     handlePersonNewParents(event: any): any {
 
-        var personID = event.memo.personID;
+        var personID = event.detail.personID;
         if (!editor.getGraph().isPerson(personID)) {
             return;
         }
@@ -341,7 +340,7 @@ export default class Controller {
         var changeSet = editor.getGraph().addNewParents(personID);
         editor.getView().applyChanges(changeSet, true);
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
 
@@ -351,10 +350,10 @@ export default class Controller {
     handlePersonNewSibling(event: any): any {
 
         // { "personID": id, "childParams": data.params.parameters, "preferLeft": false };
-        var personID    = event.memo.personID;
-        var childParams = event.memo.childParams ? cloneObject(event.memo.childParams) : {};
-        var numTwins    = event.memo.twins ? event.memo.twins : 1;
-        var numPersons  = event.memo.groupSize ? event.memo.groupSize : 0;
+        var personID    = event.detail.personID;
+        var childParams = event.detail.childParams ? cloneObject(event.detail.childParams) : {};
+        var numTwins    = event.detail.twins ? event.detail.twins : 1;
+        var numPersons  = event.detail.groupSize ? event.detail.groupSize : 0;
 
         var parentRelationship = editor.getGraph().getParentRelationship(personID);
 
@@ -363,27 +362,27 @@ export default class Controller {
             parentRelationship = editor.getController().handlePersonNewParents( { 'memo': { 'personID': personID, 'noUndoRedo': true } } );
         }
 
-        if (event.memo.twins) {
-            var nextEvent = { 'nodeID': personID, 'modifications': { 'addTwin': event.memo.twins }, 'noUndoRedo': true };
+        if (event.detail.twins) {
+            var nextEvent = { 'nodeID': personID, 'modifications': { 'addTwin': event.detail.twins }, 'noUndoRedo': true };
             editor.getController().handleModification( { 'memo': nextEvent } );
         } else {
             var nextEvent2 = { 'partnershipID': parentRelationship, 'childParams': childParams, 'noUndoRedo': true } as any;
-            if (event.memo.groupSize) {
-                nextEvent2['groupSize'] = event.memo.groupSize;
+            if (event.detail.groupSize) {
+                nextEvent2['groupSize'] = event.detail.groupSize;
             }
 
             editor.getController().handleRelationshipNewChild( { 'memo': nextEvent2 } );
         }
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
     }
 
     handlePersonDragToNewSibling(event: any): any {
 
-        var sibling1 = event.memo.sibling1ID;
-        var sibling2 = event.memo.sibling2ID;
+        var sibling1 = event.detail.sibling1ID;
+        var sibling2 = event.detail.sibling2ID;
 
         var parentRelationship = editor.getGraph().getParentRelationship(sibling1);
         if (parentRelationship == null) {
@@ -403,7 +402,7 @@ export default class Controller {
             editor.getController().handlePersonDragToNewParent( { 'memo': { 'personID': sibling1, 'parentID': parentRelationship, 'noUndoRedo': true } } );
         }
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
     }
@@ -413,14 +412,14 @@ export default class Controller {
 
         try {
 
-            var personID    = event.memo.personID;
+            var personID    = event.detail.personID;
             if (!editor.getGraph().isPerson(personID)) {
                 return;
             }
-            var preferLeft  = event.memo.preferLeft;
-            var childParams = event.memo.childParams ? cloneObject(event.memo.childParams) : {};
-            var numTwins    = event.memo.twins ? event.memo.twins : 1;
-            var numPersons  = event.memo.groupSize ? event.memo.groupSize : 0;
+            var preferLeft  = event.detail.preferLeft;
+            var childParams = event.detail.childParams ? cloneObject(event.detail.childParams) : {};
+            var numTwins    = event.detail.twins ? event.detail.twins : 1;
+            var numPersons  = event.detail.groupSize ? event.detail.groupSize : 0;
 
             if (editor.getGraph().isChildless(personID)) {
                 childParams['isAdopted'] = true;
@@ -433,7 +432,7 @@ export default class Controller {
             var changeSet = editor.getGraph().addNewRelationship(personID, childParams, preferLeft, numTwins);
             editor.getView().applyChanges(changeSet, true);
 
-            if (!event.memo.noUndoRedo) {
+            if (!event.detail.noUndoRedo) {
                 editor.getActionStack().addState( event );
             }
 
@@ -445,8 +444,8 @@ export default class Controller {
 
     handlePersonDragToNewPartner(event: any): any {
 
-        var personID  = event.memo.personID;
-        var partnerID = event.memo.partnerID;
+        var personID  = event.detail.personID;
+        var partnerID = event.detail.partnerID;
         if (!editor.getGraph().isPerson(personID) || !editor.getGraph().isPerson(partnerID)) {
             return;
         }
@@ -476,26 +475,26 @@ export default class Controller {
         var changeSet = editor.getGraph().assignPartner(personID, partnerID, childProperties);
         editor.getView().applyChanges(changeSet, true);
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
     }
 
     handleRelationshipNewChild(event: any): any {
 
-        var partnershipID = event.memo.partnershipID;
+        var partnershipID = event.detail.partnershipID;
         if (!editor.getGraph().isRelationship(partnershipID)) {
             return;
         }
 
-        var numTwins = event.memo.twins ? event.memo.twins : 1;
+        var numTwins = event.detail.twins ? event.detail.twins : 1;
 
-        var childParams = cloneObject(event.memo.childParams);
+        var childParams = cloneObject(event.detail.childParams);
         if (editor.getGraph().isChildless(partnershipID)) {
             childParams['isAdopted'] = true;
         }
 
-        var numPersons = event.memo.groupSize ? event.memo.groupSize : 0;
+        var numPersons = event.detail.groupSize ? event.detail.groupSize : 0;
         if (numPersons > 0) {
             childParams['numPersons'] = numPersons;
         }
@@ -503,7 +502,7 @@ export default class Controller {
         var changeSet = editor.getGraph().addNewChild(partnershipID, childParams, numTwins);
         editor.getView().applyChanges(changeSet, true);
 
-        if (!event.memo.noUndoRedo) {
+        if (!event.detail.noUndoRedo) {
             editor.getActionStack().addState( event );
         }
     }

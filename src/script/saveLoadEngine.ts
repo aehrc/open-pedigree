@@ -78,7 +78,7 @@ export default class SaveLoadEngine {
 
     createGraphFromSerializedData(JSONString: any, noUndo?: any, centerAround0?: any): any {
         console.log('---- load: parsing data ----');
-        document.fire('pedigree:load:start');
+        document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
         var changeSet;
         try {
@@ -86,8 +86,8 @@ export default class SaveLoadEngine {
         } catch(err) {
             console.log('ERROR loading the graph: ', err);
             alert('Error loading the graph');
-            document.fire('pedigree:graph:clear');
-            document.fire('pedigree:load:finish');
+            document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
+            document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
             return false;
         }
 
@@ -103,13 +103,13 @@ export default class SaveLoadEngine {
             editor.getActionStack().addState(null, null, JSONString);
         }
 
-        document.fire('pedigree:load:finish');
+        document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
         return true;
     }
 
     createGraphFromImportData(importString: any, importType: any, importOptions: any, noUndo?: any, centerAround0?: any): any {
         console.log('---- import: parsing data ----');
-        document.fire('pedigree:load:start');
+        document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
         var changeSet;
         try {
@@ -121,7 +121,7 @@ export default class SaveLoadEngine {
             console.log('Error importing pedigree:');
             console.log(err);
             alert('Error importing pedigree: ' + err);
-            document.fire('pedigree:load:finish');
+            document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
             return false;
         }
 
@@ -142,7 +142,7 @@ export default class SaveLoadEngine {
             editor.getActionStack().addState(null, null, JSONString);
         }
 
-        document.fire('pedigree:load:finish');
+        document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
         return true;
     }
 
@@ -153,15 +153,14 @@ export default class SaveLoadEngine {
 
         var me = this;
 
-
         if (patientDataUrl) {
-            document.fire('pedigree:save:start');
-            var image = $('canvas');
-            var background = image.getElementsByClassName('panning-background')[0];
+            document.dispatchEvent(new CustomEvent('pedigree:save:start'));
+            var image = document.getElementById('canvas') as HTMLElement;
+            var background = image.getElementsByClassName('panning-background')[0] as HTMLElement;
             var backgroundPosition = background.nextSibling;
-            var backgroundParent =  background.parentNode;
+            var backgroundParent = background.parentNode as HTMLElement;
             backgroundParent.removeChild(background);
-            var bbox = image.down().getBBox();
+            var bbox = (image.firstElementChild as any).getBBox();
             var pedigreeImage = image.innerHTML.replace(/xmlns:xlink=".*?"/, '')
                 .replace(/width=".*?"/, '')
                 .replace(/height=".*?"/, '')
@@ -192,7 +191,7 @@ export default class SaveLoadEngine {
                 localStorage.setItem(localStorageKey, JSON.stringify(data, null, 2));
 
                 console.log('[SAVE] to local storage : ' + localStorageKey + ' as ' + format);
-                document.fire('pedigree:save:complete');
+                document.dispatchEvent(new CustomEvent('pedigree:save:complete'));
                 if (closeOnSave === 'true' || closeOnSave === ''){
                     console.log('Attempt to close the window');
                     window.close();
@@ -203,18 +202,17 @@ export default class SaveLoadEngine {
 
                 console.log('[SAVE] data: ' + JSON.stringify(jsonData2,null, 2));
 
-                new Ajax.Request(patientDataUrl, {
+                me._saveInProgress = true;
+                fetch(patientDataUrl, {
                     method: 'POST',
-                    onCreate: function() {
-                        me._saveInProgress = true;
-                    },
-                    onComplete: function() {
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ 'property#data': jsonData2, 'property#image': pedigreeImage })
+                })
+                    .catch(err => console.log('[SAVE] Error: ' + err))
+                    .finally(() => {
                         me._saveInProgress = false;
-                        document.fire('pedigree:save:complete');
-                    },
-                    onSuccess: function() {},
-                    parameters: {'property#data': jsonData2, 'property#image': pedigreeImage}
-                });
+                        document.dispatchEvent(new CustomEvent('pedigree:save:complete'));
+                    });
             }
             backgroundParent.insertBefore(background, backgroundPosition);
         }
@@ -276,14 +274,14 @@ export default class SaveLoadEngine {
                 }
             }
             else {
-                new Ajax.Request(patientDataUrl, {
-                    method: 'GET',
-                    onCreate: function() {
-                        document.fire('pedigree:load:start');
-                    },
-                    onSuccess: function(response: any) {
-                        if (response && response.responseXML) {
-                            var rawdata  = getSubSelectorTextFromXML(response.responseXML, 'property', 'name', 'data', 'value');
+                document.dispatchEvent(new CustomEvent('pedigree:load:start'));
+                fetch(patientDataUrl, { method: 'GET' })
+                    .then(response => response.text())
+                    .then(text => {
+                        try {
+                            var parser = new DOMParser();
+                            var responseXML = parser.parseFromString(text, 'application/xml');
+                            var rawdata  = getSubSelectorTextFromXML(responseXML, 'property', 'name', 'data', 'value');
                             var jsonData = unescapeRestData(rawdata);
                             if (jsonData.trim()) {
                                 console.log('[LOAD] recived JSON: ' + JSON.stringify(jsonData));
@@ -294,15 +292,17 @@ export default class SaveLoadEngine {
 
                                 didLoadData = true;
                             }
+                        } catch (err) {
+                            console.log('[LOAD] Error parsing response: ' + err);
                         }
-                    },
-                    onComplete: function() {
+                    })
+                    .catch(err => console.log('[LOAD] Fetch error: ' + err))
+                    .finally(() => {
                         if (!didLoadData) {
                             // If load failed, just open templates
                             new TemplateSelector(true);
                         }
-                    }
-                });
+                    });
             }
         } else {
             new TemplateSelector(true);

@@ -6,10 +6,8 @@
     "skipLibCheck": true,
     "target": "ES2017",
     "module": "commonjs",
-    "baseUrl": ".",
     "paths": {
-      "pedigree/*": ["src/script/*"],
-      "vendor/*": ["public/vendor/*"]
+      "pedigree/*": ["./src/script/*"]
     }
   },
   "include": ["src/script/**/*", "src/types/**/*"]

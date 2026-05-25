@@ -42,7 +42,7 @@ function sector(canvas, xPosition, yPosition, radius, gender, startAngle, endAng
     //returns the side of the square on which the coordinate exists. Sides are numbered 0-3 counter-clockwise,
     //starting with the right side
     function sideAtAngle(angle) {
-      return (((angle + 45)/90).floor()) % 4;
+      return Math.floor((angle + 45)/90) % 4;
     }
 
     //returns the tangent value of the parameter degrees

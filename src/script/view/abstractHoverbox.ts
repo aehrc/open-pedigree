@@ -391,7 +391,7 @@ export default class AbstractHoverbox {
         var action = function() {
             me.animateHideHoverZone();
             var event = { 'nodeID': me.getNode().getID() };
-            document.fire('pedigree:node:remove', event);
+            document.dispatchEvent(new CustomEvent('pedigree:node:remove', { detail: event }));
         };
         var attributes = PedigreeEditorParameters.attributes.deleteBtnIcon;
         var x = this.getX() + this.getWidth() - 20 - this.getWidth()/40;

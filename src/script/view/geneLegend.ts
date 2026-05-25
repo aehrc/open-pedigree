@@ -49,8 +49,8 @@ export default class GeneLegend extends Legend {
      * @private
      */
     _updateTermName(id: any): any {
-        var name = this._legendBox.down('li#' + this._getPrefix() + '-' + id + ' .disorder-name');
-        name.update(this.getTerm(id).getName());
+        var name = this._legendBox.querySelector('li#' + this._getPrefix() + '-' + id + ' .disorder-name');
+        name.textContent = this.getTerm(id).getName();
     }
 
     /**
@@ -65,7 +65,7 @@ export default class GeneLegend extends Legend {
         if (!this._objectColors.hasOwnProperty(geneID)) {
             var color = this._generateColor(geneID);
             this._objectColors[geneID] = color;
-            document.fire('gene:color', {'id' : geneID, color: color});
+            document.dispatchEvent(new CustomEvent('gene:color', { detail: {'id' : geneID, color: color} }));
         }
 
         return super._generateElement(geneID, name);

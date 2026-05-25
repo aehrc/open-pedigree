@@ -82,8 +82,8 @@ export default class PhenotypeLegend extends Legend {
      * @private
      */
     _updateTermName(id: any): any {
-        var name = this._legendBox.down('li#' + this._getPrefix() + '-' + id + ' .disorder-name');
-        name.update(this.getTerm(id).getName());
+        var name = this._legendBox.querySelector('li#' + this._getPrefix() + '-' + id + ' .disorder-name');
+        name.textContent = this.getTerm(id).getName();
     }
 
     getCurrentPhenotypes(): any {

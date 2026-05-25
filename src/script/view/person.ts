@@ -73,6 +73,7 @@ export default class Person extends AbstractPerson {
             delete (Person as any)._pendingIsProband;
             delete (Person as any)._pendingType;
         }
+        this._gender = this.parseGender((AbstractPerson as any)._pendingGender);
         this._setDefault();
         return new PersonVisuals(this, x, y);
     }
