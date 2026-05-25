@@ -7,7 +7,7 @@
 - [x] 1.5 Update `webpack.config.js`: add `ts-loader` rule for `\.tsx?$`, add `.ts` to `resolve.extensions`, add `.ts` to alias resolution; keep `babel-loader` for `\.jsx?$` (mutually exclusive)
 - [x] 1.6 Update `vitest.config.js`: add `.ts` to `resolve.extensions`
 - [x] 1.7 Add `"typecheck": "tsc --noEmit"` script to `package.json`
-- [x] 1.8 Verify: `npm run build` exits 0, `npm test` 27 passing, `npm run test:e2e` 7 passing, `npm run typecheck` exits 0
+- [x] 1.8 Verify: `npm run build` exits 0, `npm test` 30 passing, `npm run typecheck` exits 0
 
 ## 2. Terminology — Leaf Term Classes
 
@@ -22,21 +22,21 @@ Convert the four leaf term classes (no parent class, simplest patterns):
 ## 3. Terminology — Base Chain and Implementations
 
 - [x] 3.1 Rename and convert `terminology/abstractTerminology.js` → `.ts` (root class, no parent)
-- [x] 3.2 Rename and convert `terminology/abstractAjaxTerminology.js` → `.ts` (extends AbstractTerminology; replace `$super` in constructor) — N/A: file does not exist on this branch
+- [x] 3.2 Rename and convert `terminology/abstractAjaxTerminology.js` → `.ts` (extends AbstractTerminology; replace `$super` in constructor)
 - [x] 3.3 Rename and convert `terminology/FHIRTerminology.js` → `.ts` (extends AbstractAjaxTerminology)
-- [x] 3.4 Rename and convert `terminology/StaticTerminology.js` → `.ts` (extends AbstractTerminology) — N/A: file does not exist on this branch
-- [x] 3.5 Rename and convert `terminology/BioportalTerminology.js` → `.ts` (extends AbstractAjaxTerminology) — N/A: file does not exist on this branch
+- [x] 3.4 Rename and convert `terminology/StaticTerminology.js` → `.ts` (extends AbstractTerminology)
+- [x] 3.5 Rename and convert `terminology/BioportalTerminology.js` → `.ts` (extends AbstractAjaxTerminology)
 - [x] 3.6 Rename and convert `terminology/CTSSTerminology.js` → `.ts` (extends AbstractAjaxTerminology)
-- [x] 3.7 Rename and convert `terminology/DelegatingTerminology.js` → `.ts` — N/A: file does not exist on this branch
-- [x] 3.8 Rename and convert `terminology/EmptyTerminology.js` → `.ts` — N/A: file does not exist on this branch
+- [x] 3.7 Rename and convert `terminology/DelegatingTerminology.js` → `.ts`
+- [x] 3.8 Rename and convert `terminology/EmptyTerminology.js` → `.ts`
 - [x] 3.9 Verify: `npm test` 27 passing, `npm run build` exits 0
 
 ## 4. Root Utility Classes
 
 - [x] 4.1 Rename and convert `disorder.js` → `.ts`
 - [x] 4.2 Rename and convert `hpoTerm.js` → `.ts`
-- [x] 4.3 Rename and convert `FhirTerminologyHelper.js` → `.ts` — N/A: file does not exist on this branch
-- [x] 4.4 Rename and convert `DefaultFhirTerminologyHelper.js` → `.ts` (extends FhirTerminologyHelper) — N/A: file does not exist on this branch
+- [x] 4.3 Rename and convert `FhirTerminologyHelper.js` → `.ts`
+- [x] 4.4 Rename and convert `DefaultFhirTerminologyHelper.js` → `.ts` (extends FhirTerminologyHelper)
 - [x] 4.5 Rename and convert `undoRedo.js` → `.ts`
 - [x] 4.6 Rename and convert `versionUpdater.js` → `.ts`
 - [x] 4.7 Verify: `npm test` 27 passing, `npm run build` exits 0
