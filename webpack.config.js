@@ -11,9 +11,7 @@ module.exports = {
     clean: false,
   },
 
-  externals: [
-    { jquery: 'jQuery' },
-  ],
+  externals: [],
 
   module: {
     rules: [
@@ -87,6 +85,8 @@ module.exports = {
     new webpack.ProvidePlugin({
       process: 'process/browser',
       Buffer: ['buffer', 'Buffer'],
+      jQuery: 'jquery',
+      $: 'jquery',
     }),
   ],
 
