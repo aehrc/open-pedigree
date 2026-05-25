@@ -96,4 +96,4 @@ Convert the four leaf term classes (no parent class, simplest patterns):
 - [x] 9.5 Run `npm run build` — confirm `dist/pedigree.min.js` produced, exit 0
 - [x] 9.6 Run `npm test` — confirm all 27 unit tests pass
 - [x] 9.7 Run `npm run test:e2e` — confirm all 7 E2E tests pass
-- [ ] 9.8 Commit the completed migration
+- [x] 9.8 Commit the completed migration
