@@ -11,7 +11,8 @@ export default class FHIRTerminology extends AbstractTerminology {
     }
 
     getLookupURL(id: any): any {
-        return this._fhirBaseUrl + 'CodeSystem/$lookup?_format=json&system=' + this.getCodeSystem() + '&code=' + this.desanitizeID(id);
+        const base = this._fhirBaseUrl.replace(/\/$/, '');
+        return base + '/CodeSystem/$lookup?_format=json&system=' + this.getCodeSystem() + '&code=' + this.desanitizeID(id);
     }
 
     processLookupResponse(response: any): any {
@@ -28,7 +29,8 @@ export default class FHIRTerminology extends AbstractTerminology {
     }
 
     getSearchURL(searchTerm: any): any {
-        return this._fhirBaseUrl + 'ValueSet/$expand?_format=json&url=' + this._valueSet + "&count=" + this.getSearchCount() + "&filter=" + searchTerm;
+        const base = this._fhirBaseUrl.replace(/\/$/, '');
+        return base + '/ValueSet/$expand?_format=json&url=' + this._valueSet + "&count=" + this.getSearchCount() + "&filter=" + searchTerm;
     }
 
     processSearchResponse(response: any): any {

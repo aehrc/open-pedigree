@@ -1921,6 +1921,7 @@ Ajax.Response = Class.create({
   },
 
   _getHeaderJSON: function() {
+    return null; // X-JSON header blocked by modern browsers; not used by this app
     var json = this.getHeader('X-JSON');
     if (!json) return null;
 

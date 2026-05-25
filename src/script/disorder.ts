@@ -48,7 +48,7 @@ export default class Disorder {
             onSuccess: this.onDataReady.bind(this),
             onFailure: this.onDataFail.bind(this),
             //onComplete: complete.bind(this)
-            onComplete: callWhenReady ? callWhenReady : {}
+            onComplete: callWhenReady
         });
     }
 

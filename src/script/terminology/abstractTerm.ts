@@ -53,8 +53,8 @@ export default class AbstractTerm {
                 'X-Prototype-Version': null
             },
             onSuccess: this.onDataReady.bind(this),
-            onError: this.onDataFail.bind(this),
-            onComplete: callWhenReady ? callWhenReady : {}
+            onFailure: this.onDataFail.bind(this),
+            onComplete: callWhenReady
         };
         //console.log("QueryURL: " + queryURL);
         new Ajax.Request(queryURL, {...baseAjaxOptions, ...extraAjaxOptions});
