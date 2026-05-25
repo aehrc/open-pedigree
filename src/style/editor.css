@@ -4,6 +4,9 @@
 #body {
   overflow: hidden;
 }
+.hidden {
+  display: none !important;
+}
 /* =========================================
  * MENU
  */
@@ -265,7 +268,10 @@
   outline-style: none;
 }
 .calendar_date_select {
-  z-index: 100000 !important;
+  z-index: 100001 !important;
+}
+.flatpickr-calendar {
+  z-index: 100001 !important;
 }
 .width80px {
   width: 80px;

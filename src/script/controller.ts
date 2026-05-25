@@ -32,7 +32,7 @@ export default class Controller {
 
     editor.getWorkspace().centerAroundNode(0, false);
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
   }
@@ -51,7 +51,7 @@ export default class Controller {
         var changeSet = editor.getGraph().improvePosition();
         editor.getView().applyChanges(changeSet, true);
 
-        if (!event.detail.noUndoRedo) {
+        if (!event.detail?.noUndoRedo) {
           editor.getActionStack().addState( event );
         }
       } catch(err) {
@@ -237,7 +237,7 @@ export default class Controller {
 
     editor.getNodeMenu().update();
 
-    if (!event.detail.noUndoRedo && changedValue) {
+    if (!event.detail?.noUndoRedo && changedValue) {
       editor.getActionStack().addState( event, undoEvent );
     }
   }
@@ -269,7 +269,7 @@ export default class Controller {
         }
       }
 
-      if (!event.detail.noUndoRedo) {
+      if (!event.detail?.noUndoRedo) {
         editor.getActionStack().addState( event );
       }
 
@@ -296,7 +296,7 @@ export default class Controller {
         editor.getWorkspace().centerAroundNode(personID, true);
       }
 
-      if (!event.detail.noUndoRedo) {
+      if (!event.detail?.noUndoRedo) {
         editor.getActionStack().addState( event );
       }
 
@@ -313,7 +313,7 @@ export default class Controller {
     var changeSet = editor.getGraph().addNewParents(personID);
     editor.getView().applyChanges(changeSet, true);
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
 
@@ -344,7 +344,7 @@ export default class Controller {
       editor.getController().handleRelationshipNewChild( { 'detail': nextEvent } );
     }
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
   }
@@ -368,7 +368,7 @@ export default class Controller {
       editor.getController().handlePersonDragToNewParent( { 'detail': { 'personID': sibling1, 'parentID': parentRelationship, 'noUndoRedo': true } } );
     }
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
   }
@@ -397,7 +397,7 @@ export default class Controller {
       var changeSet = editor.getGraph().addNewRelationship(personID, childParams, preferLeft, numTwins);
       editor.getView().applyChanges(changeSet, true);
 
-      if (!event.detail.noUndoRedo) {
+      if (!event.detail?.noUndoRedo) {
         editor.getActionStack().addState( event );
       }
 
@@ -435,7 +435,7 @@ export default class Controller {
     var changeSet = editor.getGraph().assignPartner(personID, partnerID, childProperties);
     editor.getView().applyChanges(changeSet, true);
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
   }
@@ -461,7 +461,7 @@ export default class Controller {
     var changeSet = editor.getGraph().addNewChild(partnershipID, childParams, numTwins);
     editor.getView().applyChanges(changeSet, true);
 
-    if (!event.detail.noUndoRedo) {
+    if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
   }

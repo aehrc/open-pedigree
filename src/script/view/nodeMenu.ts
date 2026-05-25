@@ -393,6 +393,7 @@ export default class NodeMenu {
       flatpickr(datePicker as any, {
         dateFormat: 'Y-m-d',
         allowInput: true,
+        position: 'above',
         onChange: function(selectedDates: any, dateStr: string) {
           (datePicker as any).alt = dateStr;
           datePicker.dispatchEvent(new CustomEvent('xwiki:date:changed'));
@@ -551,7 +552,7 @@ export default class NodeMenu {
 
   _onClickOutside(event: any): any {
     var target = event.target as Element;
-    if (target && !target.closest('.menu-box') && !target.closest('.calendar_date_select') && !target.closest('.suggestItems')) {
+    if (target && !target.closest('.menu-box') && !target.closest('.calendar_date_select') && !target.closest('.flatpickr-calendar') && !target.closest('.suggestItems')) {
       this.hide();
     }
   }
