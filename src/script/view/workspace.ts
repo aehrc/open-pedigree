@@ -292,7 +292,7 @@ export default class Workspace {
     this.__pan.title = 'Pan';
     this.__controls.appendChild(this.__pan);
     ['up', 'right', 'down', 'left', 'home'].forEach(function (direction: any) {
-      var faIconClass = (direction == 'home') ? 'fa-user' : 'fa-arrow-' + direction;
+      var faIconClass = (direction == 'home') ? 'fa-house' : 'fa-arrow-' + direction;
       _this.__pan[direction] = document.createElement('span');
       _this.__pan[direction].className = 'view-control-pan pan-' + direction + ' fas fa-fw ' + faIconClass;
       _this.__pan[direction].title = 'Pan ' + direction;
