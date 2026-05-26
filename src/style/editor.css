@@ -128,7 +128,7 @@
 }
 .view-controls-pan .pan-up {
   top: 4px;
-  left: 22px;
+  left: 21px;
 }
 .view-controls-pan .pan-right {
   top: 22px;
@@ -136,16 +136,15 @@
 }
 .view-controls-pan .pan-down {
   bottom: 4px;
-  left: 22px;
+  left: 21px;
 }
 .view-controls-pan .pan-left {
   top: 22px;
-  left: 4px;
+  left: 3px;
 }
 .view-controls-pan .pan-home {
   top: 22px;
-  left: 22px;
-  font-size: 12px;
+  left: 20px;
 }
 /* ----------------------------------------
  * Zoom
