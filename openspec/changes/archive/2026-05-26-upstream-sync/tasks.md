@@ -25,5 +25,5 @@
 
 ## 5. Commit and push
 
-- [ ] 5.1 Commit all changes to `master` and push; verify the GitHub Pages deploy workflow succeeds
-- [ ] 5.2 Cherry-pick or apply the same changes to `feature/redcap_em_0.4_upgrade` and push
+- [x] 5.1 Commit all changes to `master` and push; verify the GitHub Pages deploy workflow succeeds
+- [x] 5.2 Cherry-pick or apply the same changes to `feature/redcap_em_0.4_upgrade` and push
