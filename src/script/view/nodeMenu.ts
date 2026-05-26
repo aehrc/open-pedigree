@@ -9,6 +9,7 @@ import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import DisorderLegend from 'pedigree/view/disorderLegend';
 import flatpickr from 'flatpickr';
+import jQuery from 'jquery';
 
 /**
  * NodeMenu is a UI Element containing options for AbstractNode elements

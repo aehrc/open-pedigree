@@ -11,10 +11,6 @@ module.exports = {
     clean: false,
   },
 
-  externals: [
-    { jquery: 'jQuery' },
-  ],
-
   module: {
     rules: [
       {
