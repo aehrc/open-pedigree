@@ -4,6 +4,9 @@
 #body {
   overflow: hidden;
 }
+.hidden {
+  display: none !important;
+}
 /* =========================================
  * MENU
  */
@@ -182,6 +185,16 @@
   height: 10px;
   margin-left: -9px;
 }
+.view-controls-zoom .zoom-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 20px;
+  height: 200px;
+  cursor: pointer;
+  margin: auto;
+  display: block;
+  padding: 0;
+}
 .view-controls-zoom .zoom-crt-value {
   background: transparent;
   border: 0 none;
@@ -255,7 +268,10 @@
   outline-style: none;
 }
 .calendar_date_select {
-  z-index: 100000 !important;
+  z-index: 100001 !important;
+}
+.flatpickr-calendar {
+  z-index: 100001 !important;
 }
 .width80px {
   width: 80px;
@@ -712,9 +728,49 @@
     margin: 3px;
 }
 
+.msdialog-modal-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    overflow: auto;
+}
 .msdialog-box {
     /*overflow:auto;*/
+    position: relative;
     width: 650px;
+    margin: 80px auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.msdialog-box.msdialog-top {
+    margin-top: 20px;
+}
+.msdialog-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ccc;
+}
+.msdialog-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 1.6em;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+}
+.msdialog-close-btn:hover {
+    color: #000;
 }
 .msdialog-box .content {
     text-align: center;

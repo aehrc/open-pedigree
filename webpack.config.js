@@ -1,5 +1,5 @@
-const webpack = require('webpack');
 const path = require('path');
+const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
@@ -8,19 +8,19 @@ module.exports = {
   output: {
     filename: 'pedigree.min.js',
     path: path.resolve(__dirname, 'dist'),
+    clean: false,
   },
-
-  externals: [
-    'XWiki', // XWiki JS library
-    'Class', // PrototypeJS
-    'Prototype',
-    '$$',
-    '$',
-    '$F',
-  ],
 
   module: {
     rules: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        loader: 'ts-loader',
+        options: {
+          transpileOnly: true
+        }
+      },
       {
         test: /\.jsx?$/,
         exclude: /node_modules/,
@@ -33,52 +33,78 @@ module.exports = {
         test: /\.css$/,
         use: [
           'style-loader',
-          'css-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              url: {
+                // Absolute paths (e.g. /resources/icons/xwiki/...) are XWiki
+                // server-side resources; leave them unresolved for runtime.
+                filter: (url) => !url.startsWith('/'),
+              },
+            },
+          },
         ]
       },
       {
         test: /\.scss$/,
         use: [
           'style-loader',
-          'css-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              url: {
+                filter: (url) => !url.startsWith('/'),
+              },
+            },
+          },
           'sass-loader',
         ]
       },
       {
         test: /\.(png|svg|jpg|gif)$/,
-        use: [{
-         loader: 'file-loader',
-         options: {
-           outputPath: 'assets',
-           publicPath: 'dist/assets',
-         }
-       }]
+        type: 'asset/resource',
+        generator: {
+          filename: 'assets/[name][ext]',
+          publicPath: 'dist/',
+        }
       }
     ]
   },
 
   devServer: {
-    contentBase: path.join(__dirname, '.'),
+    static: {
+      directory: path.join(__dirname, '.'),
+    },
+    devMiddleware: {
+      publicPath: '/dist/',
+    },
     port: 9000
   },
+
+  plugins: [
+    new webpack.ProvidePlugin({
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
+    }),
+  ],
 
   optimization: {
     minimize: true,
     minimizer: [
-      new TerserPlugin({
-        terserOptions: {
-          mangle: {
-            reserved: ['$super'],
-          },
-        },
-      }),
+      new TerserPlugin(),
     ],
   },
 
   resolve: {
-  	alias: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    alias: {
       'pedigree': path.resolve(__dirname, 'src/script/'),
       'vendor': path.resolve(__dirname, 'public/vendor/'),
-  	}
+    },
+    fallback: {
+      stream: require.resolve('stream-browserify'),
+      util: require.resolve('util/'),
+      buffer: require.resolve('buffer/'),
+    },
   }
 };

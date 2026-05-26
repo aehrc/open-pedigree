@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "target": "ES2017",
+    "module": "commonjs",
+    "paths": {
+      "pedigree/*": ["./src/script/*"]
+    }
+  },
+  "include": ["src/script/**/*", "src/types/**/*"]
+}
