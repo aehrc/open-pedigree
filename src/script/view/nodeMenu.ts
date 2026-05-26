@@ -23,6 +23,7 @@
  */
 
 import flatpickr from 'flatpickr';
+import jQuery from 'jquery';
 
 var SELECTIZE_DELIMITER = '|';
 
