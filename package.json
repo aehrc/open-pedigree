@@ -60,7 +60,7 @@
     "file-saver": "^2.0.5",
     "flatpickr": "^4.6.13",
     "pdfkit": "^0.18.0",
-    "sifter": "^0.5.4",
+    "sifter": "^0.6.0",
     "svg-to-pdfkit": "^0.1.8",
     "urijs": "^1.19.11"
   },
