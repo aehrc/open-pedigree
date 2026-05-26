@@ -47,7 +47,7 @@ Open a browser to http://localhost:9000/
 
 ### Docker
 
-You can also use the supplied Docker image to run the applicarion.  To get started:
+You can also use the supplied Docker image to run the application. To get started:
 
 ```
 git clone git@github.com:phenotips/open-pedigree.git
