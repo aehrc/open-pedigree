@@ -9,12 +9,18 @@
   <a href="https://opensource.org/licenses/LGPL-2.1" target="_blank">
     <img src="https://img.shields.io/badge/license-LGPL--2.1-blue.svg" alt="LGPL-2.1">
   </a>
+  <a href="https://aehrc.github.io/open-pedigree/" target="_blank">
+    <img src="https://img.shields.io/badge/demo-live-brightgreen.svg" alt="Live demo">
+  </a>
+  <img src="https://img.shields.io/badge/made%20in-australia-green.svg" alt="Made in Australia">
 </p>
 
 
 ## A free and open-source pedigree tool powered by PhenoTips®
 
-Open Pedigree is a robust browser-based genomic pedigree drawing solution using [Prototype](prototypejs.org), [Raphaël](https://dmitrybaranovskiy.github.io/raphael/), and [PhenoTips](https://phenotips.com).
+**[Try the live demo](https://aehrc.github.io/open-pedigree/)**
+
+Open Pedigree is a robust browser-based genomic pedigree drawing solution using [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) and [PhenoTips](https://phenotips.org).
 
 <img width="983" alt="image" src="https://user-images.githubusercontent.com/4251264/68103796-e1048080-fe9d-11e9-9353-6b491aae588d.png">
 
