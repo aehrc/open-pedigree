@@ -27,6 +27,7 @@ import {DisorderTermType} from 'pedigree/terminology/disorderTerm';
 import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import BioportalTerminology from './terminology/BioportalTerminology';
+import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider';
 
 export default class PedigreeEditor {
   DEBUG_MODE: any;
@@ -52,6 +53,7 @@ export default class PedigreeEditor {
   _saveLoadEngine: any;
   _closing: any;
   _controller: any;
+  _patientProvider: any;
 
   constructor(options: any) {
     options = options || {};
@@ -72,6 +74,8 @@ export default class PedigreeEditor {
     this.DEBUG_MODE = Boolean(options.DEBUG_MODE);
     this._omimServiceUrl = options.omimServiceUrl || '';
     this._hpoServiceUrl  = options.hpoServiceUrl  || '';
+
+    this._patientProvider = options.patientProvider || new EmptyPatientProvider();
 
     (window as any).editor = this;
 
@@ -303,6 +307,10 @@ export default class PedigreeEditor {
     return this._saveLoadEngine;
   }
 
+  getPatientProvider(): any {
+    return this._patientProvider;
+  }
+
   getTemplateSelector(): any {
     return this._templateSelector;
   }
@@ -362,6 +370,28 @@ export default class PedigreeEditor {
         'function' : 'setLastName'
       },
       {
+        'name' : 'link_patient',
+        'label' : 'Patient',
+        'type' : 'button-action',
+        'tab': 'Personal',
+        'buttonLabel' : 'Link to patient',
+        'action' : function(menu: any) {
+          var nodeId = menu.targetNode.getID();
+          (window as any).editor.getPatientProvider().openPatientPickerModal(nodeId,
+            function(fhirRef: string, details: any) {
+              var properties: any = { setLinkedPatientRef: fhirRef, setFirstName: details.firstName };
+              if (details.lastName)   properties.setLastName   = details.lastName;
+              if (details.gender)     properties.setGender     = details.gender;
+              if (details.birthDate)  properties.setBirthDate  = details.birthDate;
+              if (details.lifeStatus) properties.setLifeStatus = details.lifeStatus;
+              document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+                detail: { nodeID: nodeId, properties: properties }
+              }));
+            }
+          );
+        }
+      },
+      {
         'name' : 'external_id',
         'label': 'Identifier',
         'type' : 'text',
@@ -395,6 +425,31 @@ export default class PedigreeEditor {
         'type' : 'disease-picker',
         'tab': 'Clinical',
         'function' : 'setDisorders'
+      },
+      {
+        'name' : 'import_from_record',
+        'label' : 'Clinical record',
+        'type' : 'button-action',
+        'tab': 'Clinical',
+        'buttonLabel' : 'Import from record',
+        'action' : function(menu: any) {
+          var nodeId = menu.targetNode.getID();
+          var node = (window as any).editor.getView().getNode(nodeId);
+          var fhirRef = node && node.getLinkedPatientRef ? node.getLinkedPatientRef() : '';
+          if (!fhirRef) return;
+          (window as any).editor.getPatientProvider().openClinicalImportModal(nodeId, fhirRef,
+            function(disorders: any[]) {
+              if (!disorders || disorders.length === 0) return;
+              var n = (window as any).editor.getView().getNode(nodeId);
+              var existing = (n && n.getDisorders) ? n.getDisorders().slice(0) : [];
+              var existingIds = new Set(existing);
+              var merged = existing.concat(disorders.filter((d: any) => !existingIds.has(d.id)).map((d: any) => d.id));
+              document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+                detail: { nodeID: nodeId, properties: { setDisorders: merged } }
+              }));
+            }
+          );
+        }
       },
       {
         'name' : 'candidate_genes',
