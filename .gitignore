@@ -64,3 +64,4 @@ dist/
 
 # jetbrains editor
 .idea
+.claude/settings.local.json
