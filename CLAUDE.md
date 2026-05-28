@@ -12,6 +12,42 @@ Use **OpenSpec** for all non-trivial changes:
 - `/opsx:verify` — check implementation before archiving
 - `/opsx:archive` — finalise a completed change
 
+## Branch Model
+
+```
+master                  — stable releases only; tagged v<major>.<minor>
+  ├── develop           — generic open-pedigree (upstream-compatible, SMART on FHIR target)
+  └── develop_redcap_em — REDCap EM layer; stays in sync with develop
+
+feature/<name>          — branched from develop; merged into BOTH develop and develop_redcap_em
+```
+
+### Rules
+
+- **Always branch from `develop`**, not from `develop_redcap_em` or `master`.
+- **Merge feature branches into both** `develop` and `develop_redcap_em` to keep them in sync. The library contains no hard REDCap dependencies in the JS — REDCap-specific behaviour is wired at runtime via options (`backend`, `patientProvider`, terminology options). A feature that works generically belongs in both.
+- **`develop_redcap_em` only diverges** if JS code is genuinely REDCap-only with no generic use case. This has not occurred yet.
+- **`master`** only receives PRs from `develop` or `develop_redcap_em` at release time.
+- See `docs/branch-delta.md` for the full history of what exists on each branch and upcoming features.
+
+### Day-to-day
+
+```bash
+# Start a new feature
+git checkout develop && git pull
+git checkout -b feature/my-feature
+
+# ... implement, commit ...
+
+# Merge into develop
+git checkout develop
+git merge --no-ff feature/my-feature
+
+# Merge into develop_redcap_em to keep in sync
+git checkout develop_redcap_em
+git merge --no-ff feature/my-feature
+```
+
 ## Commands
 
 ```bash
@@ -27,17 +63,17 @@ npx eslint src/
 
 ## Architecture
 
-Open Pedigree is a browser-based genetics pedigree editor. It bundles to a single JS file (`dist/pedigree.min.js`) that exposes `window.OpenPedigree`. The host page loads Prototype.js and other vendor libraries separately (they are webpack externals), then calls `OpenPedigree.initialiseEditor(options)`.
+Open Pedigree is a browser-based genetics pedigree editor. It bundles to a single JS file (`dist/pedigree.min.js`) that exposes `window.OpenPedigree`. The host page calls `OpenPedigree.initialiseEditor(options)`.
 
 ### Module alias
 Webpack aliases `pedigree` → `src/script/` and `vendor` → `public/vendor/`. All internal imports use `import X from 'pedigree/...'`.
 
 ### Core components (`src/script/`)
 
-**`pedigree.js` — `PedigreeEditor`** (the root)  
-Instantiates and wires every subsystem. Sets `window.editor` as the global singleton. Options accepted: `patientDataUrl`, `returnUrl`, `DEBUG_MODE`.
+**`pedigree.ts` — `PedigreeEditor`** (the root)  
+Instantiates and wires every subsystem. Sets `window.editor` as the global singleton. Key options: `patientDataUrl`, `returnUrl`, `DEBUG_MODE`, `backend: { save, load }`, `patientProvider`, terminology options (`disorderOptions`, `phenotypeOptions`, `geneOptions`).
 
-**`controller.js` — `Controller`**  
+**`controller.ts` — `Controller`**  
 Listens to custom DOM events (e.g. `pedigree:node:setproperty`, `pedigree:person:drag:newpartner`) fired by the view layer and mutates the graph model accordingly. All inter-component communication flows through these DOM events.
 
 **Model layer (`src/script/model/`)**  
@@ -48,37 +84,31 @@ Three-layer graph stack, built bottom-up at startup:
 
 `import.js` handles PED, LINKAGE, GEDCOM (Cyrillic), and BOADICEA parsing into `BaseGraph`.  
 `export.js` handles PED, BOADICEA, and JSON serialisation.  
-`FHIRConverter.js` handles FHIR Composition/List import and export (non-standard; see README for mapping limitations).  
-`GA4GHFHIRConverter.js` handles GA4GH FHIR export.
+`GA4GHFHIRConverter.js` handles GA4GH FHIR pedigree format (Composition + Patient + FamilyMemberHistory + Condition + Observation) — the primary FHIR format.
 
-**View layer (`src/script/view/` + `view.js`)**  
-Uses the [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) SVG library (loaded via npm, not a vendor script). `View` maintains a `_nodeMap` of node IDs to visual node objects. Node types: `Person`, `PersonGroup`, `Partnership`. Each has a `*Visuals` class (SVG drawing) and a `*Hoverbox` class (interactive handles).
+**View layer (`src/script/view/` + `view.ts`)**  
+Uses the [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) SVG library. `View` maintains a `_nodeMap` of node IDs to visual node objects. Node types: `Person`, `PersonGroup`, `Partnership`. Each has a `*Visuals` class (SVG drawing) and a `*Hoverbox` class (interactive handles).
 
-Legends (`disorderLegend.js`, `phenotypeLegend.js`, `geneLegend.js`) track which disorders/phenotypes/genes are in use and display a colour key.
+**`saveLoadEngine.ts` — `SaveLoadEngine`**  
+Delegates save/load to an injected `backend: { save, load }` object. Serialises to the internal JSON format via `DynamicPositionedGraph.toJSON()`.
 
-**`saveLoadEngine.js` — `SaveLoadEngine`**  
-Loads/saves pedigree data via AJAX to the `patientDataUrl` passed at init. Serialises to the internal JSON format via `DynamicPositionedGraph.toJSON()`. Also supports `localStorageBackend` for standalone use.
-
-**`undoRedo.js` — `ActionStack`**  
+**`undoRedo.ts` — `ActionStack`**  
 Captures graph state snapshots on each mutating event for undo/redo.
 
 **Terminology subsystem (`src/script/terminology/`)**  
-Pluggable terminology backends for disorders, phenotypes, and genes.  
-- Terminology type is configured via options passed to `initialiseEditor` (not hardcoded).
-- `FHIRTerminology` queries a FHIR R4 server: `ValueSet/$expand` for search, `CodeSystem/$lookup` for label resolution. Default server: `https://tx.ontoserver.csiro.au/fhir/`.
-- `StaticTerminology` provides client-side fuzzy search over a fixed term list (uses `sifter`).
-- `DelegatingTerminology` forwards requests to a custom URL function (used by REDCap module).
-- `FhirTerminologyHelper` / `DefaultFhirTerminologyHelper` handle FHIR resource coding during import/export.
+Pluggable terminology backends for disorders, phenotypes, and genes, configured via options passed to `initialiseEditor`.
+- `FHIRTerminology` — queries a FHIR R4 ValueSet/$expand endpoint.
+- `StaticTerminology` — client-side fuzzy search over a fixed term list (sifter).
+- `DelegatingTerminology` — forwards to caller-supplied URL functions.
+- `EmptyTerminology` — no-op; prevents null checks when no terminology configured.
+- `FhirTerminologyHelper` / `DefaultFhirTerminologyHelper` — FHIR CodeableConcept mapping during GA4GH export.
 
-### External (vendor) dependencies
-Loaded by the host HTML, **not** bundled — declared as webpack externals:
-- **PrototypeJS 1.7.3** — `Class.create()`, `$()`, `$$()`, Ajax, DOM events (`document.observe`, `document.fire`)
-- **Scriptaculous** — drag-and-drop, visual effects
-- jQuery, XWiki REST API helpers, PhenoTips widgets, Selectize (autocomplete)
-
-All classes use `Class.create()` from PrototypeJS. The global `editor` variable is the `PedigreeEditor` instance.
+**Patient provider subsystem (`src/script/patientProvider/`)**  
+Pluggable provider for FHIR Patient sourcing, configured via `patientProvider` option.
+- `EmptyPatientProvider` — default no-op (hides patient-related UI).
+- `FHIRPatientProvider` — FHIR R4 Patient search and Condition import via native `fetch`. Exported as `OpenPedigree.FHIRPatientProvider`.
+- Person nodes carry a `linkedPatientRef` property (e.g. `"Patient/123"`) persisted in the JSON serialisation and used as a stable ID in GA4GH export.
 
 ### OOP conventions
-- Use PrototypeJS `Class.create({ initialize: function(){...}, ... })` for new classes.
-- `$super` is reserved in the Terser minifier config — do not rename it.
-- Inter-component calls go through `window.editor.getXxx()` accessors or DOM custom events.
+- New code uses TypeScript ES6 classes. Inter-component calls go through `window.editor.getXxx()` accessors or DOM custom events (`pedigree:node:setproperty` etc.).
+- `$super` is reserved in the Terser minifier config — do not use it as a variable name.

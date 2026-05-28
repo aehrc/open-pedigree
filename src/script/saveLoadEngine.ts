@@ -149,7 +149,34 @@ export default class SaveLoadEngine {
       editor.getActionStack().addState(null, null, JSONString);
     }
 
+    this._resolveLinkedPatientNames();
+
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
+  }
+
+  _resolveLinkedPatientNames(): void {
+    const provider = (editor as any).getPatientProvider();
+    if (!provider || !provider.isConfigured()) return;
+    const graph = editor.getGraph();
+    const view = editor.getView();
+    for (let i = 0; i < graph.getMaxNodeId(); i++) {
+      if (!graph.isPerson(i)) continue;
+      const node = view.getNode(i);
+      if (!node || !node.getLinkedPatientRef || !node.getLinkedPatientRef()) continue;
+      const fhirRef = node.getLinkedPatientRef();
+      const nodeId = i;
+      provider.lookupPatient(fhirRef,
+        (displayName: string) => {
+          const n = view.getNode(nodeId);
+          if (n && n.getFirstName && !n.getFirstName() && !n.getLastName()) {
+            document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+              detail: { nodeID: nodeId, properties: { setFirstName: displayName } }
+            }));
+          }
+        },
+        (_err: string) => {}
+      );
+    }
   }
 
   createGraphFromImportData(importString: any, importType: any, importOptions: any, noUndo?: any, centerAround0?: any): any {
