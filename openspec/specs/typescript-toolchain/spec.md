@@ -25,16 +25,17 @@ A `tsconfig.json` SHALL exist at the project root, configured with `allowJs: tru
 
 ---
 
-### Requirement: Webpack handles .ts files via ts-loader
-The webpack config SHALL include a `ts-loader` rule for `*.ts` files (mutually exclusive with the existing `babel-loader` rule for `*.js` files) and SHALL add `.ts` to `resolve.extensions`.
+### Requirement: All source files are TypeScript
 
-#### Scenario: Production build succeeds after toolchain addition
-- **WHEN** `npm run build` is run with no `.ts` files yet migrated
-- **THEN** `dist/pedigree.min.js` is produced and the command exits 0
+All source files under `src/` SHALL be `.ts`. No `.js` source files SHALL remain (excluding `node_modules` and generated output). The webpack entry point SHALL be `src/app.ts`.
 
-#### Scenario: TypeScript file is resolved without extension in import
-- **WHEN** a `.ts` file imports `from 'pedigree/model/baseGraph'` and `baseGraph.ts` exists
-- **THEN** webpack resolves it correctly without requiring a `.ts` extension in the import statement
+#### Scenario: No .js source files remain
+- **WHEN** `find src/ -name "*.js"` is run
+- **THEN** it returns no results
+
+#### Scenario: Build succeeds with .ts entry point
+- **WHEN** `npm run build` is run after all renames are complete
+- **THEN** `dist/pedigree.min.js` is produced and the command exits 0 with no errors (warnings permitted)
 
 ---
 
