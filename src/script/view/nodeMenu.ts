@@ -513,6 +513,16 @@ export default class NodeMenu {
       input.value = '';
       result.replaceChildren(input);
       return result;
+    },
+    'button-action': function(this: any, data: any) {
+      var _menu = this;
+      var result = this._generateEmptyField(data);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = data.buttonLabel || data.label || '';
+      btn.addEventListener('click', () => { if (data.action) data.action(_menu); });
+      result.inputsContainer.appendChild(btn);
+      return result;
     }
   };
 
@@ -743,7 +753,8 @@ export default class NodeMenu {
       if (target) {
         target.value = value;
       }
-    }
+    },
+    'button-action': function(_container: any, _value: any) {}
   };
 
   _toggleFieldVisibility(container: any, doHide: any): any {
@@ -801,7 +812,8 @@ export default class NodeMenu {
     },
     'hidden' : function(this: any, container: any, inactive: any): any {
       this._toggleFieldVisibility(container, inactive);
-    }
+    },
+    'button-action': function(this: any, container: any, inactive: any) { this._toggleFieldVisibility(container, inactive); }
   };
 
   _setFieldDisabled: any = {
@@ -852,6 +864,10 @@ export default class NodeMenu {
     },
     'hidden' : function(container: any, inactive: any): any {
       // FIXME: Not implemented
+    },
+    'button-action': function(container: any, disabled: any) {
+      var btn = container.querySelector('button');
+      if (btn) btn.disabled = disabled;
     }
   };
 }

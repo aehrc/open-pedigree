@@ -595,7 +595,14 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     'properties': properties
   };
 
-  properties.id = patientResource.id;
+  const rawId = patientResource.id;
+  properties.id = rawId;
+  // If the patient ID does not look like a UUID (8-4-4-4-12 hex), preserve it as a linkedPatientRef
+  // so the reference round-trips on re-export.
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (rawId && !uuidPattern.test(rawId)) {
+    properties.linkedPatientRef = 'Patient/' + rawId;
+  }
   properties.gender = 'U';
   if (patientResource.gender === 'male') {
     properties.gender = 'M';
@@ -1059,7 +1066,12 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
 
   const nodeProperties = pedigree.GG.properties[index];
   const externalId = nodeProperties['externalID'];
-  let ref = (knownFhirPatienReference && externalId && knownFhirPatienReference[externalId]) ? knownFhirPatienReference[externalId] : generateUUID();
+  let ref;
+  if (nodeProperties['linkedPatientRef'] && nodeProperties['linkedPatientRef'].startsWith('Patient/')) {
+    ref = nodeProperties['linkedPatientRef'];
+  } else {
+    ref = (knownFhirPatienReference && externalId && knownFhirPatienReference[externalId]) ? knownFhirPatienReference[externalId] : generateUUID();
+  }
   nodeIndexToRef[index] = ref;
   pedigreeIndividuals[index] = this.buildPedigreeIndividual(ref, nodeProperties, privacySetting);
 

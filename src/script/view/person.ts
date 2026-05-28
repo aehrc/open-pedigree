@@ -43,6 +43,7 @@ export default class Person extends AbstractPerson {
   _monozygotic: any;
   _evaluated: any;
   _lostContact: any;
+  _linkedPatientRef: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
     Person._pendingIsProband = (id === 0);
@@ -92,6 +93,7 @@ export default class Person extends AbstractPerson {
     this._monozygotic = false;
     this._evaluated = false;
     this._lostContact = false;
+    this._linkedPatientRef = '';
   }
 
   /**
@@ -102,6 +104,14 @@ export default class Person extends AbstractPerson {
    */
   isProband(): boolean {
     return this._isProband;
+  }
+
+  getLinkedPatientRef(): string {
+    return this._linkedPatientRef || '';
+  }
+
+  setLinkedPatientRef(ref: string): void {
+    this._linkedPatientRef = ref;
   }
 
   /**
@@ -901,7 +911,9 @@ export default class Person extends AbstractPerson {
       monozygotic:     {value : this.getMonozygotic(), inactive: inactiveMonozygothic, disabled: disableMonozygothic},
       evaluated:       {value : this.getEvaluated()},
       hpo_positive:    {value : phenotypeTerms},
-      nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact}
+      nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact},
+      link_patient:    {value: this.getLinkedPatientRef(), inactive: !(editor as any).getPatientProvider().isConfigured()},
+      import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())}
     };
   }
 
@@ -970,6 +982,9 @@ export default class Person extends AbstractPerson {
     if (this.getLostContact()) {
       info['lostContact'] = this.getLostContact();
     }
+    if (this.getLinkedPatientRef() != '') {
+      info['linkedPatientRef'] = this.getLinkedPatientRef();
+    }
     return info;
   }
 
@@ -1034,6 +1049,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('lostContact') && this.getLostContact() !== info.lostContact) {
         this.setLostContact(info.lostContact);
+      }
+      if (info.hasOwnProperty('linkedPatientRef') && this.getLinkedPatientRef() != info.linkedPatientRef) {
+        this.setLinkedPatientRef(info.linkedPatientRef);
       }
       return true;
     }
