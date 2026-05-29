@@ -8,7 +8,7 @@ vi.mock('pedigree/model/export', () => ({
     }
 }));
 
-import SmartFhirBackend from 'pedigree/SmartFhirBackend';
+import SmartFhirBackend, { bundleToContainedComposition } from 'pedigree/SmartFhirBackend';
 
 const GA4GH_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
 
@@ -162,5 +162,115 @@ describe('SmartFhirBackend.save', () => {
         const msg = document.getElementById('smart-relaunch-message');
         expect(msg).not.toBeNull();
         msg && msg.remove();
+    });
+});
+
+describe('SmartFhirBackend.load — 401 handling', () => {
+    beforeEach(() => {
+        global.window = global.window || {};
+        global.window.editor = undefined;
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('shows re-launch message on 401 during load', async () => {
+        const err401 = Object.assign(new Error('Unauthorized'), { status: 401 });
+        const client = makeClient({ request: vi.fn().mockRejectedValue(err401) });
+        const backend = new SmartFhirBackend(client);
+        const args = makeArgs();
+
+        backend.load(args);
+        await new Promise(r => setTimeout(r, 20));
+
+        const msg = document.getElementById('smart-relaunch-message');
+        expect(msg).not.toBeNull();
+        expect(args.onFailure).not.toHaveBeenCalled();
+        msg && msg.remove();
+    });
+
+    it('calls onFailure (not relaunch) on non-401 load error', async () => {
+        const err = new Error('network fail');
+        const client = makeClient({ request: vi.fn().mockRejectedValue(err) });
+        const backend = new SmartFhirBackend(client);
+        const args = makeArgs();
+
+        backend.load(args);
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(args.onFailure).toHaveBeenCalled();
+        expect(document.getElementById('smart-relaunch-message')).toBeNull();
+    });
+});
+
+describe('bundleToContainedComposition', () => {
+    const PATIENT_ID = 'test-patient';
+
+    const makeBundle = (extra = {}) => ({
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+            {
+                fullUrl: 'urn:uuid:comp-1',
+                resource: {
+                    resourceType: 'Composition',
+                    id: 'comp-1',
+                    section: [
+                        { entry: [{ reference: 'urn:uuid:pat-1' }, { reference: 'urn:uuid:fmh-1' }] }
+                    ],
+                    author: [],
+                    subject: {}
+                }
+            },
+            {
+                fullUrl: 'urn:uuid:pat-1',
+                resource: { resourceType: 'Patient', id: 'ind-proband' }
+            },
+            {
+                fullUrl: 'urn:uuid:fmh-1',
+                resource: { resourceType: 'FamilyMemberHistory', id: 'fmh-father' }
+            },
+            ...(extra.entries || [])
+        ]
+    });
+
+    it('extracts Composition and wraps other resources as contained', () => {
+        const result = bundleToContainedComposition(makeBundle(), PATIENT_ID);
+        expect(result.resourceType).toBe('Composition');
+        expect(result.contained).toHaveLength(2);
+        expect(result.contained.map((r) => r.resourceType).sort()).toEqual(['FamilyMemberHistory', 'Patient']);
+    });
+
+    it('rewrites section entry references to #id form', () => {
+        const result = bundleToContainedComposition(makeBundle(), PATIENT_ID);
+        const refs = result.section[0].entry.map((e) => e.reference);
+        expect(refs).toEqual(['#ind-proband', '#fmh-father']);
+    });
+
+    it('sets subject and author from patientId', () => {
+        const result = bundleToContainedComposition(makeBundle(), PATIENT_ID);
+        expect(result.subject).toEqual({ reference: 'Patient/' + PATIENT_ID });
+        expect(result.author).toEqual([{ display: 'Open Pedigree' }]);
+    });
+
+    it('also rewrites ResourceType/id style references', () => {
+        const bundle = makeBundle();
+        bundle.entry[0].resource.section[0].entry[0].reference = 'Patient/ind-proband';
+        const result = bundleToContainedComposition(bundle, PATIENT_ID);
+        expect(result.section[0].entry[0].reference).toBe('#ind-proband');
+    });
+
+    it('throws when no Composition entry in bundle', () => {
+        const bundle = { resourceType: 'Bundle', entry: [
+            { fullUrl: 'urn:uuid:pat-1', resource: { resourceType: 'Patient', id: 'p1' } }
+        ]};
+        expect(() => bundleToContainedComposition(bundle, PATIENT_ID)).toThrow('No Composition found');
+    });
+
+    it('assigns fallback id to resources without an id', () => {
+        const bundle = makeBundle();
+        delete bundle.entry[1].resource.id;
+        const result = bundleToContainedComposition(bundle, PATIENT_ID);
+        const patient = result.contained.find((r) => r.resourceType === 'Patient');
+        expect(patient.id).toMatch(/^contained-/);
     });
 });

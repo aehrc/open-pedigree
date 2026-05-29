@@ -912,7 +912,7 @@ export default class Person extends AbstractPerson {
       evaluated:       {value : this.getEvaluated()},
       hpo_positive:    {value : phenotypeTerms},
       nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact},
-      link_patient:    {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().isConfigured() && (this.getID() === 0 ? (editor as any).getPatientProvider().canLinkProband() : (editor as any).getPatientProvider().canSearchFamilyMembers()))},
+      link_patient:    {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canLinkPatient(this.getID()))},
       import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())}
     };
   }

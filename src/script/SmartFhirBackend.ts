@@ -3,7 +3,7 @@ import PedigreeExport from 'pedigree/model/export';
 const GA4GH_PEDIGREE_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
 const SESSION_KEY_PREFIX = 'smart_composition_';
 
-function bundleToContainedComposition(bundle: any, patientId: string): any {
+export function bundleToContainedComposition(bundle: any, patientId: string): any {
     const compositionEntry = (bundle.entry || []).find(
         (e: any) => e.resource && e.resource.resourceType === 'Composition'
     );
@@ -163,8 +163,13 @@ export default class SmartFhirBackend {
                 }
             })
             .catch((err: any) => {
-                console.error('[SmartFhirBackend] load error:', err);
-                args.onFailure();
+                const status = err && (err.status || (err.response && err.response.status));
+                if (status === 401) {
+                    me._showRelaunchMessage();
+                } else {
+                    console.error('[SmartFhirBackend] load error:', err);
+                    args.onFailure();
+                }
             });
     }
 

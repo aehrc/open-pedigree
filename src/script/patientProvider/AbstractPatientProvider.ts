@@ -4,6 +4,9 @@ export default abstract class AbstractPatientProvider {
 
     canSearchFamilyMembers(): boolean { return true; }
     canLinkProband(): boolean { return true; }
+    canLinkPatient(nodeId: number): boolean {
+        return this.isConfigured() && (nodeId === 0 ? this.canLinkProband() : this.canSearchFamilyMembers());
+    }
 
     abstract lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void;
 
