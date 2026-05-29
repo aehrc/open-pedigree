@@ -43,21 +43,34 @@ function patientIdFromRef(fhirRef: string): string {
 
 export default class FHIRPatientProvider extends AbstractPatientProvider {
     _fhirBaseUrl: string;
+    _smartClient: any;
 
     constructor(options: any) {
         super();
         options = options || {};
-        this._fhirBaseUrl = (options.fhirBaseUrl || '').replace(/\/$/, '');
+        this._smartClient = options.smartClient || null;
+        if (this._smartClient) {
+            this._fhirBaseUrl = (this._smartClient.getState('serverUrl') || '').replace(/\/$/, '');
+        } else {
+            this._fhirBaseUrl = (options.fhirBaseUrl || '').replace(/\/$/, '');
+        }
     }
 
     isConfigured(): boolean { return true; }
     canImportClinicalData(): boolean { return true; }
 
+    _request(url: string): Promise<any> {
+        if (this._smartClient) {
+            return this._smartClient.request(url);
+        }
+        return fetch(url, { headers: { 'Accept': 'application/fhir+json' } })
+            .then(r => { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); });
+    }
+
     lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void {
-        fetch(this._fhirBaseUrl + '/' + fhirRef, { headers: { 'Accept': 'application/fhir+json' } })
-            .then(r => { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); })
+        this._request(this._fhirBaseUrl + '/' + fhirRef)
             .then(patient => onSuccess(extractPatientDisplayName(patient)))
-            .catch(e => onError(String(e)));
+            .catch((e: any) => onError(String(e)));
     }
 
     openPatientPickerModal(nodeId: number, onSelected: (fhirRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void {
@@ -90,8 +103,7 @@ export default class FHIRPatientProvider extends AbstractPatientProvider {
             if (!query) return;
             results.textContent = 'Searching…';
             const url = this._fhirBaseUrl + '/Patient?name=' + encodeURIComponent(query) + '&_count=20';
-            fetch(url, { headers: { 'Accept': 'application/fhir+json' } })
-                .then(r => { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); })
+            this._request(url)
                 .then(bundle => {
                     results.innerHTML = '';
                     const entries = bundle.entry || [];
@@ -135,8 +147,7 @@ export default class FHIRPatientProvider extends AbstractPatientProvider {
         modal.show();
 
         const url = this._fhirBaseUrl + '/Condition?patient=' + encodeURIComponent(patientId) + '&_count=100';
-        fetch(url, { headers: { 'Accept': 'application/fhir+json' } })
-            .then(r => { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); })
+        this._request(url)
             .then(bundle => {
                 const entries = bundle.entry || [];
                 const disorders: {id: string, name: string, checked: boolean}[] = [];

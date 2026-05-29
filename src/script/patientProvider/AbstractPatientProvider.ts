@@ -2,6 +2,9 @@ export default abstract class AbstractPatientProvider {
     abstract isConfigured(): boolean;
     abstract canImportClinicalData(): boolean;
 
+    canSearchFamilyMembers(): boolean { return true; }
+    canLinkProband(): boolean { return true; }
+
     abstract lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void;
 
     abstract openPatientPickerModal(nodeId: number, onSelected: (fhirRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void;
