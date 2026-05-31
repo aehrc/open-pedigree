@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const backend = new SmartFhirBackend(client);
             const provider = new SmartPatientProvider(client);
 
+            const ONTOSERVER_BASE = 'https://tx.ontoserver.csiro.au/fhir';
+            const SNOMED_SYSTEM   = 'http://snomed.info/sct';
+            const HGNC_SYSTEM     = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
+
             const editor = OpenPedigree.initialiseEditor({
                 patientDataUrl: 'smart:pedigree',
                 backend: {
@@ -44,9 +48,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     load: backend.load.bind(backend),
                 },
                 patientProvider: provider,
-                disorderOptions:  { type: 'Empty' },
-                phenotypeOptions: { type: 'Empty' },
-                geneOptions:      { type: 'Empty' },
+                disorderOptions: {
+                    type:         'FHIR',
+                    codeSystem:   SNOMED_SYSTEM,
+                    fhirBaseUrl:  ONTOSERVER_BASE,
+                    valueSet:     'http://snomed.info/sct?fhir_vs=refset/32570581000036105',
+                    validIdRegex: /^\d+$/,
+                },
+                phenotypeOptions: {
+                    type:         'FHIR',
+                    codeSystem:   SNOMED_SYSTEM,
+                    fhirBaseUrl:  ONTOSERVER_BASE,
+                    valueSet:     'http://ga4gh.org/fhir/ValueSet/phenotype',
+                    validIdRegex: /^\d+$/,
+                },
+                geneOptions: {
+                    type:        'FHIR',
+                    codeSystem:  HGNC_SYSTEM,
+                    fhirBaseUrl: ONTOSERVER_BASE,
+                    valueSet:    'http://www.genenames.org',
+                },
+                fhirTerminologyHelperOptions: {
+                    disorderCodeSystem:  SNOMED_SYSTEM,
+                    phenotypeCodeSystem: SNOMED_SYSTEM,
+                    geneCodeSystem:      HGNC_SYSTEM,
+                },
             });
 
             // Wait for the async pedigree load to finish before linking the proband,
