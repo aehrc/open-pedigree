@@ -232,7 +232,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     if (fatherLink == null) {
       fatherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
         'gender': 'M',
-        'comments': 'unknown'
+        'comments': 'unknown',
+        'unknownParent': true
       }, newG.defaultPersonNodeWidth);
     } else {
       fatherID = findReferencedPerson(fatherLink, 'father');
@@ -244,7 +245,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     if (motherLink == null) {
       motherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
         'gender': 'F',
-        'comments': 'unknown'
+        'comments': 'unknown',
+        'unknownParent': true
       }, newG.defaultPersonNodeWidth);
     } else {
       motherID = findReferencedPerson(motherLink, 'mother');
@@ -721,13 +723,15 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     }
   }
 
-  if (checkUnbornExtension && patientResource.extension) {
+  if (patientResource.extension) {
     for (const ext of patientResource.extension) {
-      if (ext.url === 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn') {
+      if (checkUnbornExtension && ext.url === 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn') {
         if (ext.valueBoolean) {
           properties.lifeStatus = 'unborn';
         }
-        break;
+      }
+      if (ext.url === 'https://github.com/aehrc/open-pedigree/unknownParent' && ext.valueBoolean) {
+        properties.unknownParent = true;
       }
     }
   }
@@ -1280,8 +1284,14 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   patientResource.extension.push({
     'url': 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn',
     'valueBoolean': unbornFlag
+  });
+
+  if (nodeProperties.unknownParent) {
+    patientResource.extension.push({
+      'url': 'https://github.com/aehrc/open-pedigree/unknownParent',
+      'valueBoolean': true
+    });
   }
-  );
 
   if (nodeProperties.twinGroup) {
     patientResource.multipleBirthBoolean = true;

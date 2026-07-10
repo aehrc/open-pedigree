@@ -241,6 +241,27 @@ export default class Workspace {
     };
     submenus.forEach(_createSubmenu);
 
+    var viewGroup = document.createElement('div');
+    viewGroup.className = 'view-actions action-group';
+    var unknownToggleBtn = document.createElement('span');
+    unknownToggleBtn.id = 'action-hide-unknown-parents';
+    unknownToggleBtn.className = 'menu-item hide-unknown-parents';
+    unknownToggleBtn.title = 'Show or hide unknown parent nodes';
+    var unknownIcon = document.createElement('span');
+    unknownIcon.className = 'fas fa-eye-slash';
+    unknownToggleBtn.appendChild(unknownIcon);
+    unknownToggleBtn.appendChild(document.createTextNode(' '));
+    unknownToggleBtn.appendChild(document.createTextNode('Hide unknown parents'));
+    unknownToggleBtn.addEventListener('click', function() {
+      (editor as any).toggleHideUnknownParents();
+      var hidden = (editor as any).isHideUnknownParents();
+      unknownToggleBtn.classList.toggle('menu-item-active', hidden);
+      unknownIcon.className = hidden ? 'fas fa-eye' : 'fas fa-eye-slash';
+      unknownToggleBtn.childNodes[2].textContent = hidden ? 'Show unknown parents' : 'Hide unknown parents';
+    });
+    viewGroup.appendChild(unknownToggleBtn);
+    menu.appendChild(viewGroup);
+
     var poweredBy = document.createElement('div');
     poweredBy.className = 'powered-by';
     poweredBy.appendChild(document.createTextNode('Powered by '));

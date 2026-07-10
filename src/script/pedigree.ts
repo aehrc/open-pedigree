@@ -54,6 +54,7 @@ export default class PedigreeEditor {
   _closing: any;
   _controller: any;
   _patientProvider: any;
+  _hideUnknownParents: boolean;
 
   constructor(options: any) {
     options = options || {};
@@ -71,6 +72,7 @@ export default class PedigreeEditor {
       console.error('No "load" function provided for backend');
     }
 
+    this._hideUnknownParents = false;
     this.DEBUG_MODE = Boolean(options.DEBUG_MODE);
     this._omimServiceUrl = options.omimServiceUrl || '';
     this._hpoServiceUrl  = options.hpoServiceUrl  || '';
@@ -218,6 +220,15 @@ export default class PedigreeEditor {
 
   getView(): any {
     return this._view;
+  }
+
+  isHideUnknownParents(): boolean {
+    return this._hideUnknownParents;
+  }
+
+  toggleHideUnknownParents(): void {
+    this._hideUnknownParents = !this._hideUnknownParents;
+    this.getView().setUnknownParentsVisible(!this._hideUnknownParents);
   }
 
   getVersionUpdater(): any {
@@ -535,6 +546,13 @@ export default class PedigreeEditor {
         'type' : 'checkbox',
         'tab': 'Personal',
         'function' : 'setLostContact'
+      },
+      {
+        'name' : 'unknown_parent',
+        'label' : 'Unknown parent',
+        'type' : 'checkbox',
+        'tab': 'Personal',
+        'function' : 'setUnknownParent'
       },
       {
         'name' : 'placeholder',

@@ -44,6 +44,7 @@ export default class Person extends AbstractPerson {
   _evaluated: any;
   _lostContact: any;
   _linkedPatientRef: any;
+  _unknownParent: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
     Person._pendingIsProband = (id === 0);
@@ -94,6 +95,7 @@ export default class Person extends AbstractPerson {
     this._evaluated = false;
     this._lostContact = false;
     this._linkedPatientRef = '';
+    this._unknownParent = false;
   }
 
   /**
@@ -249,6 +251,23 @@ export default class Person extends AbstractPerson {
       return;
     }
     this._lostContact = lostContact;
+  }
+
+  getUnknownParent(): boolean {
+    return this._unknownParent;
+  }
+
+  isUnknownParent(): boolean {
+    return this._unknownParent;
+  }
+
+  setUnknownParent(unknownParent: boolean): void {
+    if (unknownParent === this._unknownParent) {
+      return;
+    }
+    this._unknownParent = unknownParent;
+    this.getGraphics().setGenderGraphics();
+    this.getGraphics().updateNameLabel();
   }
 
   /**
@@ -912,6 +931,7 @@ export default class Person extends AbstractPerson {
       evaluated:       {value : this.getEvaluated()},
       hpo_positive:    {value : phenotypeTerms},
       nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact},
+      unknown_parent:  {value : this.getUnknownParent(), inactive: this.isProband()},
       link_patient:    {value: this.getLinkedPatientRef(), inactive: !(editor as any).getPatientProvider().isConfigured()},
       import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())}
     };
@@ -985,6 +1005,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedPatientRef() != '') {
       info['linkedPatientRef'] = this.getLinkedPatientRef();
     }
+    if (this._unknownParent) {
+      info['unknownParent'] = true;
+    }
     return info;
   }
 
@@ -1052,6 +1075,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedPatientRef') && this.getLinkedPatientRef() != info.linkedPatientRef) {
         this.setLinkedPatientRef(info.linkedPatientRef);
+      }
+      if (info.hasOwnProperty('unknownParent') && this._unknownParent !== info.unknownParent) {
+        this.setUnknownParent(info.unknownParent);
       }
       return true;
     }

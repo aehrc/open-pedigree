@@ -31,6 +31,7 @@ PedigreeEditorParameters.attributes = {
   nodeShapeMenuOnPartner: {fill: '#000', stroke: 'none', 'fill-opacity': 0.1},
   nodeShapeMenuOffPartner: {fill: '#000', stroke: 'none', 'fill-opacity': 0},
   nodeShapeDiag: {fill: '45-#ffffff:0-#B8B8B8:100', stroke: '#333333', 'stroke-width': 3.0},
+  nodeShapeUnknown: {fill: '#e8e8e8', stroke: '#999999', 'stroke-width': 2.0, 'stroke-dasharray': '5,3'},
   boxOnHover : {fill: 'gray', stroke: 'none', opacity: 1, 'fill-opacity':.35},
   menuBtnIcon : {fill: '#1F1F1F', stroke: 'none'},
   deleteBtnIcon : {fill: '#990000', stroke: 'none'},

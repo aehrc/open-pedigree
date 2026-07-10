@@ -234,7 +234,19 @@ PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPa
 
 // ===============================================================================================
 
-PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
+PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all', exportOptions: any = {}) {
+  var hideUnknownParents = !!exportOptions.hideUnknownParents;
+  var restoredStyles: Array<{el: HTMLElement, opacity: string, fillOpacity: string}> = [];
+
+  if (hideUnknownParents) {
+    var unknownEls = document.querySelectorAll('[data-unknown-parent="true"]');
+    unknownEls.forEach(function(el: any) {
+      restoredStyles.push({ el: el, opacity: el.style.opacity, fillOpacity: el.style.fillOpacity });
+      el.style.opacity = '0';
+      el.style.fillOpacity = '0';
+    });
+  }
+
   var image = $('canvas');
   var background = image.getElementsByClassName('panning-background')[0];
   var backgroundPosition;
@@ -299,13 +311,22 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
   }
 
   const serializer = new XMLSerializer();
-  return serializer.serializeToString(dom);
+  var result = serializer.serializeToString(dom);
+
+  if (hideUnknownParents) {
+    restoredStyles.forEach(function(s) {
+      s.el.style.opacity = s.opacity;
+      s.el.style.fillOpacity = s.fillOpacity;
+    });
+  }
+
+  return result;
 }
 
 
 
-PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize = 'A4', layout = 'landscape', legendPos = 'TopRight'){
-  var pedigreeImage = PedigreeExport.exportAsSVG(pedigree, privacySetting);
+PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize = 'A4', layout = 'landscape', legendPos = 'TopRight', exportOptions: any = {}){
+  var pedigreeImage = PedigreeExport.exportAsSVG(pedigree, privacySetting, exportOptions);
 
   let legend = [];
   let itemCount = 0;

@@ -195,7 +195,12 @@ export default class AbstractPersonVisuals extends AbstractNodeVisuals {
       shape = editor.getPaper().rect(x - radius, y - radius, radius * 2, radius * 2);
     }
 
-    if (this.getNode().getGender() == 'U') {
+    if (this.getNode().isUnknownParent && this.getNode().isUnknownParent()) {
+      shape.attr(PedigreeEditorParameters.attributes.nodeShapeUnknown);
+      if (this.getNode().getGender() == 'U') {
+        shape.attr({ transform: '...R45' });
+      }
+    } else if (this.getNode().getGender() == 'U') {
       shape.attr(PedigreeEditorParameters.attributes.nodeShapeDiag);
       shape.attr({ transform: '...R45' });
     } else {
@@ -211,6 +216,10 @@ export default class AbstractPersonVisuals extends AbstractNodeVisuals {
 
     this._genderShape = shape;
     this._genderGraphics = editor.getPaper().set(shadow, shape);
+    if (this.getNode().isUnknownParent && this.getNode().isUnknownParent()) {
+      this._genderGraphics.node && this._genderGraphics.node.setAttribute('data-unknown-parent', 'true');
+      shape.node && shape.node.setAttribute('data-unknown-parent', 'true');
+    }
   }
 
   setHighlightBox(): void {

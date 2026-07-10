@@ -171,6 +171,21 @@ export default class ExportSelector {
     dataSection3.appendChild(configListElementPED);
     dataSection3.appendChild(configListElementPrivacy);
     dataSection3.appendChild(configListElementPDF);
+
+    var unknownParentsRow = document.createElement('div');
+    unknownParentsRow.id = 'unknownParentsOption';
+    unknownParentsRow.style.display = 'none';
+    var unknownParentsLabel = document.createElement('label');
+    unknownParentsLabel.className = 'export-subconfig-label';
+    var unknownParentsCheckbox = document.createElement('input');
+    unknownParentsCheckbox.type = 'checkbox';
+    unknownParentsCheckbox.id = 'export-hide-unknown-parents';
+    unknownParentsCheckbox.name = 'export-hide-unknown-parents';
+    unknownParentsLabel.appendChild(unknownParentsCheckbox);
+    unknownParentsLabel.appendChild(document.createTextNode(' Hide unknown parents'));
+    unknownParentsRow.appendChild(unknownParentsLabel);
+    dataSection3.appendChild(unknownParentsRow);
+
     mainDiv.appendChild(dataSection3);
 
     var buttons = document.createElement('div');
@@ -220,6 +235,7 @@ export default class ExportSelector {
     var privacyOptionsTable = document.getElementById('privacyOptions');
     var pdfOptionsTable = document.getElementById('pdfOptions');
 
+    var unknownParentsOption = document.getElementById('unknownParentsOption');
     if (exportType == 'ped') {
       pedOptionsTable.style.display = '';
       privacyOptionsTable.style.display = 'none';
@@ -234,6 +250,11 @@ export default class ExportSelector {
       pdfOptionsTable.style.display = '';
     } else {
       pdfOptionsTable.style.display = 'none';
+    }
+    if (exportType == 'svg' || exportType == 'pdf') {
+      unknownParentsOption.style.display = '';
+    } else {
+      unknownParentsOption.style.display = 'none';
     }
   }
 
@@ -262,13 +283,15 @@ export default class ExportSelector {
       saveAs(new Blob([exportString], {type: mimeType}), fileName);
     } else {
       var privacySetting = (document.querySelector('input:checked[type=radio][name="privacy-options"]') as any).value;
+      var hideUnknownParentsEl = document.getElementById('export-hide-unknown-parents') as HTMLInputElement;
+      var exportOptions = { hideUnknownParents: hideUnknownParentsEl ? hideUnknownParentsEl.checked : false };
       if (exportType == 'GA4GH') {
         var exportString = PedigreeExport.exportAsGA4GH(editor.getGraph().DG, privacySetting);
         var fileName = 'open-pedigree-GA4GH-fhir.json';
         var mimeType = 'application/fhir+json';
         saveAs(new Blob([exportString], {type: mimeType}), fileName);
       } else if (exportType == 'svg') {
-        var exportString = PedigreeExport.exportAsSVG(editor.getGraph().DG, privacySetting);
+        var exportString = PedigreeExport.exportAsSVG(editor.getGraph().DG, privacySetting, exportOptions);
         var fileName = 'open-pedigree.svg';
         var mimeType = 'image/svg+xml';
         saveAs(new Blob([exportString], {type: mimeType}), fileName);
@@ -276,7 +299,7 @@ export default class ExportSelector {
         var pageSize = (document.querySelector('select[name="pdf-page-size"]') as any).value;
         var layout = (document.querySelector('select[name="pdf-page-orientation"]') as any).value;
         var legendPos = (document.querySelector('select[name="pdf-legend-pos"]') as any).value;
-        let pdf = PedigreeExport.exportAsPDF(editor.getGraph().DG, privacySetting, pageSize, layout, legendPos);
+        let pdf = PedigreeExport.exportAsPDF(editor.getGraph().DG, privacySetting, pageSize, layout, legendPos, exportOptions);
       }
     }
   }

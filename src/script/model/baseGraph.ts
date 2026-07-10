@@ -600,6 +600,13 @@ BaseGraph.prototype = {
     return false;
   },
 
+  isUnknownParent: function(v) {
+    if (this.properties[v].hasOwnProperty('unknownParent')) {
+      return this.properties[v]['unknownParent'];
+    }
+    return false;
+  },
+
   getGender: function(v) {
     if (!this.isPerson(v)) {
       throw 'Assertion failed: attempting to get gender of a non-person';

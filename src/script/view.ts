@@ -99,6 +99,32 @@ export default class View {
     delete this.getNodeMap()[nodeID];
   }
 
+  setUnknownParentsVisible(visible: boolean): void {
+    const opacity = visible ? 1 : 0;
+    for (var nodeID in this._nodeMap) {
+      if (!this._nodeMap.hasOwnProperty(nodeID)) continue;
+      var node = this._nodeMap[nodeID];
+      if (node.getType() === 'Person' && node.isUnknownParent && node.isUnknownParent()) {
+        var g = node.getGraphics();
+        // Target only visible elements — deliberately exclude hoverbox and highlight box
+        // to avoid restoring their normally-zero opacity and making them visible.
+        var gg = g.getGenderGraphics && g.getGenderGraphics();
+        if (gg) { gg.attr({ opacity: opacity }); }
+        var labels = g.getLabels && g.getLabels();
+        if (labels) { labels.attr({ opacity: opacity }); }
+        var carrier = g.getCarrierGraphics && g.getCarrierGraphics();
+        if (carrier) { carrier.attr({ opacity: opacity }); }
+        var evaluation = g.getEvaluationGraphics && g.getEvaluationGraphics();
+        if (evaluation) { evaluation.attr({ opacity: opacity }); }
+        // Block/restore mouse interaction on the shape
+        var shape = g.getGenderShape && g.getGenderShape();
+        if (shape && shape.node) {
+          shape.node.style.pointerEvents = visible ? '' : 'none';
+        }
+      }
+    }
+  }
+
   drawCurvedLineWithCrossings(id: any, xFrom: any, yFrom: any, yTop: any, xTo: any, yTo: any, lastBend: any, attr: any, twoLines: any, secondLineBelow: any): void {
     if (yFrom == yTop && yFrom == yTo) {
       return this.drawLineWithCrossings(id, xFrom, yFrom, xTo, yTo, attr, twoLines, secondLineBelow);

@@ -76,11 +76,14 @@ export default class Controller {
       }
     };
 
-    if (window.confirm('All highlighted nodes will be removed. Do you want to proceed?')) {
-      removeSelected();
-    } else {
-      unhighlightSelected();
-    }
+    // Defer confirm so the browser paints the highlights before the dialog blocks rendering
+    setTimeout(function() {
+      if (window.confirm('All highlighted nodes will be removed. Do you want to proceed?')) {
+        removeSelected();
+      } else {
+        unhighlightSelected();
+      }
+    }, 0);
   }
 
   handleSetProperty(event: any): void {

@@ -185,15 +185,18 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   updateNameLabel(): any {
     this._nameLabel && this._nameLabel.remove();
-    var text =  '';
-    this.getNode().getFirstName() && (text = this.getNode().getFirstName());
-
-    if (this.getNode().getLastName()) {
-      text += ' ' + this.getNode().getLastName();
+    var text = '';
+    if (this.getNode().isUnknownParent && this.getNode().isUnknownParent()) {
+      text = '?';
+    } else {
+      this.getNode().getFirstName() && (text = this.getNode().getFirstName());
+      if (this.getNode().getLastName()) {
+        text += ' ' + this.getNode().getLastName();
+      }
     }
 
     this._nameLabel && this._nameLabel.remove();
-    if(text.trim() != '') {
+    if (text.trim() != '') {
       this._nameLabel = editor.getPaper().text(this.getX(), this.getY() + PedigreeEditorParameters.attributes.radius, text).attr(PedigreeEditorParameters.attributes.nameLabels);
     } else {
       this._nameLabel = null;

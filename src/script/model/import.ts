@@ -346,7 +346,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     // .PED supports specifying only mohter of father. Pedigree editor requires both (for now).
     // So create a virtual parent in case one of the parents is missing
     if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       fatherID = nameToId[fatherID];
       if (newG.properties[fatherID].gender == 'F') {
@@ -354,7 +354,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
       }
     }
     if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       motherID = nameToId[motherID];
       if (newG.properties[motherID].gender == 'M') {
@@ -577,7 +577,7 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
     // .PED supports specifying only mother or father. Pedigree editor requires both (for now).
     // So create a virtual parent in case one of the parents is missing
     if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       fatherID = nameToId[fatherID];
       if (newG.properties[fatherID].gender == 'F') {
@@ -585,7 +585,7 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
       }
     }
     if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       motherID = nameToId[motherID];
       if (newG.properties[motherID].gender == 'M') {
@@ -961,7 +961,7 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
 
     // create a virtual parent in case one of the parents is missing
     if (fatherLink == null) {
-      var fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      var fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       var fatherID = externalIDToID[fatherLink];
       if (newG.properties[fatherID].gender == 'F') {
@@ -969,7 +969,7 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
       }
     }
     if (motherLink == null) {
-      var motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      var motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       var motherID = externalIDToID[motherLink];
       if (newG.properties[motherID].gender == 'M') {
@@ -1195,7 +1195,7 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     // .PED supports specifying only mohter of father. Pedigree editor requires both (for now).
     // So create a virtual parent in case one of the parents is missing
     if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       fatherID = nameToId[fatherID];
       if (newG.properties[fatherID].gender == 'F') {
@@ -1203,7 +1203,7 @@ PedigreeImport.initFromDADA2 = function(inputText) {
       }
     }
     if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
+      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown', 'unknownParent': true}, newG.defaultPersonNodeWidth );
     } else {
       motherID = nameToId[motherID];
       if (newG.properties[motherID].gender == 'M') {
