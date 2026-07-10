@@ -10,7 +10,7 @@ import LocalStorageBackend from "./script/localStorageBackend";
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
 
 
-const OpenPedigree = OpenPedigree || {};
+const OpenPedigree: any = {};
 
 OpenPedigree.initialiseEditor = function(options){
   return new PedigreeEditor(options);
