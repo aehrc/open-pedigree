@@ -9,25 +9,27 @@ async function loadEditor(page) {
 test('export dialog opens and shows all format options', async ({ page }) => {
   await loadEditor(page);
   await page.evaluate(() => window.editor.getExportSelector().show());
-  await expect(page.locator('.pedigree-import-chooser')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
 
-  await expect(page.locator('input[value="ped"]')).toBeAttached();
-  await expect(page.locator('input[value="GA4GH"]')).toBeAttached();
-  await expect(page.locator('input[value="DADA2"]')).toBeAttached();
-  await expect(page.locator('input[value="svg"]')).toBeAttached();
+  await expect(page.locator('input[name="export-type"][value="ped"]')).toBeAttached();
+  await expect(page.locator('input[name="export-type"][value="GA4GH"]')).toBeAttached();
+  await expect(page.locator('input[name="export-type"][value="DADA2"]')).toBeAttached();
+  await expect(page.locator('input[name="export-type"][value="svg"]')).toBeAttached();
 });
 
 test('PED export triggers a download with correct filename', async ({ page }) => {
   await loadEditor(page);
   await page.evaluate(() => window.editor.getExportSelector().show());
-  await expect(page.locator('.pedigree-import-chooser')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
 
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 10000 }),
-    (async () => {
-      await page.check('input[value="ped"]', { force: true });
-      await page.locator('#export_button').click({ force: true });
-    })(),
+    page.evaluate(() => {
+      const pedRadio = document.querySelector('input[type=radio][name="export-type"][value="ped"]');
+      pedRadio.checked = true;
+      pedRadio.click();
+      document.getElementById('export_button').click();
+    }),
   ]);
 
   expect(download.suggestedFilename()).toBe('open-pedigree.ped');
@@ -36,14 +38,16 @@ test('PED export triggers a download with correct filename', async ({ page }) =>
 test('DADA2 export triggers a download with correct filename', async ({ page }) => {
   await loadEditor(page);
   await page.evaluate(() => window.editor.getExportSelector().show());
-  await expect(page.locator('.pedigree-import-chooser')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
 
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 10000 }),
-    (async () => {
-      await page.check('input[value="DADA2"]', { force: true });
-      await page.locator('#export_button').click({ force: true });
-    })(),
+    page.evaluate(() => {
+      const dada2Radio = document.querySelector('input[type=radio][name="export-type"][value="DADA2"]');
+      dada2Radio.checked = true;
+      dada2Radio.click();
+      document.getElementById('export_button').click();
+    }),
   ]);
 
   expect(download.suggestedFilename()).toBe('open-pedigree.dada2');
@@ -52,16 +56,15 @@ test('DADA2 export triggers a download with correct filename', async ({ page }) 
 test('GA4GH FHIR export triggers a download with correct filename', async ({ page }) => {
   await loadEditor(page);
   await page.evaluate(() => window.editor.getExportSelector().show());
-  await expect(page.locator('.pedigree-import-chooser')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
 
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 15000 }),
-    // Use PrototypeJS $$ and $ within the page context so observers fire correctly
     page.evaluate(() => {
-      const ga4ghRadio = $$('input[type=radio][name="export-type"][value="GA4GH"]')[0];
+      const ga4ghRadio = document.querySelector('input[type=radio][name="export-type"][value="GA4GH"]');
       ga4ghRadio.checked = true;
       ga4ghRadio.click(); // fires disableEnableOptions → shows privacy section
-      $('export_button').click();
+      document.getElementById('export_button').click();
     }),
   ]);
 
