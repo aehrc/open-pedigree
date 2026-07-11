@@ -207,7 +207,7 @@ export default class ExportSelector {
     });
 
     var closeShortcut = ['Esc'];
-    this.dialog = new NativeModal(mainDiv, {close: {method : this.hide.bind(this), keys : closeShortcut}}, {extraClassName: 'pedigree-import-chooser', title: 'Pedigree export', displayCloseButton: true});
+    this.dialog = new NativeModal(mainDiv, {close: {method : this.hide.bind(this), keys : closeShortcut}}, {extraClassName: 'pedigree-export-chooser', title: 'Pedigree export', displayCloseButton: true});
   }
 
   /*
