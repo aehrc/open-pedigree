@@ -350,8 +350,8 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
     return; // didn't have a relationship
   }
 
-  let firstNodeData = nodeDataLookup[firstFamilyMember];
-  let secondNodeData = nodeDataLookup[secondFamilyMember];
+  let firstNodeData = this.resolveNodeRef(firstFamilyMember, nodeDataLookup);
+  let secondNodeData = this.resolveNodeRef(secondFamilyMember, nodeDataLookup);
   if (!firstNodeData || !secondNodeData) {
     return;
   }
@@ -433,19 +433,17 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
 };
 
 GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker) {
-  if (!conditionResource.subject || !(conditionResource.subject.reference in nodeDataLookup) || !conditionResource.code){
-    // condition doesn't link to a subject in our list or has no code
+  if (!conditionResource.subject || !conditionResource.code){
     return;
   }
 
   let familyMember = conditionResource.subject.reference;
+  let nodeData = this.resolveNodeRef(familyMember, nodeDataLookup);
+  if (!nodeData) {
+    return;
+  }
 
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
-
-  if (!(familyMember in nodeDataLookup)){
-    console.log('Failed to find node for ' + familyMember);
-  }
-  let nodeData = nodeDataLookup[familyMember];
 
   if (conditionResource.code){
     let conditionToAdd = fhirTerminologyHelper.getDisorderFromCodeableConcept(conditionResource.code, false);
@@ -464,14 +462,15 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
 
 GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, nodeDataLookup, containedResourcesLookup, twinTracker) {
 
-  if (!observationResource.subject || !(observationResource.subject.reference in nodeDataLookup)){
-    // observation doesn't link to a subject in our list or has no code
+  if (!observationResource.subject) {
     return;
   }
 
   let familyMember = observationResource.subject.reference;
-
-  let nodeData = nodeDataLookup[familyMember];
+  let nodeData = this.resolveNodeRef(familyMember, nodeDataLookup);
+  if (!nodeData) {
+    return;
+  }
 
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
   
@@ -1178,6 +1177,15 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
     pedigreeRelationship.push(this.buildPedigreeRelation(ref, relRef, relationshipsToBuild[relIndex]));
   }
   return ref;
+};
+
+GA4GHFHIRConverter.resolveNodeRef = function(ref, nodeDataLookup) {
+  if (!ref) return undefined;
+  let node = nodeDataLookup[ref];
+  if (!node && ref.startsWith('Patient/')) {
+    node = nodeDataLookup['#' + ref.substring('Patient/'.length)];
+  }
+  return node;
 };
 
 GA4GHFHIRConverter.getReference = function(id) {
