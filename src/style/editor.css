@@ -258,7 +258,7 @@
  */
 .menu-box {
   position: absolute;
-  width: 350px;
+  width: 430px;
   color: #000000;
   z-index: 100000;
 }
@@ -286,6 +286,7 @@
 .menu-box .tabs dd, .tabs .tab-title {
   position: relative;
   margin-bottom: -3px !important;
+  margin-left: 4px;
   list-style: none;
   float: left;
   border-radius: 0.8em 0.8em 0 0;
