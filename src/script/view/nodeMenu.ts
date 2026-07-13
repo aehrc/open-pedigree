@@ -134,14 +134,56 @@ export default class NodeMenu {
 
     // Date pickers are initialised per-field in _generateField['date-picker'] using flatpickr.
 
-    /**
-     *
-     * @param input
-     * @param {Legend} legend
-     * @param selectizeOptions
-     * @returns {*|jQuery|HTMLElement}
-     * @private
-     */
+    this._initializeSuggestPickers();
+
+    // Update disorder colors
+    this._updateDisorderColor = function(this: any, id: any, color: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-disorders li input[value="' + id + '"]')).forEach(function(item: any) {
+        var li = item.closest('li');
+        var colorBubble = li.querySelector('.disorder-color');
+        if (!colorBubble) {
+          colorBubble = document.createElement('span');
+          colorBubble.className = 'disorder-color';
+          li.prepend(colorBubble);
+        }
+        colorBubble.style.background = color;
+      });
+    }.bind(this);
+    document.addEventListener('disorder:color', function(event: any) {
+      if (!event.detail || !event.detail.id || !event.detail.color) {
+        return;
+      }
+      _this._updateDisorderColor(event.detail.id, event.detail.color);
+    });
+
+    // Update gene colors
+    this._updateGeneColor = function(this: any, id: any, color: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes li input[value="' + id + '"]')).forEach(function(item: any) {
+        var li = item.closest('li');
+        var colorBubble = li.querySelector('.disorder-color');
+        if (!colorBubble) {
+          colorBubble = document.createElement('span');
+          colorBubble.className = 'disorder-color';
+          li.prepend(colorBubble);
+        }
+        colorBubble.style.background = color;
+      });
+    }.bind(this);
+    document.addEventListener('gene:color', function(event: any) {
+      if (!event.detail || !event.detail.id || !event.detail.color) {
+        return;
+      }
+      _this._updateGeneColor(event.detail.id, event.detail.color);
+    });
+  }
+
+  /**
+   * Wires up Selectize on every not-yet-initialized suggest-picker <select> in the form
+   * (disorders/genes/phenotypes via their Legend, questionnaire choice fields via their
+   * per-linkId terminology instance). Safe to call repeatedly - already-initialized
+   * elements (marked with the 'initialized' class) are skipped.
+   */
+  _initializeSuggestPickers(): void {
     var _createSuggest = function(input: any, termType: any, selectizeOptions: any) {
       var jqnode = jQuery(input);
       if (jqnode) {
@@ -197,45 +239,107 @@ export default class NodeMenu {
       }
     });
 
-    // Update disorder colors
-    this._updateDisorderColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-disorders li input[value="' + id + '"]')).forEach(function(item: any) {
-        var li = item.closest('li');
-        var colorBubble = li.querySelector('.disorder-color');
-        if (!colorBubble) {
-          colorBubble = document.createElement('span');
-          colorBubble.className = 'disorder-color';
-          li.prepend(colorBubble);
-        }
-        colorBubble.style.background = color;
-      });
-    }.bind(this);
-    document.addEventListener('disorder:color', function(event: any) {
-      if (!event.detail || !event.detail.id || !event.detail.color) {
-        return;
+    // questionnaire answerValueSet-backed choice fields - one terminology instance per linkId,
+    // not routed through a Legend (no color-swatch/id-cache concept needed here)
+    var _createQuestionnaireSuggest = function(input: any, linkId: any) {
+      var jqnode = jQuery(input);
+      if (jqnode) {
+        jqnode.selectize({
+          options: [],
+          create: false,
+          sortField: 'text',
+          persist: true,
+          maxItems: input.multiple ? null : 1,
+          delimiter: SELECTIZE_DELIMITER,
+          onChange: () => {
+            input.dispatchEvent(new CustomEvent('xwiki:customchange'));
+          },
+          load: (query: any, callback: any) => {
+            if (query.length < 2) return callback();
+            var terminology = editor.getQuestionnaireTerminology && editor.getQuestionnaireTerminology(linkId);
+            if (!terminology) return callback();
+            terminology.searchForTerms(query,
+              (search: any, result: any) => callback(result),
+              (err: any) => callback()
+            );
+          }
+        });
       }
-      _this._updateDisorderColor(event.detail.id, event.detail.color);
+      return jqnode;
+    };
+    Array.from(this.form.querySelectorAll('select.suggest-questionnaire')).forEach(function(item: any) {
+      if (!item.classList.contains('initialized')) {
+        _createQuestionnaireSuggest(item, item.dataset.linkid);
+        item.classList.add('initialized');
+      }
     });
+  }
 
-    // Update gene colors
-    this._updateGeneColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes li input[value="' + id + '"]')).forEach(function(item: any) {
-        var li = item.closest('li');
-        var colorBubble = li.querySelector('.disorder-color');
-        if (!colorBubble) {
-          colorBubble = document.createElement('span');
-          colorBubble.className = 'disorder-color';
-          li.prepend(colorBubble);
-        }
-        colorBubble.style.background = color;
-      });
-    }.bind(this);
-    document.addEventListener('gene:color', function(event: any) {
-      if (!event.detail || !event.detail.id || !event.detail.color) {
+  /**
+   * Appends field descriptors to an already-constructed menu (used when a questionnaireUrl
+   * fetch resolves after the editor has already been built). Creates the "Custom" tab on
+   * demand if it doesn't already exist.
+   */
+  addFields(fields: any): void {
+    if (!fields || fields.length === 0) {
+      return;
+    }
+    var _this = this;
+    fields.forEach(function(d: any) {
+      if (typeof ((_this._generateField as any)[d.type]) != 'function') {
         return;
       }
-      _this._updateGeneColor(event.detail.id, event.detail.color);
+      var insertLocation = _this.form;
+      if (d.tab) {
+        if (!_this.tabs.hasOwnProperty(d.tab)) {
+          _this._addTab(d.tab);
+        }
+        insertLocation = _this.tabs[d.tab];
+      }
+      insertLocation.appendChild((_this._generateField as any)[d.type].call(_this, d));
     });
+    this._initializeSuggestPickers();
+    if (this.targetNode) {
+      this._setCrtData(this.targetNode.getSummary());
+    }
+  }
+
+  /**
+   * Creates a new tab (header + content div) on an already-constructed menu.
+   */
+  _addTab(tabName: any): void {
+    if (!this.tabTop) {
+      // menu was constructed with no tabs at all (single-tab mode) - nothing to attach a new tab to
+      return;
+    }
+    var activeClass = Object.keys(this.tabs).length === 0 ? 'active' : '';
+    this.tabs[tabName] = document.createElement('div');
+    this.tabs[tabName].id = 'tab_' + tabName;
+    this.tabs[tabName].className = 'content ' + activeClass;
+    this.form.appendChild(this.tabs[tabName]);
+
+    this.tabHeaders[tabName] = document.createElement('dd');
+    this.tabHeaders[tabName].className = activeClass;
+    this.tabHeaders[tabName].innerHTML = '<a>' + tabName + '</a>';
+    var _this = this;
+    var switchTab = function(tabName: any) {
+      return function() {
+        for (var tab in _this.tabs) {
+          if (_this.tabs.hasOwnProperty(tab)) {
+            if (tab != tabName) {
+              _this.tabs[tab].className = 'content';
+              _this.tabHeaders[tab].className = '';
+            } else {
+              _this.tabs[tab].className = 'content active';
+              _this.tabHeaders[tab].className = 'active';
+            }
+          }
+        }
+        _this.reposition();
+      };
+    };
+    this.tabHeaders[tabName].addEventListener('click', switchTab(tabName));
+    this.tabTop.appendChild(this.tabHeaders[tabName]);
   }
 
   _generateEmptyField(data: any): any {
@@ -514,6 +618,60 @@ export default class NodeMenu {
       result.replaceChildren(input);
       return result;
     },
+    'number' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      var number = document.createElement('input');
+      number.type = 'number';
+      number.name = data.name;
+      if (data.step) {
+        number.step = data.step;
+      }
+      var numberSpan = document.createElement('span');
+      numberSpan.appendChild(number);
+      result.inputsContainer.appendChild(numberSpan);
+      (number as any)._getValue = function(this: any) {
+        if ((this as any).value === '') {
+          return [null];
+        }
+        var parsed = Number((this as any).value);
+        return [isNaN(parsed) ? null : parsed];
+      }.bind(number);
+      this._attachFieldEventListeners(number, ['keyup', 'change'], [true]);
+      return result;
+    },
+    'heading' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      result.classList.add('field-heading');
+      return result;
+    },
+    'questionnaire-choice-picker' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      var picker = document.createElement('select');
+      picker.multiple = !!data.repeats;
+      picker.className = 'suggest-questionnaire';
+      picker.name = data.name;
+      (picker as any).dataset.linkid = data.linkId;
+      result.appendChild(picker);
+      (picker as any)._getValue = function(this: any) {
+        var target = jQuery(this);
+        if (target && target[0] && (target[0] as any).selectize) {
+          var selectizeInstance = (target[0] as any).selectize;
+          var ids = selectizeInstance.getValue();
+          if (!ids || (Array.isArray(ids) && ids.length === 0) || ids === '') {
+            return [data.repeats ? [] : null];
+          }
+          var idList = data.repeats ? ids : [ids];
+          var answers = idList.map(function(id: any) {
+            var option = selectizeInstance.options[id];
+            return option ? { system: option.system, code: option.value, display: option.text } : { code: id, display: id };
+          });
+          return [data.repeats ? answers : answers[0]];
+        }
+        return [data.repeats ? [] : null];
+      }.bind(picker);
+      this._attachFieldEventListeners(picker, ['xwiki:customchange']);
+      return result;
+    },
     'button-action': function(this: any, data: any) {
       var _menu = this;
       var result = this._generateEmptyField(data);
@@ -754,6 +912,30 @@ export default class NodeMenu {
         target.value = value;
       }
     },
+    'number' : function(container: any, value: any): any {
+      var target = container.querySelector('input[type=number]');
+      if (target) {
+        target.value = (value === null || value === undefined) ? '' : value;
+      }
+    },
+    'heading' : function(_container: any, _value: any): any {
+      // no interactive value
+    },
+    'questionnaire-choice-picker' : function(container: any, value: any): any {
+      var target = jQuery(container).find('select.suggest-questionnaire');
+      if (target && target[0] && (target[0] as any).selectize) {
+        var selectizeInstance = (target[0] as any).selectize;
+        var answers = Array.isArray(value) ? value : (value ? [value] : []);
+        selectizeInstance.clearOptions(true);
+        answers.forEach(function(answer: any) {
+          if (answer && answer.code) {
+            selectizeInstance.addOption({ text: answer.display || answer.code, value: answer.code, system: answer.system });
+          }
+        });
+        selectizeInstance.setValue(answers.map(function(a: any) { return a.code; }), true);
+        selectizeInstance.refreshOptions(false);
+      }
+    },
     'button-action': function(_container: any, _value: any) {}
   };
 
@@ -813,6 +995,15 @@ export default class NodeMenu {
     'hidden' : function(this: any, container: any, inactive: any): any {
       this._toggleFieldVisibility(container, inactive);
     },
+    'number' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
+    'heading' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
+    'questionnaire-choice-picker' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
     'button-action': function(this: any, container: any, inactive: any) { this._toggleFieldVisibility(container, inactive); }
   };
 
@@ -863,6 +1054,18 @@ export default class NodeMenu {
       // FIXME: Not implemented
     },
     'hidden' : function(container: any, inactive: any): any {
+      // FIXME: Not implemented
+    },
+    'number' : function(container: any, disabled: any): any {
+      var target = container.querySelector('input[type=number]');
+      if (target) {
+        target.disabled = disabled;
+      }
+    },
+    'heading' : function(container: any, inactive: any): any {
+      // no interactive value
+    },
+    'questionnaire-choice-picker' : function(container: any, inactive: any): any {
       // FIXME: Not implemented
     },
     'button-action': function(container: any, disabled: any) {

@@ -1,0 +1,67 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "Questionnaire/demo-questionnaire",
+      "resource": {
+        "resourceType": "Questionnaire",
+        "id": "demo-questionnaire",
+        "url": "https://aehrc.github.io/open-pedigree/Questionnaire/demo",
+        "version": "1.0",
+        "title": "Open Pedigree SMART demo - family history intake",
+        "status": "active",
+        "item": [
+          {
+            "linkId": "clinical_notes",
+            "type": "text",
+            "text": "Clinical notes",
+            "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
+            "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+          },
+          {
+            "linkId": "intake_group",
+            "type": "group",
+            "text": "Family history intake",
+            "item": [
+              {
+                "linkId": "diabetes",
+                "type": "boolean",
+                "text": "Diagnosed with diabetes?",
+                "code": [{ "system": "http://snomed.info/sct", "code": "73211009", "display": "Diabetes mellitus" }],
+                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToCondition" }]
+              },
+              {
+                "linkId": "smoking_status",
+                "type": "choice",
+                "text": "Smoking status",
+                "answerOption": [
+                  { "valueString": "never" },
+                  { "valueString": "former" },
+                  { "valueString": "current" }
+                ],
+                "code": [{ "system": "http://loinc.org", "code": "72166-2", "display": "Tobacco smoking status" }],
+                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToObservation" }]
+              },
+              {
+                "linkId": "research_consent",
+                "type": "boolean",
+                "text": "Consent to research use of this pedigree?"
+              },
+              {
+                "linkId": "consent_notes",
+                "type": "string",
+                "text": "Consent notes",
+                "enableWhen": [{ "question": "research_consent", "operator": "=", "answerBoolean": true }]
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Questionnaire/demo-questionnaire"
+      }
+    }
+  ]
+}

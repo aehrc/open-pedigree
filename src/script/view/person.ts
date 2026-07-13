@@ -1,6 +1,7 @@
 import { ChildlessBehavior } from 'pedigree/view/abstractNode';
 import AbstractPerson from 'pedigree/view/abstractPerson';
 import PersonVisuals from 'pedigree/view/personVisuals';
+import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 
 declare const editor: any;
 
@@ -44,6 +45,7 @@ export default class Person extends AbstractPerson {
   _evaluated: any;
   _lostContact: any;
   _linkedPatientRef: any;
+  _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
     Person._pendingIsProband = (id === 0);
@@ -53,6 +55,70 @@ export default class Person extends AbstractPerson {
     // because changing properties requires a redraw, which relies on gender
     // shapes being there already
     this.assignProperties(properties);
+    this._synthesizeQuestionnaireSetters();
+  }
+
+  /**
+   * Creates a get/set method pair on this instance for every configured Questionnaire
+   * item that isn't a heading and isn't mapsToField-mapped (those read/write the existing
+   * property's own getter/setter instead - see questionnaire-fields design D9).
+   * Instance-level (not prototype) so multiple editors with different Questionnaires never collide.
+   */
+  _synthesizeQuestionnaireSetters(): void {
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    if (!config || !config.items) {
+      return;
+    }
+    var _this = this;
+    config.items.forEach(function(item: any) {
+      if (item.fieldType === 'heading') {
+        return;
+      }
+      if (item.mapping && item.mapping.kind === 'field') {
+        return;
+      }
+      var getterName = 'getQuestionnaireAnswer_' + item.linkId;
+      var setterName = 'setQuestionnaireAnswer_' + item.linkId;
+      if (!(_this as any)[setterName]) {
+        (_this as any)[getterName] = function(): any {
+          return _this.getQuestionnaireAnswer(item.linkId);
+        };
+        (_this as any)[setterName] = function(value: any): void {
+          _this.setQuestionnaireAnswer(item.linkId, value);
+        };
+      }
+    });
+  }
+
+  /**
+   * Returns the stored answer for a Questionnaire item, or undefined if unanswered.
+   *
+   * @method getQuestionnaireAnswer
+   */
+  getQuestionnaireAnswer(linkId: any): any {
+    return this._questionnaireAnswers.hasOwnProperty(linkId) ? this._questionnaireAnswers[linkId] : undefined;
+  }
+
+  /**
+   * Stores (or clears, if value is empty) the answer for a Questionnaire item.
+   *
+   * @method setQuestionnaireAnswer
+   */
+  setQuestionnaireAnswer(linkId: any, value: any): void {
+    if (value === undefined || value === null || value === '') {
+      delete this._questionnaireAnswers[linkId];
+    } else {
+      this._questionnaireAnswers[linkId] = value;
+    }
+  }
+
+  /**
+   * Returns the full linkId -> answer map, used by GA4GH FHIR export/import.
+   *
+   * @method getQuestionnaireAnswers
+   */
+  getQuestionnaireAnswers(): any {
+    return this._questionnaireAnswers;
   }
 
   /**
@@ -94,6 +160,7 @@ export default class Person extends AbstractPerson {
     this._evaluated = false;
     this._lostContact = false;
     this._linkedPatientRef = '';
+    this._questionnaireAnswers = {};
   }
 
   /**
@@ -398,7 +465,7 @@ export default class Person extends AbstractPerson {
   }
 
   /**
-   * Returns the the birth date of this Person
+   * Returns the birthdate of this Person
    *
    * @method getBirthDate
    * @return {Date}
@@ -408,7 +475,7 @@ export default class Person extends AbstractPerson {
   }
 
   /**
-   * Replaces the birth date with newDate
+   * Replaces the birthdate with newDate
    *
    * @method setBirthDate
    * @param {Date} newDate Must be earlier date than deathDate and a later than conception date
@@ -439,7 +506,7 @@ export default class Person extends AbstractPerson {
    */
   setDeathDate(deathDate: any): any {
     deathDate = deathDate ? (new Date(deathDate)) : '';
-    // only set death date if it happens to be after the birth date, or there is no birth or death date
+    // only set death date if it happens to be after the birthdate, or there is no birth or death date
     if (!deathDate || !this.getBirthDate() || deathDate.getTime() > this.getBirthDate().getTime()) {
       this._deathDate = deathDate;
       this._deathDate && (this.getLifeStatus() === 'alive') && this.setLifeStatus('deceased');
@@ -863,17 +930,17 @@ export default class Person extends AbstractPerson {
 
     var cantChangeAdopted = this.isFetus() || editor.getGraph().hasToBeAdopted(this.getID());
 
-    var inactiveMonozygothic = true;
-    var disableMonozygothic  = true;
+    var inactiveMonozygotic = true;
+    var disableMonozygotic  = true;
     var twins = editor.getGraph().getAllTwinsSortedByOrder(this.getID());
     if (twins.length > 1) {
       // check that there are twins and that all twins
-      // have the same gender, otherwise can't be monozygothic
-      inactiveMonozygothic = false;
-      disableMonozygothic  = false;
+      // have the same gender, otherwise can't be monozygotic
+      inactiveMonozygotic = false;
+      disableMonozygotic  = false;
       for (var i = 0; i < twins.length; i++) {
         if (editor.getGraph().getGender(twins[i]) !== this.getGender()) {
-          disableMonozygothic = true;
+          disableMonozygotic = true;
           break;
         }
       }
@@ -890,6 +957,22 @@ export default class Person extends AbstractPerson {
     }
 
     var inactiveLostContact = this.isProband() || !editor.getGraph().isRelatedToProband(this.getID());
+
+    var questionnaireFields: any = {};
+    var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    if (questionnaireConfig && questionnaireConfig.items) {
+      var _this = this;
+      questionnaireConfig.items.forEach(function(item: any) {
+        if (item.fieldType === 'heading' || (item.mapping && item.mapping.kind === 'field')) {
+          return;
+        }
+        var isEnabled = evaluateEnableWhen(item.enableWhen, item.enableBehavior, _this._questionnaireAnswers);
+        questionnaireFields['q_' + item.linkId] = {
+          value: _this.getQuestionnaireAnswer(item.linkId),
+          inactive: !isEnabled
+        };
+      });
+    }
 
     return {
       identifier:      {value : this.getID()},
@@ -908,12 +991,13 @@ export default class Person extends AbstractPerson {
       gestation_age:   {value : this.getGestationAge(), inactive : !this.isFetus()},
       childlessSelect: {value : this.getChildlessStatus() ? this.getChildlessStatus() : 'none', inactive : childlessInactive},
       placeholder:     {value : false, inactive: true},
-      monozygotic:     {value : this.getMonozygotic(), inactive: inactiveMonozygothic, disabled: disableMonozygothic},
+      monozygotic:     {value : this.getMonozygotic(), inactive: inactiveMonozygotic, disabled: disableMonozygotic},
       evaluated:       {value : this.getEvaluated()},
       hpo_positive:    {value : phenotypeTerms},
       nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact},
       link_patient:    {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canLinkPatient(this.getID()))},
-      import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())}
+      import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())},
+      ...questionnaireFields
     };
   }
 
@@ -985,6 +1069,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedPatientRef() != '') {
       info['linkedPatientRef'] = this.getLinkedPatientRef();
     }
+    if (Object.keys(this._questionnaireAnswers).length > 0) {
+      info['questionnaireAnswers'] = this._questionnaireAnswers;
+    }
     return info;
   }
 
@@ -1052,6 +1139,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedPatientRef') && this.getLinkedPatientRef() != info.linkedPatientRef) {
         this.setLinkedPatientRef(info.linkedPatientRef);
+      }
+      if (info.hasOwnProperty('questionnaireAnswers')) {
+        this._questionnaireAnswers = info.questionnaireAnswers;
       }
       return true;
     }

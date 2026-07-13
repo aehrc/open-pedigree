@@ -1,5 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
+import { MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 
 
 
@@ -68,6 +69,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   let familyHistoryResources = [];
   let conditionResources = [];
   let observationResources = [];
+  let questionnaireResponseResources = [];
 
   if (containedResources) {
     let containedArr = containedResources;
@@ -85,6 +87,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         }
         if (containedArr[i].resourceType === 'Observation') {
           observationResources.push(containedArr[i]);
+        }
+        if (containedArr[i].resourceType === 'QuestionnaireResponse') {
+          questionnaireResponseResources.push(containedArr[i]);
         }
       }
     }
@@ -124,7 +129,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     this.extractDataFromObservation(observationResource, nodeDataLookup, containedResourcesLookup, twinTracker);
   }
 
-
+  for (const questionnaireResponseResource of questionnaireResponseResources){
+    this.extractDataFromQuestionnaireResponse(questionnaireResponseResource, nodeDataLookup);
+  }
 
 
   // first pass: add all vertices and assign vertex IDs
@@ -432,6 +439,55 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
 
 };
 
+GA4GHFHIRConverter.codeableConceptMatches = function (a, b) {
+  if (!a || !b || !a.coding || !b.coding) {
+    return false;
+  }
+  for (const codingA of a.coding) {
+    for (const codingB of b.coding) {
+      if (codingA.system === codingB.system && codingA.code === codingB.code) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+GA4GHFHIRConverter.findMappedQuestionnaireItem = function (code, kind) {
+  var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  if (!questionnaireConfig || !code) {
+    return null;
+  }
+  for (const item of questionnaireConfig.items) {
+    if (item.mapping && item.mapping.kind === kind && this.codeableConceptMatches(code, item.mapping.code)) {
+      return item;
+    }
+  }
+  return null;
+};
+
+GA4GHFHIRConverter.observationValueToAnswer = function (itemType, observationResource) {
+  switch (itemType) {
+  case 'boolean':
+    return observationResource.valueBoolean;
+  case 'integer':
+    return observationResource.valueInteger;
+  case 'decimal':
+    return observationResource.valueDecimal;
+  case 'date':
+    return observationResource.valueDate;
+  case 'choice':
+  case 'open-choice':
+    if (observationResource.valueCodeableConcept && observationResource.valueCodeableConcept.coding && observationResource.valueCodeableConcept.coding[0]) {
+      const c = observationResource.valueCodeableConcept.coding[0];
+      return { 'system': c.system, 'code': c.code, 'display': c.display };
+    }
+    return observationResource.valueString;
+  default:
+    return observationResource.valueString;
+  }
+};
+
 GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker) {
   if (!conditionResource.subject || !conditionResource.code){
     return;
@@ -440,6 +496,15 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
   let familyMember = conditionResource.subject.reference;
   let nodeData = this.resolveNodeRef(familyMember, nodeDataLookup);
   if (!nodeData) {
+    return;
+  }
+
+  const mappedItem = this.findMappedQuestionnaireItem(conditionResource.code, 'condition');
+  if (mappedItem) {
+    if (!nodeData.properties.questionnaireAnswers) {
+      nodeData.properties.questionnaireAnswers = {};
+    }
+    nodeData.properties.questionnaireAnswers[mappedItem.linkId] = true;
     return;
   }
 
@@ -472,8 +537,17 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     return;
   }
 
+  const mappedItem = this.findMappedQuestionnaireItem(observationResource.code, 'observation');
+  if (mappedItem) {
+    if (!nodeData.properties.questionnaireAnswers) {
+      nodeData.properties.questionnaireAnswers = {};
+    }
+    nodeData.properties.questionnaireAnswers[mappedItem.linkId] = this.observationValueToAnswer(mappedItem.itemType, observationResource);
+    return;
+  }
+
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
-  
+
   let foundCode = false;
   
   if (observationResource.valueCodeableConcept) {
@@ -759,12 +833,13 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
   let pedigreeRelationship = []; // all the constructed relationships
   let conditions = {}; // constructed conditions keyed by patient
   let observations = {}; // constructed observations keyed by patient
+  let questionnaireResponses = {}; // constructed QuestionnaireResponses keyed by patient
   let nodeIndexToRef = {}; // maps node index to ref
   let containedResources = [];
 
   let probandRef = (pedigree.GG.isPerson(0))
     ? this.processTreeNode(0, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
-      pedigreeRelationship, conditions, observations, nodeIndexToRef)
+      pedigreeRelationship, conditions, observations, nodeIndexToRef, questionnaireResponses)
     : generateUUID();
 
   // add any missing nodes, the recursion only goes up the tree
@@ -773,7 +848,7 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
       continue;
     }
     this.processTreeNode(i, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
-      pedigreeRelationship, conditions, observations, nodeIndexToRef);
+      pedigreeRelationship, conditions, observations, nodeIndexToRef, questionnaireResponses);
   }
 
   let probandReference = {
@@ -899,6 +974,29 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
       });
     }
   }
+
+  let questionnaireResponseSection = {
+    'title': 'Questionnaire Responses',
+    'code': {
+      'coding': [
+        {
+          'system': 'http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType',
+          'code': 'questionnaire-responses'
+        }
+      ]
+    },
+    'entry': []
+  };
+  for (let key in questionnaireResponses) {
+    for (let qr of questionnaireResponses[key]) {
+      containedResources.push(qr);
+      questionnaireResponseSection.entry.push({
+        'type': 'QuestionnaireResponse',
+        'reference': this.getReference(qr.id)
+      });
+    }
+  }
+
   let composition = {
     'resourceType': 'Composition',
     'id': generateUUID(),
@@ -927,6 +1025,9 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
       relationshipSection,
       otherSection]
   };
+  if (questionnaireResponseSection.entry.length > 0) {
+    composition.section.push(questionnaireResponseSection);
+  }
 
 
   if (pedigreeImage) {
@@ -1056,7 +1157,7 @@ GA4GHFHIRConverter.relationshipMap = {
 };
 
 GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, knownFhirPatienReference,
-  pedigreeIndividuals, pedigreeRelationship, condtions, observations, nodeIndexToRef) {
+  pedigreeIndividuals, pedigreeRelationship, condtions, observations, nodeIndexToRef, questionnaireResponses) {
 
   if (pedigreeIndividuals[index]) {
     // already processed
@@ -1078,6 +1179,12 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   this.addConditions(nodeProperties, ref, condtions);
 
   this.addObservations(nodeProperties, ref, observations);
+
+  // Build the QuestionnaireResponse first, then derive mapsToCondition/mapsToObservation
+  // resources from ITS item[] (not from nodeProperties directly) - mirroring how import
+  // derives properties from an incoming QuestionnaireResponse's item[]. See design D12.
+  const questionnaireResponse = this.addQuestionnaireResponse(nodeProperties, ref, questionnaireResponses);
+  this.deriveResourcesFromQuestionnaireResponse(questionnaireResponse, ref, condtions, observations);
 
   let relationshipsToBuild = {};
 
@@ -1173,7 +1280,7 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   for (let relIndex in relationshipsToBuild) {
     // recursion
     let relRef = this.processTreeNode(relIndex, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
-      pedigreeRelationship, condtions, observations, nodeIndexToRef);
+      pedigreeRelationship, condtions, observations, nodeIndexToRef, questionnaireResponses);
     pedigreeRelationship.push(this.buildPedigreeRelation(ref, relRef, relationshipsToBuild[relIndex]));
   }
   return ref;
@@ -1559,5 +1666,215 @@ GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations
   observations[ref] = observationsForRef;
 };
 //===============================================================================================
+
+GA4GHFHIRConverter.answerToFhirValue = function (itemType, value) {
+  switch (itemType) {
+  case 'boolean':
+    return { 'valueBoolean': !!value };
+  case 'integer':
+    return { 'valueInteger': value };
+  case 'decimal':
+    return { 'valueDecimal': value };
+  case 'date':
+    return { 'valueDate': value };
+  case 'choice':
+  case 'open-choice': {
+    // QuestionnaireResponse.item.answer.value[x] only permits Coding, not CodeableConcept
+    // (https://hl7.org/fhir/R4/questionnaireresponse-definitions.html#QuestionnaireResponse.item.answer.value_x_)
+    // - for the same answer's value[x] on a derived Observation resource (which does allow
+    // CodeableConcept, and is what the existing generic phenotype/gene Observations already
+    // use), see answerToObservationValue below.
+    const coding = Array.isArray(value) ? value[0] : value;
+    if (coding && coding.code) {
+      return { 'valueCoding': { 'system': coding.system, 'code': coding.code, 'display': coding.display } };
+    }
+    return { 'valueString': String(value) };
+  }
+  default:
+    return { 'valueString': String(value) };
+  }
+};
+
+// Same shaping as answerToFhirValue, except 'choice'/'open-choice' produce valueCodeableConcept
+// instead of valueCoding - Observation.value[x] allows CodeableConcept (and the existing generic
+// phenotype/gene Observations in addObservations already use it), unlike
+// QuestionnaireResponse.item.answer.value[x], which only allows Coding.
+GA4GHFHIRConverter.answerToObservationValue = function (itemType, value) {
+  if (itemType === 'choice' || itemType === 'open-choice') {
+    const coding = Array.isArray(value) ? value[0] : value;
+    if (coding && coding.code) {
+      return { 'valueCodeableConcept': { 'coding': [{ 'system': coding.system, 'code': coding.code, 'display': coding.display }] } };
+    }
+    return { 'valueString': String(value) };
+  }
+  return this.answerToFhirValue(itemType, value);
+};
+
+GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
+  if (!answerEntry) {
+    return undefined;
+  }
+  switch (itemType) {
+  case 'boolean':
+    return answerEntry.valueBoolean;
+  case 'integer':
+    return answerEntry.valueInteger;
+  case 'decimal':
+    return answerEntry.valueDecimal;
+  case 'date':
+    return answerEntry.valueDate;
+  case 'choice':
+  case 'open-choice':
+    if (answerEntry.valueCoding) {
+      return { 'system': answerEntry.valueCoding.system, 'code': answerEntry.valueCoding.code, 'display': answerEntry.valueCoding.display };
+    }
+    return answerEntry.valueString;
+  default:
+    return answerEntry.valueString;
+  }
+};
+
+GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
+  var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  if (!questionnaireConfig) {
+    return null;
+  }
+  const storedAnswers = nodeProperties['questionnaireAnswers'] || {};
+  const items = [];
+  for (const item of questionnaireConfig.items) {
+    if (item.fieldType === 'heading') {
+      continue;
+    }
+    let value;
+    if (item.mapping && item.mapping.kind === 'field') {
+      value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
+    } else {
+      value = storedAnswers[item.linkId];
+    }
+    if (value === undefined || value === null || value === '') {
+      continue;
+    }
+    const values = Array.isArray(value) ? value : [value];
+    items.push({
+      'linkId': item.linkId,
+      'answer': values.map((v) => this.answerToFhirValue(item.itemType, v))
+    });
+  }
+  if (items.length === 0) {
+    return null;
+  }
+  return {
+    'resourceType': 'QuestionnaireResponse',
+    'id': generateUUID(),
+    'status': 'completed',
+    'questionnaire': questionnaireConfig.canonicalUrl,
+    'subject': { 'reference': this.patRefAsRef(ref) },
+    'item': items
+  };
+};
+
+GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses) {
+  const qr = this.buildQuestionnaireResponse(ref, nodeProperties);
+  questionnaireResponses[ref] = qr ? [qr] : [];
+  return qr;
+};
+
+// Derives mapsToCondition/mapsToObservation resources from an already-built
+// QuestionnaireResponse's item[] - the same "given a QuestionnaireResponse, derive other
+// resources from it" shape as the FHIR SDC $extract operation
+// (https://build.fhir.org/ig/HL7/sdc/en/OperationDefinition-QuestionnaireResponse-extract.html),
+// implemented client-side rather than as a server operation (the spec doesn't require a
+// server - both its input parameters are optional - but we have no FHIR server dependency at
+// all for most backends, e.g. local storage, and can't assume the SMART-launching server
+// supports $extract even when one exists). mapsToField items don't need handling here - they
+// already wrote straight into nodeProperties via the pre-existing property setter, which
+// buildPedigreeIndividual/addConditions/addObservations already serialise unconditionally.
+GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse = function (qr, ref, condtions, observations) {
+  if (!qr) {
+    return;
+  }
+  var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  if (!questionnaireConfig) {
+    return;
+  }
+  const itemsByLinkId = {};
+  for (const item of questionnaireConfig.items) {
+    itemsByLinkId[item.linkId] = item;
+  }
+
+  for (const qrItem of qr.item) {
+    const item = itemsByLinkId[qrItem.linkId];
+    if (!item || !item.mapping || (item.mapping.kind !== 'condition' && item.mapping.kind !== 'observation')) {
+      continue;
+    }
+    const value = this.fhirValueToAnswer(item.itemType, qrItem.answer[0]);
+
+    if (item.mapping.kind === 'condition') {
+      if (value !== true) {
+        continue;
+      }
+      condtions[ref].push({
+        'resourceType': 'Condition',
+        'id': generateUUID(),
+        'subject': { 'reference': this.patRefAsRef(ref) },
+        'code': item.mapping.code
+      });
+    } else {
+      let fhirObservation = {
+        'resourceType': 'Observation',
+        'id': generateUUID(),
+        'status': 'preliminary',
+        'code': item.mapping.code,
+        'subject': { 'reference': this.patRefAsRef(ref) }
+      };
+      Object.assign(fhirObservation, this.answerToObservationValue(item.itemType, value));
+      observations[ref].push(fhirObservation);
+    }
+  }
+};
+
+GA4GHFHIRConverter.extractDataFromQuestionnaireResponse = function (qrResource, nodeDataLookup) {
+  const nodeData = this.resolveNodeRef(qrResource.subject && qrResource.subject.reference, nodeDataLookup);
+  if (!nodeData) {
+    return;
+  }
+  var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  const itemsByLinkId = {};
+  if (questionnaireConfig) {
+    for (const item of questionnaireConfig.items) {
+      itemsByLinkId[item.linkId] = item;
+    }
+  }
+  const matches = questionnaireConfig && qrResource.questionnaire === questionnaireConfig.canonicalUrl;
+
+  if (!nodeData.properties.questionnaireAnswers) {
+    nodeData.properties.questionnaireAnswers = {};
+  }
+
+  if (!matches) {
+    // Preserve raw answers verbatim so a later export doesn't lose them, without rendering.
+    for (const qrItem of (qrResource.item || [])) {
+      nodeData.properties.questionnaireAnswers[qrItem.linkId] = qrItem.answer;
+    }
+    console.warn('QuestionnaireResponse.questionnaire (' + qrResource.questionnaire + ') does not match the configured Questionnaire - answers preserved but not rendered');
+    return;
+  }
+
+  for (const qrItem of (qrResource.item || [])) {
+    const item = itemsByLinkId[qrItem.linkId];
+    if (!item || !qrItem.answer || qrItem.answer.length === 0) {
+      continue;
+    }
+    const values = qrItem.answer.map((a) => this.fhirValueToAnswer(item.itemType, a));
+    const value = item.repeats ? values : values[0];
+
+    if (item.mapping && item.mapping.kind === 'field') {
+      // D9: the mapped property (already populated from Patient/Observation extraction) is
+      // authoritative - the QR entry is recorded for completeness but never overrides it.
+      continue;
+    }
+    nodeData.properties.questionnaireAnswers[qrItem.linkId] = value;
+  }
+};
 
 export default GA4GHFHIRConverter;

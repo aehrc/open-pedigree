@@ -28,6 +28,7 @@ import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import BioportalTerminology from './terminology/BioportalTerminology';
 import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider';
+import { parseQuestionnaire } from 'pedigree/questionnaire/questionnaireParser';
 
 export default class PedigreeEditor {
   DEBUG_MODE: any;
@@ -54,6 +55,8 @@ export default class PedigreeEditor {
   _closing: any;
   _controller: any;
   _patientProvider: any;
+  _questionnaireConfig: any;
+  _questionnaireTerminologies: any;
 
   constructor(options: any) {
     options = options || {};
@@ -78,6 +81,13 @@ export default class PedigreeEditor {
     this._patientProvider = options.patientProvider || new EmptyPatientProvider();
 
     (window as any).editor = this;
+
+    this._questionnaireConfig = null;
+    this._questionnaireTerminologies = {};
+    if (options.questionnaireLocal) {
+      this._questionnaireConfig = parseQuestionnaire(options.questionnaireLocal);
+      this._initialiseQuestionnaireTerminologies(options);
+    }
 
     this._graphModel = DynamicPositionedGraph.makeEmpty(PedigreeEditorParameters.attributes.layoutRelativePersonWidth, PedigreeEditorParameters.attributes.layoutRelativeOtherWidth);
 
@@ -200,12 +210,127 @@ export default class PedigreeEditor {
       document.addEventListener('pedigree:person:newpartnerandchild', autosave);
       document.addEventListener('pedigree:partnership:newchild',      autosave);
     }
+
+    if (options.questionnaireUrl && !options.questionnaireLocal) {
+      this._loadQuestionnaireFromUrl(options.questionnaireUrl, options);
+    }
   }
 
   autosave(patientDataUrl: any): any {
     return () => {
       editor.getSaveLoadEngine().save(patientDataUrl);
     };
+  }
+
+  /**
+   * Fetches a Questionnaire from questionnaireUrl and, once resolved, wires it into an
+   * already-constructed editor: appends the Custom tab's fields to the node menu and
+   * retroactively synthesizes per-item setters on any Person nodes constructed before
+   * the fetch resolved (see questionnaire-fields design D1/D5).
+   */
+  _loadQuestionnaireFromUrl(url: any, options: any): void {
+    var _this = this;
+    fetch(url)
+      .then(function(response: any) {
+        if (!response.ok) {
+          throw new Error('Unexpected response status ' + response.status);
+        }
+        return response.json();
+      })
+      .then(function(questionnaire: any) {
+        if (!questionnaire || questionnaire.resourceType !== 'Questionnaire') {
+          throw new Error('Resource at questionnaireUrl is not a Questionnaire');
+        }
+        _this._questionnaireConfig = parseQuestionnaire(questionnaire);
+        _this._initialiseQuestionnaireTerminologies(options);
+
+        var view = _this.getView();
+        if (view) {
+          var nodeMap = view.getNodeMap();
+          for (var nodeID in nodeMap) {
+            if (nodeMap.hasOwnProperty(nodeID) && nodeMap[nodeID].getType && nodeMap[nodeID].getType() === 'Person') {
+              nodeMap[nodeID]._synthesizeQuestionnaireSetters();
+            }
+          }
+        }
+
+        if (_this._nodeMenu) {
+          _this._nodeMenu.addFields(_this._buildQuestionnaireFieldDescriptors());
+        }
+      })
+      .catch(function(err: any) {
+        console.warn('Failed to load questionnaireUrl - Custom tab will not be shown', err);
+      });
+  }
+
+  _initialiseQuestionnaireTerminologies(options: any): void {
+    if (!this._questionnaireConfig) {
+      return;
+    }
+    var _this = this;
+    this._questionnaireConfig.items.forEach(function(item: any) {
+      if (item.fieldType !== 'questionnaire-choice-picker') {
+        return;
+      }
+      var termOptionsKey = item.linkId + 'Options';
+      var termOptions = (options.questionnaireTerminologyOptions && options.questionnaireTerminologyOptions[item.linkId])
+        || options[termOptionsKey];
+      if (!termOptions) {
+        var baseUrl = options.questionnaireTerminologyBaseUrl;
+        if (!baseUrl) {
+          console.warn('Questionnaire item ' + item.linkId + ' has an answerValueSet but no questionnaireTerminologyBaseUrl (or per-item options) configured - falling back to plain rendering');
+          item.fieldType = item.answerOption ? 'select' : 'text';
+          return;
+        }
+        termOptions = { type: 'FHIR', fhirBaseUrl: baseUrl, valueSet: item.answerValueSet };
+      }
+      var syntheticOptions: any = {};
+      syntheticOptions[termOptionsKey] = termOptions;
+      _this._questionnaireTerminologies[item.linkId] = _this._initialiseTerminology(item.linkId, syntheticOptions);
+    });
+  }
+
+  /**
+   * Builds NodeMenu field descriptors for the "Custom" tab from the parsed Questionnaire
+   * config. mapsToField-mapped items are excluded (see design D9) - they read/write the
+   * existing property directly and are not rendered separately.
+   */
+  _buildQuestionnaireFieldDescriptors(): any {
+    if (!this._questionnaireConfig) {
+      return [];
+    }
+    var fields: any[] = [];
+    this._questionnaireConfig.items.forEach(function(item: any) {
+      if (item.mapping && item.mapping.kind === 'field') {
+        return;
+      }
+      var descriptor: any = {
+        'name': 'q_' + item.linkId,
+        'label': item.label,
+        'type': item.fieldType,
+        'tab': 'Custom',
+        'linkId': item.linkId,
+        'repeats': item.repeats
+      };
+      if (item.fieldType === 'select') {
+        descriptor.values = (item.answerOption || []).map(function(opt: any) {
+          return { 'actual': opt.value, 'displayed': opt.display };
+        });
+      }
+      if (item.fieldType !== 'heading') {
+        descriptor.function = 'setQuestionnaireAnswer_' + item.linkId;
+      }
+      fields.push(descriptor);
+    });
+    return fields;
+  }
+
+  getQuestionnaireConfig(): any {
+    return this._questionnaireConfig;
+  }
+
+  getQuestionnaireTerminology(linkId: any): any {
+    return this._questionnaireTerminologies[linkId];
   }
 
   getNode(nodeID: any): any {
@@ -551,7 +676,7 @@ export default class PedigreeEditor {
         'rows' : 2,
         'function' : 'setComments'
       }
-    ], ['Personal', 'Clinical']);
+    ].concat(this._buildQuestionnaireFieldDescriptors()), this._questionnaireConfig ? ['Personal', 'Clinical', 'Custom'] : ['Personal', 'Clinical']);
   }
 
   getNodeMenu(): any {
