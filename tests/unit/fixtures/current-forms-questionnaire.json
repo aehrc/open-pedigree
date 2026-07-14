@@ -1,0 +1,97 @@
+{
+  "resourceType": "Questionnaire",
+  "url": "https://github.com/aehrc/open-pedigree/Questionnaire/current-forms",
+  "version": "1.0",
+  "title": "Open Pedigree current form fields (mapsToField reference)",
+  "status": "active",
+  "description": "Reference Questionnaire showing how every mapsToField-eligible scalar property already on the Personal/Clinical tabs can be re-declared through the questionnaire-fields mechanism. Each item points item.definition at the property it maps onto (a real Patient element where one exists, or this library's own PedigreeIndividual logical model where it doesn't - see questionnaireParser.ts's MAPS_TO_FIELD_DEFINITIONS), so it does not render a duplicate field on the Custom tab (see questionnaire-fields design D9) - it exists purely so implementers have a concrete worked example, and so the test suite has a realistic fixture exercising every supported mapsToField target at once.",
+  "item": [
+    {
+      "linkId": "gender",
+      "type": "choice",
+      "text": "Gender",
+      "answerOption": [
+        { "valueString": "M" },
+        { "valueString": "F" },
+        { "valueString": "U" }
+      ],
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.gender",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "first_name",
+      "type": "string",
+      "text": "First name",
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.given",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "last_name",
+      "type": "string",
+      "text": "Last name",
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.family",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "external_id",
+      "type": "string",
+      "text": "Identifier",
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.identifier",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "date_of_birth",
+      "type": "date",
+      "text": "Date of birth",
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.birthDate",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "date_of_death",
+      "type": "date",
+      "text": "Date of death",
+      "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.deceasedDateTime",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "life_status",
+      "type": "choice",
+      "text": "Status",
+      "answerOption": [
+        { "valueString": "alive" },
+        { "valueString": "deceased" },
+        { "valueString": "stillborn" },
+        { "valueString": "aborted" },
+        { "valueString": "miscarriage" },
+        { "valueString": "unborn" }
+      ],
+      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "gestation_age",
+      "type": "integer",
+      "text": "Gestation age (weeks)",
+      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.gestationAge",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "carrier_status",
+      "type": "choice",
+      "text": "Carrier status",
+      "answerOption": [
+        { "valueString": "carrier" },
+        { "valueString": "presymptomatic" }
+      ],
+      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    },
+    {
+      "linkId": "comments",
+      "type": "text",
+      "text": "Comments",
+      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
+      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+    }
+  ]
+}

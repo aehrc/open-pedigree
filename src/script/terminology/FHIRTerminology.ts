@@ -72,7 +72,7 @@ export default class FHIRTerminology extends AbstractAjaxTerminology {
       if (parsed.expansion && parsed.expansion.contains) {
         const result: any[] = [];
         for (const v of parsed.expansion.contains) {
-          result.push({ text: v.display, value: v.code });
+          result.push({ text: v.display, value: v.code, system: v.system });
         }
         return result;
       }

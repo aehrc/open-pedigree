@@ -4,6 +4,7 @@ import SmartFhirBackend from './script/SmartFhirBackend';
 import SmartPatientProvider from './script/patientProvider/SmartPatientProvider';
 import LocalStorageBackend from './script/localStorageBackend';
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
+import { DEFAULT_QUESTIONNAIRE } from './script/questionnaire/defaultQuestionnaire';
 
 import '@fortawesome/fontawesome-free/js/fontawesome';
 import '@fortawesome/fontawesome-free/js/solid';
@@ -22,6 +23,7 @@ OpenPedigree.localStorageBackend = LocalStorageBackend;
 OpenPedigree.FHIRPatientProvider = FHIRPatientProvider;
 OpenPedigree.SmartFhirBackend = SmartFhirBackend;
 OpenPedigree.SmartPatientProvider = SmartPatientProvider;
+OpenPedigree.defaultQuestionnaire = DEFAULT_QUESTIONNAIRE;
 
 // Expose on window so tests can override via addInitScript before DOMContentLoaded
 if (!(window as any).FHIR) {
@@ -41,6 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const SNOMED_SYSTEM   = 'http://snomed.info/sct';
             const HGNC_SYSTEM     = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
 
+            // Well-known Questionnaire seeded onto the same FHIR server this app launched
+            // against (see tests/fixtures/smart/questionnaire.json / docker-compose.smart.yml).
+            // A real deployment would point this at its own Questionnaire instead.
+            const fhirBaseUrl = (client.getState('serverUrl') || '').replace(/\/$/, '');
+            const DEMO_QUESTIONNAIRE_ID = 'demo-questionnaire';
+
             const editor = OpenPedigree.initialiseEditor({
                 patientDataUrl: 'smart:pedigree',
                 backend: {
@@ -48,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     load: backend.load.bind(backend),
                 },
                 patientProvider: provider,
+                questionnaireUrl: fhirBaseUrl + '/Questionnaire/' + DEMO_QUESTIONNAIRE_ID,
                 disorderOptions: {
                     type:         'FHIR',
                     codeSystem:   SNOMED_SYSTEM,

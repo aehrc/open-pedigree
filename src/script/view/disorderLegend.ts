@@ -13,17 +13,13 @@ export default class DisorderLegend extends Legend {
   _specialDisordersRegexps: any[];
 
   constructor(terminology: any) {
-    super('Disorders', terminology);
+    super('Disorders', terminology, 'disorder');
 
     this._specialDisordersRegexps = [new RegExp('^1BrCa', 'i'),
       new RegExp('^2BrCa', 'i'),
       new RegExp('^OvCa',  'i'),
       new RegExp('^ProCa', 'i'),
       new RegExp('^PanCa', 'i') ];
-  }
-
-  _getPrefix(id?: any): any {
-    return 'disorder';
   }
 
   /**
