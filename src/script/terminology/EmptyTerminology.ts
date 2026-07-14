@@ -7,11 +7,11 @@ export default class EmptyTerminology extends AbstractTerminology {
 
   lookupTerm(id: any, onSuccess: any, onError: any, onComplete: any): void {
     onError('Empty Terminology has no terms');
-    onComplete();
+    onComplete && onComplete();
   }
 
   searchForTerms(searchTerm: any, onSuccess: any, onError: any, onComplete: any): void {
     onSuccess(searchTerm, []);
-    onComplete();
+    onComplete && onComplete();
   }
 }

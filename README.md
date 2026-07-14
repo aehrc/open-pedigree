@@ -62,6 +62,55 @@ docker build . -t open-pedigree
 docker run -p 9000:9000 -d open-pedigree
 ```
 
+## Testing
+
+### Unit tests
+
+```bash
+npm test
+```
+
+Runs all Vitest unit tests, including tests for `SmartFhirBackend`, `SmartPatientProvider`, and `FHIRPatientProvider`.
+
+### Playwright E2E tests (stub mode)
+
+The E2E suite uses a stub SMART client — no real FHIR server required. Start the dev server first, then run the tests:
+
+```bash
+npm start &
+npx playwright test
+```
+
+The stub helper (`tests/e2e/helpers/smartStub.ts`) intercepts `FHIR.oauth2.ready()` and returns a pre-configured mock client so tests run without OAuth redirects.
+
+### Full-stack SMART on FHIR environment (Docker Compose)
+
+For end-to-end testing against a real SMART OAuth + FHIR server, use the included Docker Compose setup:
+
+```bash
+docker compose -f docker-compose.smart.yml up
+```
+
+This starts:
+- **smart-launcher** at `http://localhost:8080` — a local SMART on FHIR launcher with a built-in FHIR R4 server (HAPI)
+- **fhir-seeder** — seeds two test patients on startup, then exits
+- **dev-server** at `http://localhost:9000` — the Open Pedigree webpack dev server
+
+**Pre-seeded test patients:**
+
+| Patient ID | Name | Purpose |
+|---|---|---|
+| `test-patient-a` | Alice Anderson | No prior pedigree; has 2 Conditions (Diabetes, Huntington) — tests new pedigree creation and clinical import |
+| `test-patient-b` | Bob Brown | Has an existing GA4GH pedigree Composition (proband + 2 parents + sibling) — tests load/round-trip |
+
+To launch the editor for a test patient, open the smart-launcher's EHR simulation at:
+
+```
+http://localhost:8080/launcher?launch_uri=http://localhost:9000/launch.html&patient=test-patient-a
+```
+
+Replace `test-patient-a` with `test-patient-b` to test the saved-pedigree load path.
+
 ## Contributing
 
 Contributions welcome! Fork the repository and create a pull request to share your improvements with the community.

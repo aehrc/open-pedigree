@@ -230,7 +230,7 @@ export default class SaveLoadEngine {
 
     console.log('[SAVE] data: ' + JSON.stringify(jsonData));
 
-    var image = $('canvas');
+    var image = document.getElementById('canvas');
     var background = image.getElementsByClassName('panning-background')[0];
     var backgroundPosition = background.nextSibling;
     var backgroundParent =  background.parentNode;

@@ -3,10 +3,13 @@ const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
-  entry: './src/app.ts',
+  entry: {
+    pedigree: './src/app.ts',
+    smartEditor: './src/smartEditor.ts',
+  },
 
   output: {
-    filename: 'pedigree.min.js',
+    filename: '[name].min.js',
     path: path.resolve(__dirname, 'dist'),
     clean: false,
   },
