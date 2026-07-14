@@ -1,8 +1,29 @@
 import { ChildlessBehavior } from 'pedigree/view/abstractNode';
 import AbstractPerson from 'pedigree/view/abstractPerson';
 import PersonVisuals from 'pedigree/view/personVisuals';
+import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
+import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
 
 declare const editor: any;
+
+/**
+ * setDisorders/setGenes/setPhenotypes historically accepted either raw ID strings or an
+ * already-resolved Term object (with a .getID() method) - see addDisorder/addGene/addPhenotype.
+ * The generic questionnaire-legend-picker field type (RESERVED_LEGEND_TARGETS - see
+ * questionnaire-source-of-truth design D15) introduces a THIRD shape for these same setters:
+ * plain {system, code, display} answer objects (matching every other legend item's answer
+ * shape). Normalising to raw IDs here - once, before the add/remove loop - lets
+ * addDisorder/addGene/addPhenotype's own two-shape handling stay untouched.
+ */
+function normalizeLegendAnswerIds(values: any): any {
+  return (values || []).map(function(v: any) {
+    if (v && typeof v === 'object' && typeof v.getID !== 'function' && v.hasOwnProperty('code')) {
+      return v.code;
+    }
+    return v;
+  });
+}
 
 /**
  * Person is a class representing any AbstractPerson that has sufficient information to be
@@ -44,6 +65,7 @@ export default class Person extends AbstractPerson {
   _evaluated: any;
   _lostContact: any;
   _linkedPatientRef: any;
+  _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
     Person._pendingIsProband = (id === 0);
@@ -53,6 +75,113 @@ export default class Person extends AbstractPerson {
     // because changing properties requires a redraw, which relies on gender
     // shapes being there already
     this.assignProperties(properties);
+    this._synthesizeQuestionnaireSetters();
+  }
+
+  /**
+   * Creates a get/set method pair on this instance for every configured Questionnaire
+   * item that isn't a heading and isn't mapsToField-mapped (those read/write the existing
+   * property's own getter/setter instead - see questionnaire-fields design D9).
+   * Instance-level (not prototype) so multiple editors with different Questionnaires never collide.
+   */
+  _synthesizeQuestionnaireSetters(): void {
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    if (!config || !config.items) {
+      return;
+    }
+    var _this = this;
+    config.items.forEach(function(item: any) {
+      if (item.fieldType === 'heading') {
+        return;
+      }
+      if (item.mapping && item.mapping.kind === 'field') {
+        return;
+      }
+      if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+        return;
+      }
+      var getterName = 'getQuestionnaireAnswer_' + item.linkId;
+      var setterName = 'setQuestionnaireAnswer_' + item.linkId;
+      if (!(_this as any)[setterName]) {
+        (_this as any)[getterName] = function(): any {
+          return _this.getQuestionnaireAnswer(item.linkId);
+        };
+        var isLegendMapped = item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation');
+        (_this as any)[setterName] = isLegendMapped
+          ? function(value: any): void {
+            _this.setQuestionnaireLegendAnswer(item.linkId, value);
+          }
+          : function(value: any): void {
+            _this.setQuestionnaireAnswer(item.linkId, value);
+          };
+      }
+    });
+  }
+
+  /**
+   * Returns the stored answer for a Questionnaire item, or undefined if unanswered.
+   *
+   * @method getQuestionnaireAnswer
+   */
+  getQuestionnaireAnswer(linkId: any): any {
+    return this._questionnaireAnswers.hasOwnProperty(linkId) ? this._questionnaireAnswers[linkId] : undefined;
+  }
+
+  /**
+   * Stores (or clears, if value is empty) the answer for a Questionnaire item.
+   *
+   * @method setQuestionnaireAnswer
+   */
+  setQuestionnaireAnswer(linkId: any, value: any): void {
+    if (value === undefined || value === null || value === '') {
+      delete this._questionnaireAnswers[linkId];
+    } else {
+      this._questionnaireAnswers[linkId] = value;
+    }
+  }
+
+  /**
+   * Returns the full linkId -> answer map, used by GA4GH FHIR export/import.
+   *
+   * @method getQuestionnaireAnswers
+   */
+  getQuestionnaireAnswers(): any {
+    return this._questionnaireAnswers;
+  }
+
+  /**
+   * Sets the answer for a legend-backed (mapsToLegendCondition/mapsToLegendObservation)
+   * Questionnaire item to the given list of {system, code, display} terms, diffing against
+   * the previous answer and updating the item's per-linkId Legend accordingly - generalises
+   * the addDisorder/removeDisorder diffing pattern for an arbitrary legend item.
+   *
+   * @method setQuestionnaireLegendAnswer
+   */
+  setQuestionnaireLegendAnswer(linkId: any, newValues: any): void {
+    var legend = editor.getQuestionnaireLegend(linkId);
+    var previous = this.getQuestionnaireAnswer(linkId) || [];
+    var previousIds = previous.map(function(v: any) { return v.code; });
+    var newIds = (newValues || []).map(function(v: any) { return v.code; });
+    var _this = this;
+
+    previous.forEach(function(v: any) {
+      if (newIds.indexOf(v.code) === -1) {
+        legend.removeCase(v.code, _this.getID());
+      }
+    });
+    (newValues || []).forEach(function(v: any) {
+      if (previousIds.indexOf(v.code) === -1) {
+        legend.addToCache(v.code, v.display);
+        legend.addCase(v.code, v.display, _this.getID());
+      }
+    });
+
+    if (!newValues || newValues.length === 0) {
+      delete this._questionnaireAnswers[linkId];
+    } else {
+      this._questionnaireAnswers[linkId] = newValues;
+    }
+    this.getGraphics().updateDisorderShapes();
   }
 
   /**
@@ -94,6 +223,7 @@ export default class Person extends AbstractPerson {
     this._evaluated = false;
     this._lostContact = false;
     this._linkedPatientRef = '';
+    this._questionnaireAnswers = {};
   }
 
   /**
@@ -398,7 +528,7 @@ export default class Person extends AbstractPerson {
   }
 
   /**
-   * Returns the the birth date of this Person
+   * Returns the birthdate of this Person
    *
    * @method getBirthDate
    * @return {Date}
@@ -408,7 +538,7 @@ export default class Person extends AbstractPerson {
   }
 
   /**
-   * Replaces the birth date with newDate
+   * Replaces the birthdate with newDate
    *
    * @method setBirthDate
    * @param {Date} newDate Must be earlier date than deathDate and a later than conception date
@@ -439,7 +569,7 @@ export default class Person extends AbstractPerson {
    */
   setDeathDate(deathDate: any): any {
     deathDate = deathDate ? (new Date(deathDate)) : '';
-    // only set death date if it happens to be after the birth date, or there is no birth or death date
+    // only set death date if it happens to be after the birthdate, or there is no birth or death date
     if (!deathDate || !this.getBirthDate() || deathDate.getTime() > this.getBirthDate().getTime()) {
       this._deathDate = deathDate;
       this._deathDate && (this.getLifeStatus() === 'alive') && this.setLifeStatus('deceased');
@@ -506,8 +636,9 @@ export default class Person extends AbstractPerson {
   }
 
   /**
-   * Returns the list of all colors associated with the node
-   * (e.g. all colors of all disorders and all colors of all the genes)
+   * Returns the list of all colors associated with the node: all colors of all disorders,
+   * all colors of all the genes, and all colors of any other (non-reserved, implementer-defined)
+   * legend-backed Questionnaire item's currently selected terms.
    * @method getAllNodeColors
    * @return {[String]}
    */
@@ -519,6 +650,23 @@ export default class Person extends AbstractPerson {
     }
     for (i = 0; i < this.getGenes().length; i++) {
       result.push(editor.getGeneLegend().getObjectColor(this.getGenes()[i]));
+    }
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    if (config && config.items) {
+      var _this = this;
+      config.items.forEach(function(item: any) {
+        if (!item.mapping || (item.mapping.kind !== 'legendCondition' && item.mapping.kind !== 'legendObservation')) {
+          return;
+        }
+        if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+          return;
+        }
+        var answer = _this.getQuestionnaireAnswer(item.linkId) || [];
+        var legend = editor.getQuestionnaireLegend(item.linkId);
+        answer.forEach(function(v: any) {
+          result.push(legend.getObjectColor(v.code));
+        });
+      });
     }
     return result;
   }
@@ -597,6 +745,7 @@ export default class Person extends AbstractPerson {
    * @param {Array} disorders List of Disorder objects
    */
   setDisorders(disorders: any): void {
+    disorders = normalizeLegendAnswerIds(disorders);
     let i;
     for (i = this.getDisorders().length - 1; i >= 0; i--) {
       this.removeDisorder(this.getDisorders()[i]);
@@ -686,6 +835,7 @@ export default class Person extends AbstractPerson {
       console.log('Warning: trying to setPhenotypes with non-array: ', phenotypes);
       return;
     }
+    phenotypes = normalizeLegendAnswerIds(phenotypes);
     for (i = this.getPhenotypes().length - 1; i >= 0; i--) {
       this.removePhenotype(this.getPhenotypes()[i]);
     }
@@ -745,6 +895,7 @@ export default class Person extends AbstractPerson {
       console.log('Warning: trying to setGenes with non-array: ', genes);
       return;
     }
+    genes = normalizeLegendAnswerIds(genes);
     for (var i = this.getGenes().length - 1; i >= 0; i--) {
       this.removeGene(this.getGenes()[i]);
     }
@@ -836,85 +987,61 @@ export default class Person extends AbstractPerson {
    * @return {Object} Summary object for the menu
    */
   getSummary(): any {
-    var onceAlive = editor.getGraph().hasRelationships(this.getID());
-    var inactiveStates = onceAlive ? ['unborn', 'aborted', 'miscarriage', 'stillborn'] : false;
+    var summary: any = {};
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    if (!config || !config.items) {
+      return summary;
+    }
 
-    var inactiveGenders: any = false;
-    var genderSet = editor.getGraph().getPossibleGenders(this.getID());
-    for (var gender in genderSet) {
-      if (genderSet.hasOwnProperty(gender)) {
-        if (!genderSet[gender]) {
-          inactiveGenders = [gender];
+    var graph = editor.getGraph();
+    var patientProvider = editor.getPatientProvider();
+    var context = { node: this, graph: graph, patientProvider: patientProvider };
+    var _this = this;
+
+    config.items.forEach(function(item: any) {
+      if (item.fieldType === 'heading') {
+        return;
+      }
+
+      var value;
+      if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+        // Rendered via the generic questionnaire-legend-picker field type (not the old
+        // disease-picker/gene-picker/hpo-picker types, which summaryShape's {id,value}/plain-array
+        // split was for) - its _setFieldValue expects the same {code, display} shape as any
+        // other legend item, regardless of which of the three reserved targets this is.
+        var target = RESERVED_LEGEND_TARGETS[item.linkId];
+        var ids = (_this as any)[target.getter]();
+        var legend = editor.getQuestionnaireLegend(item.linkId);
+        value = ids.map(function(id: any) {
+          return { code: id, display: legend.getTerm(id).getName() };
+        });
+      } else if (item.mapping && item.mapping.kind === 'field') {
+        value = (_this as any)[MAPS_TO_FIELD_TARGETS[item.mapping.field].getter]();
+      } else if (item.mapping && item.mapping.kind === 'action') {
+        value = _this.getLinkedPatientRef();
+      } else {
+        value = _this.getQuestionnaireAnswer(item.linkId);
+      }
+
+      var isEnabled = evaluateEnableWhen(item.enableWhen, item.enableBehavior, _this._questionnaireAnswers, context);
+      var inactive: any = !isEnabled;
+      var disabled: any = item.disabledWhen
+        ? !evaluateEnableWhen(item.disabledWhen, item.disabledBehavior, _this._questionnaireAnswers, context)
+        : false;
+
+      if (item.disablingPredicate) {
+        var disabledValues = evaluatePerOptionPredicate(item.disablingPredicate, _this, graph);
+        if (item.disablingPredicateTarget === 'disabled') {
+          disabled = disabledValues;
+        } else {
+          inactive = disabledValues;
         }
       }
-    }
 
-    var childlessInactive = this.isFetus();
-    var disorders: any[] = [];
-    this.getDisorders().forEach(function(disorder: any) {
-      var disorderName = editor.getDisorderLegend().getDisorder(disorder).getName();
-      disorders.push({id: disorder, value: disorderName});
-    });
-    var phenotypeTerms: any[] = [];
-    this.getPhenotypes().forEach(function(phenotype: any) {
-      var termName = editor.getPhenotypeLegend().getTerm(phenotype).getName();
-      phenotypeTerms.push({id: phenotype, value: termName});
+      summary[item.linkId] = { value: value, inactive: inactive, disabled: disabled };
     });
 
-    var cantChangeAdopted = this.isFetus() || editor.getGraph().hasToBeAdopted(this.getID());
-
-    var inactiveMonozygothic = true;
-    var disableMonozygothic  = true;
-    var twins = editor.getGraph().getAllTwinsSortedByOrder(this.getID());
-    if (twins.length > 1) {
-      // check that there are twins and that all twins
-      // have the same gender, otherwise can't be monozygothic
-      inactiveMonozygothic = false;
-      disableMonozygothic  = false;
-      for (var i = 0; i < twins.length; i++) {
-        if (editor.getGraph().getGender(twins[i]) !== this.getGender()) {
-          disableMonozygothic = true;
-          break;
-        }
-      }
-    }
-
-    var inactiveCarriers: any[] = [];
-    if (disorders.length > 0) {
-      if (disorders.length !== 1 || disorders[0].id !== 'affected') {
-        inactiveCarriers = [''];
-      }
-    }
-    if (this.getLifeStatus() === 'aborted' || this.getLifeStatus() === 'miscarriage') {
-      inactiveCarriers.push('presymptomatic');
-    }
-
-    var inactiveLostContact = this.isProband() || !editor.getGraph().isRelatedToProband(this.getID());
-
-    return {
-      identifier:      {value : this.getID()},
-      first_name:      {value : this.getFirstName()},
-      last_name:       {value : this.getLastName()},
-      external_id:     {value : this.getExternalID()},
-      gender:          {value : this.getGender(), inactive: inactiveGenders},
-      date_of_birth:   {value : this.getBirthDate(), inactive: this.isFetus()},
-      carrier:         {value : this.getCarrierStatus(), disabled: inactiveCarriers},
-      disorders:       {value : disorders},
-      candidate_genes: {value : this.getGenes()},
-      adopted:         {value : this.isAdopted(), inactive: cantChangeAdopted},
-      state:           {value : this.getLifeStatus(), inactive: inactiveStates},
-      date_of_death:   {value : this.getDeathDate(), inactive: this.isFetus()},
-      comments:        {value : this.getComments(), inactive: false},
-      gestation_age:   {value : this.getGestationAge(), inactive : !this.isFetus()},
-      childlessSelect: {value : this.getChildlessStatus() ? this.getChildlessStatus() : 'none', inactive : childlessInactive},
-      placeholder:     {value : false, inactive: true},
-      monozygotic:     {value : this.getMonozygotic(), inactive: inactiveMonozygothic, disabled: disableMonozygothic},
-      evaluated:       {value : this.getEvaluated()},
-      hpo_positive:    {value : phenotypeTerms},
-      nocontact:       {value : this.getLostContact(), inactive: inactiveLostContact},
-      link_patient:    {value: this.getLinkedPatientRef(), inactive: !(editor as any).getPatientProvider().isConfigured()},
-      import_from_record: {value: this.getLinkedPatientRef(), inactive: !((editor as any).getPatientProvider().canImportClinicalData() && !!this.getLinkedPatientRef())}
-    };
+    return summary;
   }
 
   /**
@@ -985,6 +1112,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedPatientRef() != '') {
       info['linkedPatientRef'] = this.getLinkedPatientRef();
     }
+    if (Object.keys(this._questionnaireAnswers).length > 0) {
+      info['questionnaireAnswers'] = this._questionnaireAnswers;
+    }
     return info;
   }
 
@@ -1052,6 +1182,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedPatientRef') && this.getLinkedPatientRef() != info.linkedPatientRef) {
         this.setLinkedPatientRef(info.linkedPatientRef);
+      }
+      if (info.hasOwnProperty('questionnaireAnswers')) {
+        this._questionnaireAnswers = info.questionnaireAnswers;
       }
       return true;
     }

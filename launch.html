@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Open Pedigree — SMART Launch</title>
+    <script src="node_modules/fhirclient/build/fhir-client.js"></script>
+  </head>
+  <body>
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var iss = params.get('iss');
+
+      if (!iss) {
+        document.body.innerHTML = '<p style="font-family:sans-serif;padding:32px;color:#b00020;">'
+          + '<strong>Launch error:</strong> Missing <code>iss</code> parameter. '
+          + 'Please launch this application from your EHR.</p>';
+        return;
+      }
+
+      var authorizeParams = {
+        iss: iss,
+        redirectUri: './smartEditor.html',
+        scope: 'launch openid fhirUser offline_access user/Patient.read user/Condition.read patient/Composition.read patient/Composition.write',
+        clientId: 'open-pedigree',
+      };
+
+      var launch = params.get('launch');
+      if (launch) {
+        authorizeParams.launch = launch;
+      }
+
+      FHIR.oauth2.authorize(authorizeParams);
+    })();
+  </script>
+  </body>
+</html>

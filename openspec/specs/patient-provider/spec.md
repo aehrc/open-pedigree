@@ -18,8 +18,8 @@ The editor SHALL accept a `patientProvider` option in `initialiseEditor()`. When
 
 ---
 
-### Requirement: Patient provider interface defines four entry points
-`AbstractPatientProvider` SHALL define: `openPatientPickerModal(nodeId, onSelected)`, `openClinicalImportModal(nodeId, fhirRef, onImported)`, `canImportClinicalData()`, and `lookupPatient(fhirRef, onSuccess, onError)`.
+### Requirement: Patient provider interface defines four entry points and three feature flags
+`AbstractPatientProvider` SHALL define: `openPatientPickerModal(nodeId, onSelected)`, `openClinicalImportModal(nodeId, fhirRef, onImported)`, `canImportClinicalData()`, and `lookupPatient(fhirRef, onSuccess, onError)`. It SHALL also expose `canSearchFamilyMembers()` and `canLinkProband()`, both defaulting to `true`, which control visibility of the patient-link button for non-proband and proband nodes respectively.
 
 #### Scenario: openPatientPickerModal receives callback with selected patient
 - **WHEN** a provider implementation calls `onSelected(fhirRef, displayName)` from within the picker modal
@@ -32,6 +32,14 @@ The editor SHALL accept a `patientProvider` option in `initialiseEditor()`. When
 #### Scenario: canImportClinicalData controls visibility of import button
 - **WHEN** `provider.canImportClinicalData()` returns false
 - **THEN** the "Import from record" button SHALL NOT be shown on the Clinical tab
+
+#### Scenario: canLinkProband controls visibility of patient-link button on proband
+- **WHEN** `provider.canLinkProband()` returns false
+- **THEN** the "Link to patient" button SHALL NOT be shown for the proband node
+
+#### Scenario: canSearchFamilyMembers controls visibility of patient-link button on non-proband nodes
+- **WHEN** `provider.canSearchFamilyMembers()` returns false
+- **THEN** the "Link to patient" button SHALL NOT be shown for any non-proband node
 
 ---
 

@@ -1,0 +1,72 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "Patient/test-patient-a",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "test-patient-a",
+        "name": [
+          {
+            "use": "official",
+            "family": "Anderson",
+            "given": ["Alice"]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "1985-03-12"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Patient/test-patient-a"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "73211009",
+              "display": "Diabetes mellitus"
+            }
+          ],
+          "text": "Diabetes mellitus"
+        },
+        "subject": { "reference": "Patient/test-patient-a" }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.omim.org",
+              "code": "143100",
+              "display": "Huntington disease"
+            }
+          ],
+          "text": "Huntington disease"
+        },
+        "subject": { "reference": "Patient/test-patient-a" }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    }
+  ]
+}

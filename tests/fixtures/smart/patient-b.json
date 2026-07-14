@@ -1,0 +1,175 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "Patient/test-patient-b",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "test-patient-b",
+        "name": [{ "use": "official", "family": "Brown", "given": ["Bob"] }],
+        "gender": "male",
+        "birthDate": "1990-07-22"
+      },
+      "request": { "method": "PUT", "url": "Patient/test-patient-b" }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }]
+        },
+        "code": {
+          "coding": [{ "system": "http://snomed.info/sct", "code": "84757009", "display": "Epilepsy" }],
+          "text": "Epilepsy"
+        },
+        "subject": { "reference": "Patient/test-patient-b" }
+      },
+      "request": { "method": "POST", "url": "Condition" }
+    },
+    {
+      "fullUrl": "Composition/test-pedigree-b",
+      "resource": {
+        "resourceType": "Composition",
+        "id": "test-pedigree-b",
+        "meta": {
+          "profile": ["http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree"]
+        },
+        "status": "final",
+        "type": {
+          "coding": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType", "code": "pedigree" }]
+        },
+        "subject": { "reference": "Patient/test-patient-b" },
+        "date": "2026-01-01",
+        "author": [{ "display": "Open Pedigree" }],
+        "title": "Family Pedigree — Bob Brown",
+        "contained": [
+          {
+            "resourceType": "Patient",
+            "id": "ind-proband",
+            "identifier": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig", "value": "ind-proband" }],
+            "name": [{ "use": "official", "family": "Brown", "given": ["Bob"] }],
+            "gender": "male",
+            "birthDate": "1990-07-22",
+            "link": [{ "other": { "reference": "Patient/test-patient-b" }, "type": "seealso" }]
+          },
+          {
+            "resourceType": "Patient",
+            "id": "ind-father",
+            "identifier": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig", "value": "ind-father" }],
+            "name": [{ "use": "official", "family": "Brown", "given": ["Charles"] }],
+            "gender": "male",
+            "birthDate": "1960-04-10"
+          },
+          {
+            "resourceType": "Patient",
+            "id": "ind-mother",
+            "identifier": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig", "value": "ind-mother" }],
+            "name": [{ "use": "official", "family": "Brown", "given": ["Diana"] }],
+            "gender": "female",
+            "birthDate": "1963-11-05"
+          },
+          {
+            "resourceType": "Patient",
+            "id": "ind-sibling",
+            "identifier": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig", "value": "ind-sibling" }],
+            "name": [{ "use": "official", "family": "Brown", "given": ["Emily"] }],
+            "gender": "female",
+            "birthDate": "1993-02-14"
+          },
+          {
+            "resourceType": "FamilyMemberHistory",
+            "id": "fmh-1",
+            "status": "completed",
+            "patient": { "reference": "#ind-proband" },
+            "relationship": {
+              "coding": [{ "system": "http://purl.org/ga4gh/kin.fhir", "code": "KIN:003", "display": "isBiologicalParent" }]
+            },
+            "extension": [{
+              "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+              "valueReference": { "reference": "#ind-father" }
+            }]
+          },
+          {
+            "resourceType": "FamilyMemberHistory",
+            "id": "fmh-2",
+            "status": "completed",
+            "patient": { "reference": "#ind-proband" },
+            "relationship": {
+              "coding": [{ "system": "http://purl.org/ga4gh/kin.fhir", "code": "KIN:003", "display": "isBiologicalParent" }]
+            },
+            "extension": [{
+              "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+              "valueReference": { "reference": "#ind-mother" }
+            }]
+          },
+          {
+            "resourceType": "FamilyMemberHistory",
+            "id": "fmh-3",
+            "status": "completed",
+            "patient": { "reference": "#ind-sibling" },
+            "relationship": {
+              "coding": [{ "system": "http://purl.org/ga4gh/kin.fhir", "code": "KIN:003", "display": "isBiologicalParent" }]
+            },
+            "extension": [{
+              "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+              "valueReference": { "reference": "#ind-father" }
+            }]
+          },
+          {
+            "resourceType": "FamilyMemberHistory",
+            "id": "fmh-4",
+            "status": "completed",
+            "patient": { "reference": "#ind-sibling" },
+            "relationship": {
+              "coding": [{ "system": "http://purl.org/ga4gh/kin.fhir", "code": "KIN:003", "display": "isBiologicalParent" }]
+            },
+            "extension": [{
+              "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+              "valueReference": { "reference": "#ind-mother" }
+            }]
+          },
+          {
+            "resourceType": "FamilyMemberHistory",
+            "id": "fmh-5",
+            "status": "completed",
+            "patient": { "reference": "#ind-father" },
+            "relationship": {
+              "coding": [{ "system": "http://purl.org/ga4gh/kin.fhir", "code": "KIN:026", "display": "SIGOTHR" }]
+            },
+            "extension": [{
+              "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+              "valueReference": { "reference": "#ind-mother" }
+            }]
+          }
+        ],
+        "section": [
+          {
+            "code": {
+              "coding": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType", "code": "individuals" }]
+            },
+            "entry": [
+              { "reference": "#ind-proband" },
+              { "reference": "#ind-father" },
+              { "reference": "#ind-mother" },
+              { "reference": "#ind-sibling" }
+            ]
+          },
+          {
+            "code": {
+              "coding": [{ "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType", "code": "relationships" }]
+            },
+            "entry": [
+              { "reference": "#fmh-1" },
+              { "reference": "#fmh-2" },
+              { "reference": "#fmh-3" },
+              { "reference": "#fmh-4" },
+              { "reference": "#fmh-5" }
+            ]
+          }
+        ]
+      },
+      "request": { "method": "PUT", "url": "Composition/test-pedigree-b" }
+    }
+  ]
+}

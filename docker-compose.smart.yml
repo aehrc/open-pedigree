@@ -1,0 +1,25 @@
+services:
+
+  smart-launcher:
+    image: smartonfhir/smart-launcher-2:latest
+    ports:
+      - "8080:80"
+
+  fhir-seeder:
+    image: curlimages/curl:latest
+    volumes:
+      - ./tests/fixtures/smart:/fixtures:ro
+    environment:
+      - FHIR_BASE_URL=http://smart-launcher/v/r4/fhir
+    entrypoint: ["/bin/sh", "/fixtures/seed.sh"]
+    depends_on:
+      - smart-launcher
+
+  dev-server:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9000:9000"
+    command: ["npm", "start"]

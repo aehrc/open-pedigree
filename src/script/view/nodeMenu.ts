@@ -27,6 +27,38 @@ import jQuery from 'jquery';
 
 var SELECTIZE_DELIMITER = '|';
 
+// Tabs may be passed either as a plain string (legacy) or as {key, label} (questionnaire-source-of-truth
+// tab derivation - see design D13), so two tabs can share a display label without colliding internally.
+function tabKey(tab: any): any {
+  return (tab && typeof tab === 'object') ? tab.key : tab;
+}
+function tabLabel(tab: any): any {
+  return (tab && typeof tab === 'object') ? tab.label : tab;
+}
+
+// Colours each currently-selected Selectize "item" chip with a small swatch bubble, reading
+// the colour from the given legend. Selectize rebuilds its .item elements from scratch on every
+// setValue()/refreshOptions() call, so this must be re-applied every time a field's value is set
+// (menu open, node switch, etc.) - a one-time colour-assignment event alone isn't enough, since
+// the swatch it adds would be wiped out the next time the field re-renders. `container` is
+// expected to be the field's own field-box element, so a plain descendant query is already
+// correctly scoped to this one field (no risk of matching another field's chips).
+function applySelectizeSwatches(container: any, legend: any): void {
+  if (!legend) {
+    return;
+  }
+  Array.from(container.querySelectorAll('.item[data-value]')).forEach(function(item: any) {
+    var value = item.dataset.value;
+    var colorBubble = item.querySelector('.disorder-color');
+    if (!colorBubble) {
+      colorBubble = document.createElement('span');
+      colorBubble.className = 'disorder-color';
+      item.prepend(colorBubble);
+    }
+    colorBubble.style.background = legend.getObjectColor(value);
+  });
+}
+
 export default class NodeMenu {
   canvas: any;
   menuBox: any;
@@ -42,6 +74,7 @@ export default class NodeMenu {
   _updating: any;
   _updateDisorderColor: any;
   _updateGeneColor: any;
+  _updateQuestionnaireLegendColor: any;
 
   constructor(data: any, tabs: any, otherCSSClass?: any) {
     this.canvas = editor.getWorkspace().canvas || document.body;
@@ -69,7 +102,8 @@ export default class NodeMenu {
       this.tabTop = document.createElement('dl');
       this.tabTop.className = 'tabs';
       for (var i = 0; i < tabs.length; i++) {
-        var tabName = tabs[i];
+        var tabName = tabKey(tabs[i]);
+        var tabDisplayLabel = tabLabel(tabs[i]);
         var activeClass = (i == 0) ? 'active' : '';
         this.tabs[tabName] = document.createElement('div');
         this.tabs[tabName].id = 'tab_' + tabName;
@@ -78,7 +112,9 @@ export default class NodeMenu {
 
         this.tabHeaders[tabName] = document.createElement('dd');
         this.tabHeaders[tabName].className = activeClass;
-        this.tabHeaders[tabName].innerHTML = '<a>' + tabName + '</a>';
+        var tabLink = document.createElement('a');
+        tabLink.textContent = tabDisplayLabel;
+        this.tabHeaders[tabName].appendChild(tabLink);
         var _this = this;
         var switchTab = function(tabName: any) {
           return function() {
@@ -119,8 +155,9 @@ export default class NodeMenu {
     data.forEach(function(d: any) {
       if (typeof ((_this._generateField as any)[d.type]) == 'function') {
         var insertLocation = _this.form;
-        if (d.tab && _this.tabs.hasOwnProperty(d.tab)) {
-          insertLocation = _this.tabs[d.tab];
+        var key = tabKey(d.tab);
+        if (key && _this.tabs.hasOwnProperty(key)) {
+          insertLocation = _this.tabs[key];
         }
         insertLocation.appendChild((_this._generateField as any)[d.type].call(_this, d));
       }
@@ -134,14 +171,88 @@ export default class NodeMenu {
 
     // Date pickers are initialised per-field in _generateField['date-picker'] using flatpickr.
 
-    /**
-     *
-     * @param input
-     * @param {Legend} legend
-     * @param selectizeOptions
-     * @returns {*|jQuery|HTMLElement}
-     * @private
-     */
+    this._initializeSuggestPickers();
+
+    // Update disorder colors. Handles the live case (a brand-new colour assigned while this
+    // field's Selectize items are already rendered) - the same swatch application also runs
+    // unconditionally on every value-set in _setFieldValue['disease-picker'], since Selectize
+    // rebuilds its .item elements from scratch each time and would otherwise wipe this out.
+    this._updateDisorderColor = function(this: any, id: any, color: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-disorders .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
+        var colorBubble = item.querySelector('.disorder-color');
+        if (!colorBubble) {
+          colorBubble = document.createElement('span');
+          colorBubble.className = 'disorder-color';
+          item.prepend(colorBubble);
+        }
+        colorBubble.style.background = color;
+      });
+    }.bind(this);
+    document.addEventListener('disorder:color', function(event: any) {
+      if (!event.detail || !event.detail.id || !event.detail.color) {
+        return;
+      }
+      _this._updateDisorderColor(event.detail.id, event.detail.color);
+    });
+
+    // Update gene colors (see disorder colors above for why this is also applied unconditionally
+    // in _setFieldValue['gene-picker']).
+    this._updateGeneColor = function(this: any, id: any, color: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
+        var colorBubble = item.querySelector('.disorder-color');
+        if (!colorBubble) {
+          colorBubble = document.createElement('span');
+          colorBubble.className = 'disorder-color';
+          item.prepend(colorBubble);
+        }
+        colorBubble.style.background = color;
+      });
+    }.bind(this);
+    document.addEventListener('gene:color', function(event: any) {
+      if (!event.detail || !event.detail.id || !event.detail.color) {
+        return;
+      }
+      _this._updateGeneColor(event.detail.id, event.detail.color);
+    });
+
+    // Update questionnaire-legend-picker colors (generic - any linkId). Legend instances used
+    // here are constructed with idPrefix 'legend-<linkId>' (see PedigreeEditor.getQuestionnaireLegend),
+    // while the field's own CSS class is 'field-<linkId>' (see PedigreeEditor._buildFieldDescriptors) -
+    // strip the 'legend-' prefix to go from one to the other. (See disorder colors above for why
+    // this is also applied unconditionally in _setFieldValue['questionnaire-legend-picker'].)
+    this._updateQuestionnaireLegendColor = function(this: any, linkId: any, id: any, color: any) {
+      var fieldLinkId = String(linkId).replace(/^legend-/, '');
+      Array.from(this.menuBox.querySelectorAll('.field-' + CSS.escape(fieldLinkId) + ' .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
+        var colorBubble = item.querySelector('.disorder-color');
+        if (!colorBubble) {
+          colorBubble = document.createElement('span');
+          colorBubble.className = 'disorder-color';
+          item.prepend(colorBubble);
+        }
+        colorBubble.style.background = color;
+      });
+    }.bind(this);
+    document.addEventListener('questionnaire-legend:color', function(event: any) {
+      if (!event.detail || !event.detail.linkId || !event.detail.id || !event.detail.color) {
+        return;
+      }
+      _this._updateQuestionnaireLegendColor(event.detail.linkId, event.detail.id, event.detail.color);
+    });
+  }
+
+  /**
+   * Wires up Selectize on every not-yet-initialized suggest-picker <select> in the form
+   * (disorders/genes/phenotypes via their Legend, questionnaire choice fields via their
+   * per-linkId terminology instance). Safe to call repeatedly - already-initialized
+   * elements (marked with the 'initialized' class) are skipped.
+   */
+  _initializeSuggestPickers(): void {
     var _createSuggest = function(input: any, termType: any, selectizeOptions: any) {
       var jqnode = jQuery(input);
       if (jqnode) {
@@ -197,44 +308,83 @@ export default class NodeMenu {
       }
     });
 
-    // Update disorder colors
-    this._updateDisorderColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-disorders li input[value="' + id + '"]')).forEach(function(item: any) {
-        var li = item.closest('li');
-        var colorBubble = li.querySelector('.disorder-color');
-        if (!colorBubble) {
-          colorBubble = document.createElement('span');
-          colorBubble.className = 'disorder-color';
-          li.prepend(colorBubble);
-        }
-        colorBubble.style.background = color;
-      });
-    }.bind(this);
-    document.addEventListener('disorder:color', function(event: any) {
-      if (!event.detail || !event.detail.id || !event.detail.color) {
-        return;
+    // questionnaire answerValueSet-backed choice fields - one terminology instance per linkId,
+    // not routed through a Legend (no color-swatch/id-cache concept needed here)
+    var _createQuestionnaireSuggest = function(input: any, linkId: any) {
+      var jqnode = jQuery(input);
+      if (jqnode) {
+        jqnode.selectize({
+          options: [],
+          create: false,
+          sortField: 'text',
+          persist: true,
+          maxItems: input.multiple ? null : 1,
+          delimiter: SELECTIZE_DELIMITER,
+          onChange: () => {
+            input.dispatchEvent(new CustomEvent('xwiki:customchange'));
+          },
+          load: (query: any, callback: any) => {
+            if (query.length < 2) return callback();
+            var terminology = editor.getQuestionnaireTerminology && editor.getQuestionnaireTerminology(linkId);
+            if (!terminology) return callback();
+            terminology.searchForTerms(query,
+              (search: any, result: any) => callback(result),
+              (err: any) => callback()
+            );
+          }
+        });
       }
-      _this._updateDisorderColor(event.detail.id, event.detail.color);
+      return jqnode;
+    };
+    Array.from(this.form.querySelectorAll('select.suggest-questionnaire')).forEach(function(item: any) {
+      if (!item.classList.contains('initialized')) {
+        _createQuestionnaireSuggest(item, item.dataset.linkid);
+        item.classList.add('initialized');
+      }
     });
 
-    // Update gene colors
-    this._updateGeneColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes li input[value="' + id + '"]')).forEach(function(item: any) {
-        var li = item.closest('li');
-        var colorBubble = li.querySelector('.disorder-color');
-        if (!colorBubble) {
-          colorBubble = document.createElement('span');
-          colorBubble.className = 'disorder-color';
-          li.prepend(colorBubble);
-        }
-        colorBubble.style.background = color;
-      });
-    }.bind(this);
-    document.addEventListener('gene:color', function(event: any) {
-      if (!event.detail || !event.detail.id || !event.detail.color) {
-        return;
+    // legend-backed Questionnaire items (mapsToLegendCondition/mapsToLegendObservation) -
+    // same terminology-backed search as suggest-questionnaire, but caches selected terms into
+    // the item's own Legend (via getQuestionnaireLegend) on change, same as disease/gene/hpo pickers.
+    var _createQuestionnaireLegendSuggest = function(input: any, linkId: any) {
+      var jqnode = jQuery(input);
+      if (jqnode) {
+        jqnode.selectize({
+          options: [],
+          create: false,
+          sortField: 'text',
+          persist: true,
+          maxItems: null,
+          delimiter: SELECTIZE_DELIMITER,
+          onChange: () => {
+            var legend = editor.getQuestionnaireLegend && editor.getQuestionnaireLegend(linkId);
+            if (legend) {
+              for (const v of jqnode[0].selectize.getValue()) {
+                const item = jqnode[0].selectize.getItem(v);
+                const name = item.text();
+                legend.addToCache(v, name);
+              }
+            }
+            input.dispatchEvent(new CustomEvent('xwiki:customchange'));
+          },
+          load: (query: any, callback: any) => {
+            if (query.length < 2) return callback();
+            var terminology = editor.getQuestionnaireTerminology && editor.getQuestionnaireTerminology(linkId);
+            if (!terminology) return callback();
+            terminology.searchForTerms(query,
+              (search: any, result: any) => callback(result),
+              (err: any) => callback()
+            );
+          }
+        });
       }
-      _this._updateGeneColor(event.detail.id, event.detail.color);
+      return jqnode;
+    };
+    Array.from(this.form.querySelectorAll('select.suggest-questionnaire-legend')).forEach(function(item: any) {
+      if (!item.classList.contains('initialized')) {
+        _createQuestionnaireLegendSuggest(item, item.dataset.linkid);
+        item.classList.add('initialized');
+      }
     });
   }
 
@@ -514,6 +664,60 @@ export default class NodeMenu {
       result.replaceChildren(input);
       return result;
     },
+    'number' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      var number = document.createElement('input');
+      number.type = 'number';
+      number.name = data.name;
+      if (data.step) {
+        number.step = data.step;
+      }
+      var numberSpan = document.createElement('span');
+      numberSpan.appendChild(number);
+      result.inputsContainer.appendChild(numberSpan);
+      (number as any)._getValue = function(this: any) {
+        if ((this as any).value === '') {
+          return [null];
+        }
+        var parsed = Number((this as any).value);
+        return [isNaN(parsed) ? null : parsed];
+      }.bind(number);
+      this._attachFieldEventListeners(number, ['keyup', 'change'], [true]);
+      return result;
+    },
+    'heading' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      result.classList.add('field-heading');
+      return result;
+    },
+    'questionnaire-choice-picker' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      var picker = document.createElement('select');
+      picker.multiple = !!data.repeats;
+      picker.className = 'suggest-questionnaire';
+      picker.name = data.name;
+      (picker as any).dataset.linkid = data.linkId;
+      result.appendChild(picker);
+      (picker as any)._getValue = function(this: any) {
+        var target = jQuery(this);
+        if (target && target[0] && (target[0] as any).selectize) {
+          var selectizeInstance = (target[0] as any).selectize;
+          var ids = selectizeInstance.getValue();
+          if (!ids || (Array.isArray(ids) && ids.length === 0) || ids === '') {
+            return [data.repeats ? [] : null];
+          }
+          var idList = data.repeats ? ids : [ids];
+          var answers = idList.map(function(id: any) {
+            var option = selectizeInstance.options[id];
+            return option ? { system: option.system, code: option.value, display: option.text } : { code: id, display: id };
+          });
+          return [data.repeats ? answers : answers[0]];
+        }
+        return [data.repeats ? [] : null];
+      }.bind(picker);
+      this._attachFieldEventListeners(picker, ['xwiki:customchange']);
+      return result;
+    },
     'button-action': function(this: any, data: any) {
       var _menu = this;
       var result = this._generateEmptyField(data);
@@ -522,6 +726,34 @@ export default class NodeMenu {
       btn.textContent = data.buttonLabel || data.label || '';
       btn.addEventListener('click', () => { if (data.action) data.action(_menu); });
       result.inputsContainer.appendChild(btn);
+      return result;
+    },
+    'questionnaire-legend-picker' : function(this: any, data: any): any {
+      var result = this._generateEmptyField(data);
+      var picker = document.createElement('select');
+      picker.multiple = true;
+      picker.className = 'suggest-questionnaire-legend';
+      picker.name = data.name;
+      (picker as any).dataset.linkid = data.linkId;
+      result.appendChild(picker);
+      (picker as any)._getValue = function(this: any) {
+        var target = jQuery(this);
+        if (target && target[0] && (target[0] as any).selectize) {
+          var selectizeInstance = (target[0] as any).selectize;
+          var ids = selectizeInstance.getValue();
+          if (!ids || (Array.isArray(ids) && ids.length === 0) || ids === '') {
+            return [[]];
+          }
+          var idList = Array.isArray(ids) ? ids : [ids];
+          var answers = idList.map(function(id: any) {
+            var option = selectizeInstance.options[id];
+            return option ? { system: option.system, code: option.value, display: option.text } : { code: id, display: id };
+          });
+          return [answers];
+        }
+        return [[]];
+      }.bind(picker);
+      this._attachFieldEventListeners(picker, ['xwiki:customchange']);
       return result;
     }
   };
@@ -702,6 +934,7 @@ export default class NodeMenu {
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
+          applySelectizeSwatches(container, editor.getDisorderLegend());
         }
       }
     },
@@ -739,6 +972,7 @@ export default class NodeMenu {
           }
           (target[0] as any).selectize.setValue(values, true);
           (target[0] as any).selectize.refreshOptions(false);
+          applySelectizeSwatches(container, editor.getGeneLegend());
         }
       }
     },
@@ -754,7 +988,54 @@ export default class NodeMenu {
         target.value = value;
       }
     },
-    'button-action': function(_container: any, _value: any) {}
+    'number' : function(container: any, value: any): any {
+      var target = container.querySelector('input[type=number]');
+      if (target) {
+        target.value = (value === null || value === undefined) ? '' : value;
+      }
+    },
+    'heading' : function(_container: any, _value: any): any {
+      // no interactive value
+    },
+    'questionnaire-choice-picker' : function(container: any, value: any): any {
+      var target = jQuery(container).find('select.suggest-questionnaire');
+      if (target && target[0] && (target[0] as any).selectize) {
+        var selectizeInstance = (target[0] as any).selectize;
+        var answers = Array.isArray(value) ? value : (value ? [value] : []);
+        selectizeInstance.clearOptions(true);
+        answers.forEach(function(answer: any) {
+          if (answer && answer.code) {
+            selectizeInstance.addOption({ text: answer.display || answer.code, value: answer.code, system: answer.system });
+          }
+        });
+        selectizeInstance.setValue(answers.map(function(a: any) { return a.code; }), true);
+        selectizeInstance.refreshOptions(false);
+      }
+    },
+    'button-action': function(_container: any, _value: any) {},
+    'questionnaire-legend-picker' : function(container: any, values: any): any {
+      var target = jQuery(container).find('select.suggest-questionnaire-legend');
+      if (target && target[0] && (target[0] as any).selectize) {
+        var linkId = (target[0] as any).dataset.linkid;
+        var legend = editor.getQuestionnaireLegend && editor.getQuestionnaireLegend(linkId);
+        if (Array.isArray(values) && legend) {
+          var ids: any[] = [];
+          values.forEach(function(v: any) {
+            if (v && v.code) {
+              ids.push(v.code);
+            }
+          });
+          (target[0] as any).selectize.clearOptions(true);
+          var currentTerms = legend.getCurrentTerms();
+          for (var term of currentTerms) {
+            (target[0] as any).selectize.addOption({'text': term.getName(), 'value': term.getID()});
+          }
+          (target[0] as any).selectize.setValue(ids, true);
+          (target[0] as any).selectize.refreshOptions(false);
+          applySelectizeSwatches(container, legend);
+        }
+      }
+    }
   };
 
   _toggleFieldVisibility(container: any, doHide: any): any {
@@ -813,7 +1094,19 @@ export default class NodeMenu {
     'hidden' : function(this: any, container: any, inactive: any): any {
       this._toggleFieldVisibility(container, inactive);
     },
-    'button-action': function(this: any, container: any, inactive: any) { this._toggleFieldVisibility(container, inactive); }
+    'number' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
+    'heading' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
+    'questionnaire-choice-picker' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    },
+    'button-action': function(this: any, container: any, inactive: any) { this._toggleFieldVisibility(container, inactive); },
+    'questionnaire-legend-picker' : function(this: any, container: any, inactive: any): any {
+      this._toggleFieldVisibility(container, inactive);
+    }
   };
 
   _setFieldDisabled: any = {
@@ -865,9 +1158,24 @@ export default class NodeMenu {
     'hidden' : function(container: any, inactive: any): any {
       // FIXME: Not implemented
     },
+    'number' : function(container: any, disabled: any): any {
+      var target = container.querySelector('input[type=number]');
+      if (target) {
+        target.disabled = disabled;
+      }
+    },
+    'heading' : function(container: any, inactive: any): any {
+      // no interactive value
+    },
+    'questionnaire-choice-picker' : function(container: any, inactive: any): any {
+      // FIXME: Not implemented
+    },
     'button-action': function(container: any, disabled: any) {
       var btn = container.querySelector('button');
       if (btn) btn.disabled = disabled;
+    },
+    'questionnaire-legend-picker' : function(container: any, inactive: any): any {
+      // FIXME: Not implemented
     }
   };
 }

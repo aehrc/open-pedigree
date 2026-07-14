@@ -11,11 +11,7 @@ import Legend from 'pedigree/view/legend';
 export default class GeneLegend extends Legend {
 
   constructor(terminology: any) {
-    super('Candidate Genes', terminology);
-  }
-
-  _getPrefix(id?: any): any {
-    return 'gene';
+    super('Candidate Genes', terminology, 'gene');
   }
 
   /**

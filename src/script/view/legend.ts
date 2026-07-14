@@ -1,3 +1,4 @@
+import Raphael from 'pedigree/raphael';
 
 /**
  * Base class for various "legend" widgets
@@ -12,19 +13,25 @@ export default class Legend {
   _terminology: any;
   _legendBox: any;
   _list: any;
+  _idPrefix: any;
 
   /**
    *
    * @param {String} title
    * @param terminology
+   * @param {String} [idPrefix] Prefix used for element IDs and, when set, enables the base
+   *   class's generic per-value colour assignment (dispatching a `questionnaire-legend:color`
+   *   event). Built-in subclasses (DisorderLegend etc.) pass their existing hardcoded prefix
+   *   here instead of overriding _getPrefix().
    */
-  constructor(title: any, terminology: any) {
+  constructor(title: any, terminology: any, idPrefix?: any) {
     this._affectedNodes = {};     // for each object: the list of affected person nodes
 
     this._objectColors = {};       // for each object: the corresponding object color
 
     this._cache = {};
     this._terminology = terminology;
+    this._idPrefix = idPrefix || null;
 
     let legendContainer = document.getElementById('legend-container');
     if (!legendContainer) {
@@ -69,7 +76,10 @@ export default class Legend {
    * @return {String} some identifier which should be a valid HTML id value (e.g. no spaces)
    */
   _getPrefix(id?: any): any {
-    // To be overwritten in derived classes
+    if (this._idPrefix) {
+      return this._idPrefix;
+    }
+    // To be overwritten in derived classes that don't pass idPrefix to the constructor
     throw 'prefix not defined';
   }
 
@@ -205,6 +215,50 @@ export default class Legend {
   }
 
   /**
+   * Assigns a colour to the given object (via _generateColor) and dispatches a
+   * `questionnaire-legend:color` event the first time it's seen, unless idPrefix wasn't
+   * provided (built-in DisorderLegend/GeneLegend already do their own assignment+dispatch with
+   * their own palettes/event names before calling this) or the subclass opts out entirely
+   * (PhenotypeLegend overrides this to a no-op - it never assigns per-value colour).
+   *
+   * @method _ensureColorAssigned
+   * @param {String|Number} id ID of the object
+   */
+  _ensureColorAssigned(id: any): void {
+    if (this._idPrefix && !this._objectColors.hasOwnProperty(id)) {
+      const color = this._generateColor(id);
+      this._objectColors[id] = color;
+      document.dispatchEvent(new CustomEvent('questionnaire-legend:color', { detail: { linkId: this._idPrefix, id: id, color: color } }));
+    }
+  }
+
+  /**
+   * Generates a CSS colour for the given object. Default implementation used by bare Legend
+   * instances (e.g. Questionnaire-driven legend items) - DisorderLegend/GeneLegend override
+   * this with their own dedicated palettes.
+   *
+   * @method _generateColor
+   * @param {String|Number} id ID of the object
+   * @return {String} CSS color
+   */
+  _generateColor(id: any): string {
+    if (this._objectColors.hasOwnProperty(id)) {
+      return this._objectColors[id];
+    }
+    const usedColors = Object.values(this._objectColors);
+    let prefColors: any[] = ['#a3d9a5', '#f7c59f', '#8ecae6', '#cdb4db', '#ffb4a2', '#b5838d', '#adb5bd', '#e9c46a'];
+    prefColors = prefColors.filter((c: any) => usedColors.indexOf(c) === -1);
+    if (prefColors.length > 0) {
+      return prefColors[0];
+    }
+    let randomColor = Raphael.getColor();
+    while (randomColor === '#ffffff' || usedColors.indexOf(randomColor) !== -1) {
+      randomColor = '#' + ((1 << 24) * Math.random() | 0).toString(16);
+    }
+    return randomColor;
+  }
+
+  /**
    * Generate the element that will display information about the given object in the legend
    *
    * @method _generateElement
@@ -213,6 +267,7 @@ export default class Legend {
    * @return {HTMLLIElement} List element to be insert in the legend
    */
   _generateElement(id: any, name: any): any {
+    this._ensureColorAssigned(id);
     const color = this.getObjectColor(id);
     const nameSpan = document.createElement('span');
     nameSpan.className = 'disorder-name';
