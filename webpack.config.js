@@ -2,7 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 
-module.exports = {
+const browserConfig = {
   entry: {
     pedigree: './src/app.ts',
     smartEditor: './src/smartEditor.ts',
@@ -109,3 +109,38 @@ module.exports = {
     },
   }
 };
+
+// Emits a plain Node/CommonJS module wrapping the built-in default Questionnaire, so it can be
+// required by scripts/generate-default-questionnaire-json.js to produce dist/defaultQuestionnaire.json
+// (a non-JS-readable form for e.g. a REDCap external module composing its own effective
+// Questionnaire in PHP - see questionnaire-source-of-truth design D14).
+const defaultQuestionnaireDataConfig = {
+  target: 'node',
+  entry: {
+    'defaultQuestionnaire.node': './src/script/questionnaire/defaultQuestionnaire.ts',
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist'),
+    library: { type: 'commonjs2' },
+    clean: false,
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        loader: 'ts-loader',
+        options: { transpileOnly: true },
+      },
+    ],
+  },
+  resolve: {
+    extensions: ['.ts', '.js'],
+    alias: {
+      'pedigree': path.resolve(__dirname, 'src/script/'),
+    },
+  },
+};
+
+module.exports = [browserConfig, defaultQuestionnaireDataConfig];

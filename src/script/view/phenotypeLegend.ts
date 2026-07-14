@@ -11,11 +11,7 @@ import Legend from 'pedigree/view/legend';
 export default class PhenotypeLegend extends Legend {
 
   constructor(terminology: any) {
-    super('Phenotypes', terminology);
-  }
-
-  _getPrefix(id?: any): any {
-    return 'hpo';
+    super('Phenotypes', terminology, 'hpo');
   }
 
   /**
@@ -27,5 +23,15 @@ export default class PhenotypeLegend extends Legend {
    */
   getObjectColor(id: any): string {
     return '#CCCCCC';
+  }
+
+  /**
+   * Phenotypes have always used a fixed grey swatch, never a per-value assigned colour -
+   * opt out of the base class's generic colour assignment/dispatch entirely.
+   *
+   * @method _ensureColorAssigned
+   */
+  _ensureColorAssigned(id: any): void {
+    // no-op
   }
 }

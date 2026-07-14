@@ -28,7 +28,9 @@ import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import BioportalTerminology from './terminology/BioportalTerminology';
 import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider';
-import { parseQuestionnaire } from 'pedigree/questionnaire/questionnaireParser';
+import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import Legend from 'pedigree/view/legend';
+import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 
 export default class PedigreeEditor {
   DEBUG_MODE: any;
@@ -44,6 +46,9 @@ export default class PedigreeEditor {
   _disorderLegend: any;
   _geneLegend: any;
   _phenotypeLegend: any;
+  _disorderTerminology: any;
+  _geneTerminology: any;
+  _phenotypeTerminology: any;
   _fhirTerminologyHelper: any;
   _view: any;
   _actionStack: any;
@@ -57,6 +62,7 @@ export default class PedigreeEditor {
   _patientProvider: any;
   _questionnaireConfig: any;
   _questionnaireTerminologies: any;
+  _questionnaireLegends: any;
 
   constructor(options: any) {
     options = options || {};
@@ -82,24 +88,33 @@ export default class PedigreeEditor {
 
     (window as any).editor = this;
 
-    this._questionnaireConfig = null;
     this._questionnaireTerminologies = {};
+    this._questionnaireLegends = {};
     if (options.questionnaireLocal) {
       this._questionnaireConfig = parseQuestionnaire(options.questionnaireLocal);
-      this._initialiseQuestionnaireTerminologies(options);
+    } else {
+      // Always an effective Questionnaire (see questionnaire-source-of-truth design D14) -
+      // the built-in default until/unless a questionnaireUrl fetch resolves.
+      this._questionnaireConfig = parseQuestionnaire(DEFAULT_QUESTIONNAIRE);
     }
 
     this._graphModel = DynamicPositionedGraph.makeEmpty(PedigreeEditorParameters.attributes.layoutRelativePersonWidth, PedigreeEditorParameters.attributes.layoutRelativeOtherWidth);
 
     this._workspace = new Workspace();
+    // Must run after Workspace exists - a legend-mapped item constructs a Legend instance,
+    // whose constructor calls editor.getWorkspace().getWorkArea().
+    this._initialiseQuestionnaireTerminologies(options);
     this._nodeMenu = this.generateNodeMenu();
     this._nodeGroupMenu = this.generateNodeGroupMenu();
     this._partnershipMenu = this.generatePartnershipMenu();
     this._nodetypeSelectionBubble = new NodetypeSelectionBubble(false);
     this._siblingSelectionBubble  = new NodetypeSelectionBubble(true);
-    this._disorderLegend = new DisorderLegend(this._initialiseTerminology(DisorderTermType, options));
-    this._geneLegend = new GeneLegend(this._initialiseTerminology(GeneTermType, options));
-    this._phenotypeLegend = new PhenotypeLegend(this._initialiseTerminology(PhenotypeTermType, options));
+    this._disorderTerminology = this._initialiseTerminology(DisorderTermType, options);
+    this._geneTerminology = this._initialiseTerminology(GeneTermType, options);
+    this._phenotypeTerminology = this._initialiseTerminology(PhenotypeTermType, options);
+    this._disorderLegend = new DisorderLegend(this._disorderTerminology);
+    this._geneLegend = new GeneLegend(this._geneTerminology);
+    this._phenotypeLegend = new PhenotypeLegend(this._phenotypeTerminology);
 
     if (options.hasOwnProperty('fhirTerminologyHelper')){
       console.log('Using passed terminology helper');
@@ -223,10 +238,11 @@ export default class PedigreeEditor {
   }
 
   /**
-   * Fetches a Questionnaire from questionnaireUrl and, once resolved, wires it into an
-   * already-constructed editor: appends the Custom tab's fields to the node menu and
-   * retroactively synthesizes per-item setters on any Person nodes constructed before
-   * the fetch resolved (see questionnaire-fields design D1/D5).
+   * Fetches a Questionnaire from questionnaireUrl and, once resolved, replaces the editor's
+   * effective Questionnaire and entirely rebuilds the node menu from it (tabs and all - see
+   * questionnaire-source-of-truth design D14). Node instances constructed before the fetch
+   * resolved get their per-item setters retroactively re-synthesized. On failure, the editor
+   * keeps rendering the built-in default Questionnaire it started with.
    */
   _loadQuestionnaireFromUrl(url: any, options: any): void {
     var _this = this;
@@ -242,6 +258,8 @@ export default class PedigreeEditor {
           throw new Error('Resource at questionnaireUrl is not a Questionnaire');
         }
         _this._questionnaireConfig = parseQuestionnaire(questionnaire);
+        _this._questionnaireTerminologies = {};
+        _this._questionnaireLegends = {};
         _this._initialiseQuestionnaireTerminologies(options);
 
         var view = _this.getView();
@@ -254,13 +272,23 @@ export default class PedigreeEditor {
           }
         }
 
-        if (_this._nodeMenu) {
-          _this._nodeMenu.addFields(_this._buildQuestionnaireFieldDescriptors());
-        }
+        _this._rebuildNodeMenu();
       })
       .catch(function(err: any) {
-        console.warn('Failed to load questionnaireUrl - Custom tab will not be shown', err);
+        console.warn('Failed to load questionnaireUrl - continuing with the built-in default Questionnaire', err);
       });
+  }
+
+  /**
+   * Discards the current node menu (if any) and regenerates it from the (now possibly
+   * updated) effective Questionnaire config.
+   */
+  _rebuildNodeMenu(): void {
+    if (this._nodeMenu && this._nodeMenu.menuBox && this._nodeMenu.menuBox.parentNode) {
+      this._nodeMenu.hide();
+      this._nodeMenu.menuBox.parentNode.removeChild(this._nodeMenu.menuBox);
+    }
+    this._nodeMenu = this.generateNodeMenu();
   }
 
   _initialiseQuestionnaireTerminologies(options: any): void {
@@ -269,7 +297,10 @@ export default class PedigreeEditor {
     }
     var _this = this;
     this._questionnaireConfig.items.forEach(function(item: any) {
-      if (item.fieldType !== 'questionnaire-choice-picker') {
+      if (item.fieldType !== 'questionnaire-choice-picker' && item.fieldType !== 'questionnaire-legend-picker') {
+        return;
+      }
+      if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
         return;
       }
       var termOptionsKey = item.linkId + 'Options';
@@ -287,6 +318,10 @@ export default class PedigreeEditor {
       var syntheticOptions: any = {};
       syntheticOptions[termOptionsKey] = termOptions;
       _this._questionnaireTerminologies[item.linkId] = _this._initialiseTerminology(item.linkId, syntheticOptions);
+
+      if (item.fieldType === 'questionnaire-legend-picker') {
+        _this._questionnaireLegends[item.linkId] = new Legend(item.label, _this._questionnaireTerminologies[item.linkId], 'legend-' + item.linkId);
+      }
     });
   }
 
@@ -295,42 +330,138 @@ export default class PedigreeEditor {
    * config. mapsToField-mapped items are excluded (see design D9) - they read/write the
    * existing property directly and are not rendered separately.
    */
-  _buildQuestionnaireFieldDescriptors(): any {
+  /**
+   * Builds NodeMenu field descriptors (and the tabs array) entirely from the parsed
+   * effective Questionnaire config - see questionnaire-source-of-truth design D13.
+   * - `invokesAction` items dispatch to a named function in `_questionnaireActions`.
+   * - `RESERVED_LEGEND_TARGETS` items (disorders/candidate_genes/hpo_positive) and
+   *   `mapsToField` items dispatch straight to their existing real Person setter.
+   * - Everything else dispatches through the synthesized `setQuestionnaireAnswer_<linkId>`.
+   */
+  _buildFieldDescriptors(): any {
     if (!this._questionnaireConfig) {
-      return [];
+      return { fields: [], tabs: [] };
     }
+    var _this = this;
     var fields: any[] = [];
     this._questionnaireConfig.items.forEach(function(item: any) {
-      if (item.mapping && item.mapping.kind === 'field') {
-        return;
-      }
       var descriptor: any = {
-        'name': 'q_' + item.linkId,
+        'name': item.linkId,
         'label': item.label,
         'type': item.fieldType,
-        'tab': 'Custom',
+        'tab': item.tab,
         'linkId': item.linkId,
         'repeats': item.repeats
       };
-      if (item.fieldType === 'select') {
-        descriptor.values = (item.answerOption || []).map(function(opt: any) {
-          return { 'actual': opt.value, 'displayed': opt.display };
-        });
+
+      if (item.fieldType === 'select' || item.fieldType === 'radio') {
+        if (item.answerOption) {
+          descriptor.values = item.answerOption.map(function(opt: any) {
+            return { 'actual': opt.value, 'displayed': opt.display };
+          });
+        }
+        if (item.range) {
+          descriptor.range = item.range;
+        }
+        if (item.nullValue) {
+          descriptor.nullValue = item.nullValue;
+        }
+        if (item.columns) {
+          descriptor.columns = item.columns;
+        }
       }
-      if (item.fieldType !== 'heading') {
+      if (item.fieldType === 'textarea') {
+        descriptor.rows = 2;
+      }
+
+      if (item.fieldType === 'button-action') {
+        descriptor.buttonLabel = item.buttonLabel;
+        descriptor.action = item.mapping && _this._questionnaireActions[item.mapping.action];
+      } else if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+        descriptor.function = RESERVED_LEGEND_TARGETS[item.linkId].setter;
+      } else if (item.mapping && item.mapping.kind === 'field') {
+        descriptor.function = MAPS_TO_FIELD_TARGETS[item.mapping.field].setter;
+      } else if (item.fieldType !== 'heading') {
         descriptor.function = 'setQuestionnaireAnswer_' + item.linkId;
       }
+
       fields.push(descriptor);
     });
-    return fields;
+    return { fields: fields, tabs: this._questionnaireConfig.tabs };
   }
+
+  /**
+   * Built-in named actions for `invokesAction` Questionnaire items (see design D17) - lifted
+   * out of the old hardcoded `link_patient`/`import_from_record` button-action descriptors.
+   */
+  _questionnaireActions: any = {
+    linkPatient: function(menu: any): void {
+      var nodeId = menu.targetNode.getID();
+      (window as any).editor.getPatientProvider().openPatientPickerModal(nodeId,
+        function(fhirRef: string, details: any) {
+          var properties: any = { setLinkedPatientRef: fhirRef, setFirstName: details.firstName };
+          if (details.lastName)   properties.setLastName   = details.lastName;
+          if (details.gender)     properties.setGender     = details.gender;
+          if (details.birthDate)  properties.setBirthDate  = details.birthDate;
+          if (details.lifeStatus) properties.setLifeStatus = details.lifeStatus;
+          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+            detail: { nodeID: nodeId, properties: properties }
+          }));
+        }
+      );
+    },
+    importClinicalData: function(menu: any): void {
+      var nodeId = menu.targetNode.getID();
+      var node = (window as any).editor.getView().getNode(nodeId);
+      var fhirRef = node && node.getLinkedPatientRef ? node.getLinkedPatientRef() : '';
+      if (!fhirRef) {
+        return;
+      }
+      (window as any).editor.getPatientProvider().openClinicalImportModal(nodeId, fhirRef,
+        function(disorders: any[]) {
+          if (!disorders || disorders.length === 0) {
+            return;
+          }
+          var n = (window as any).editor.getView().getNode(nodeId);
+          var existing = (n && n.getDisorders) ? n.getDisorders().slice(0) : [];
+          var existingIds = new Set(existing);
+          var merged = existing.concat(disorders.filter((d: any) => !existingIds.has(d.id)).map((d: any) => d.id));
+          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+            detail: { nodeID: nodeId, properties: { setDisorders: merged } }
+          }));
+        }
+      );
+    }
+  };
 
   getQuestionnaireConfig(): any {
     return this._questionnaireConfig;
   }
 
   getQuestionnaireTerminology(linkId: any): any {
-    return this._questionnaireTerminologies[linkId];
+    switch (linkId) {
+    case 'disorders':
+      return this._disorderTerminology;
+    case 'candidate_genes':
+      return this._geneTerminology;
+    case 'hpo_positive':
+      return this._phenotypeTerminology;
+    default:
+      return this._questionnaireTerminologies[linkId];
+    }
+  }
+
+  getQuestionnaireLegend(linkId: any): any {
+    switch (linkId) {
+    case 'disorders':
+      return this._disorderLegend;
+    case 'candidate_genes':
+      return this._geneLegend;
+    case 'hpo_positive':
+      return this._phenotypeLegend;
+    default:
+      return this._questionnaireLegends[linkId];
+    }
   }
 
   getNode(nodeID: any): any {
@@ -458,225 +589,8 @@ export default class PedigreeEditor {
     if (this.isReadOnlyMode()) {
       return null;
     }
-    var _this = this;
-    return new NodeMenu([
-      {
-        'name' : 'identifier',
-        'label' : '',
-        'type'  : 'hidden',
-        'tab': 'Personal'
-      },
-      {
-        'name' : 'gender',
-        'label' : 'Gender',
-        'type' : 'radio',
-        'tab': 'Personal',
-        'columns': 3,
-        'values' : [
-          { 'actual' : 'M', 'displayed' : 'Male' },
-          { 'actual' : 'F', 'displayed' : 'Female' },
-          { 'actual' : 'U', 'displayed' : 'Unknown' }
-        ],
-        'default' : 'U',
-        'function' : 'setGender'
-      },
-      {
-        'name' : 'first_name',
-        'label': 'First name',
-        'type' : 'text',
-        'tab': 'Personal',
-        'function' : 'setFirstName'
-      },
-      {
-        'name' : 'last_name',
-        'label': 'Last name',
-        'type' : 'text',
-        'tab': 'Personal',
-        'function' : 'setLastName'
-      },
-      {
-        'name' : 'link_patient',
-        'label' : 'Patient',
-        'type' : 'button-action',
-        'tab': 'Personal',
-        'buttonLabel' : 'Link to patient',
-        'action' : function(menu: any) {
-          var nodeId = menu.targetNode.getID();
-          (window as any).editor.getPatientProvider().openPatientPickerModal(nodeId,
-            function(fhirRef: string, details: any) {
-              var properties: any = { setLinkedPatientRef: fhirRef, setFirstName: details.firstName };
-              if (details.lastName)   properties.setLastName   = details.lastName;
-              if (details.gender)     properties.setGender     = details.gender;
-              if (details.birthDate)  properties.setBirthDate  = details.birthDate;
-              if (details.lifeStatus) properties.setLifeStatus = details.lifeStatus;
-              document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-                detail: { nodeID: nodeId, properties: properties }
-              }));
-            }
-          );
-        }
-      },
-      {
-        'name' : 'external_id',
-        'label': 'Identifier',
-        'type' : 'text',
-        'tab': 'Personal',
-        'function' : 'setExternalID'
-      },
-      {
-        'name' : 'carrier',
-        'label' : 'Carrier status',
-        'type' : 'radio',
-        'tab': 'Clinical',
-        'values' : [
-          { 'actual' : '', 'displayed' : 'Not affected' },
-          { 'actual' : 'carrier', 'displayed' : 'Carrier' },
-          { 'actual' : 'affected', 'displayed' : 'Affected' },
-          { 'actual' : 'presymptomatic', 'displayed' : 'Pre-symptomatic' }
-        ],
-        'default' : '',
-        'function' : 'setCarrierStatus'
-      },
-      {
-        'name' : 'evaluated',
-        'label' : 'Documented evaluation',
-        'type' : 'checkbox',
-        'tab': 'Clinical',
-        'function' : 'setEvaluated'
-      },
-      {
-        'name' : 'disorders',
-        'label' : 'Disorders',
-        'type' : 'disease-picker',
-        'tab': 'Clinical',
-        'function' : 'setDisorders'
-      },
-      {
-        'name' : 'import_from_record',
-        'label' : 'Clinical record',
-        'type' : 'button-action',
-        'tab': 'Clinical',
-        'buttonLabel' : 'Import from record',
-        'action' : function(menu: any) {
-          var nodeId = menu.targetNode.getID();
-          var node = (window as any).editor.getView().getNode(nodeId);
-          var fhirRef = node && node.getLinkedPatientRef ? node.getLinkedPatientRef() : '';
-          if (!fhirRef) return;
-          (window as any).editor.getPatientProvider().openClinicalImportModal(nodeId, fhirRef,
-            function(disorders: any[]) {
-              if (!disorders || disorders.length === 0) return;
-              var n = (window as any).editor.getView().getNode(nodeId);
-              var existing = (n && n.getDisorders) ? n.getDisorders().slice(0) : [];
-              var existingIds = new Set(existing);
-              var merged = existing.concat(disorders.filter((d: any) => !existingIds.has(d.id)).map((d: any) => d.id));
-              document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-                detail: { nodeID: nodeId, properties: { setDisorders: merged } }
-              }));
-            }
-          );
-        }
-      },
-      {
-        'name' : 'candidate_genes',
-        'label' : 'Genes',
-        'type' : 'gene-picker',
-        'tab': 'Clinical',
-        'function' : 'setGenes'
-      },
-      {
-        'name' : 'hpo_positive',
-        'label' : 'Phenotypic features',
-        'type' : 'hpo-picker',
-        'tab': 'Clinical',
-        'function' : 'setHPO'
-      },
-      {
-        'name' : 'date_of_birth',
-        'label' : 'Date of birth',
-        'type' : 'date-picker',
-        'tab': 'Personal',
-        'format' : 'dd/MM/yyyy',
-        'function' : 'setBirthDate'
-      },
-      {
-        'name' : 'date_of_death',
-        'label' : 'Date of death',
-        'type' : 'date-picker',
-        'tab': 'Personal',
-        'format' : 'dd/MM/yyyy',
-        'function' : 'setDeathDate'
-      },
-      {
-        'name' : 'state',
-        'label' : 'Individual is',
-        'type' : 'radio',
-        'tab': 'Personal',
-        'columns': 3,
-        'values' : [
-          { 'actual' : 'alive', 'displayed' : 'Alive' },
-          { 'actual' : 'stillborn', 'displayed' : 'Stillborn' },
-          { 'actual' : 'deceased', 'displayed' : 'Deceased' },
-          { 'actual' : 'miscarriage', 'displayed' : 'Miscarriage' },
-          { 'actual' : 'unborn', 'displayed' : 'Unborn' },
-          { 'actual' : 'aborted', 'displayed' : 'Aborted' }
-        ],
-        'default' : 'alive',
-        'function' : 'setLifeStatus'
-      },
-      {
-        'name' : 'gestation_age',
-        'label' : 'Gestation age',
-        'type' : 'select',
-        'tab': 'Personal',
-        'range' : {'start': 0, 'end': 50, 'item' : ['week', 'weeks']},
-        'nullValue' : true,
-        'function' : 'setGestationAge'
-      },
-      {
-        'label' : 'Heredity options',
-        'name' : 'childlessSelect',
-        'values' : [{'actual': 'none', displayed: 'None'},{'actual': 'childless', displayed: 'Childless'},{'actual': 'infertile', displayed: 'Infertile'}],
-        'type' : 'select',
-        'tab': 'Personal',
-        'function' : 'setChildlessStatus'
-      },
-      {
-        'name' : 'adopted',
-        'label' : 'Adopted',
-        'type' : 'checkbox',
-        'tab': 'Personal',
-        'function' : 'setAdopted'
-      },
-      {
-        'name' : 'monozygotic',
-        'label' : 'Monozygotic twin',
-        'type' : 'checkbox',
-        'tab': 'Personal',
-        'function' : 'setMonozygotic'
-      },
-      {
-        'name' : 'nocontact',
-        'label' : 'Not in contact with proband',
-        'type' : 'checkbox',
-        'tab': 'Personal',
-        'function' : 'setLostContact'
-      },
-      {
-        'name' : 'placeholder',
-        'label' : 'Placeholder node',
-        'type' : 'checkbox',
-        'tab': 'Personal',
-        'function' : 'makePlaceholder'
-      },
-      {
-        'name' : 'comments',
-        'label' : 'Comments',
-        'type' : 'textarea',
-        'tab': 'Clinical',
-        'rows' : 2,
-        'function' : 'setComments'
-      }
-    ].concat(this._buildQuestionnaireFieldDescriptors()), this._questionnaireConfig ? ['Personal', 'Clinical', 'Custom'] : ['Personal', 'Clinical']);
+    var built = this._buildFieldDescriptors();
+    return new NodeMenu(built.fields, built.tabs);
   }
 
   getNodeMenu(): any {

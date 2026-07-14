@@ -1,6 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 
 
 
@@ -488,6 +488,20 @@ GA4GHFHIRConverter.observationValueToAnswer = function (itemType, observationRes
   }
 };
 
+// True if the effective Questionnaire declares a mapsToLegendCondition/mapsToLegendObservation
+// item for the given (reserved) linkId - i.e. it fully owns disorders/phenotype/gene-shaped
+// extraction for that category, so the corresponding generic extraction below should not also
+// run (see design D15's import rule: "a Questionnaire either fully owns disorders-shaped
+// extraction or it doesn't"). Always true for the built-in default Questionnaire (which always
+// declares all three); only false for a bespoke custom Questionnaire that omits one deliberately.
+GA4GHFHIRConverter._hasReservedLegendItem = function (linkId, kind) {
+  var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  if (!config) {
+    return false;
+  }
+  return config.items.some(function (i) { return i.linkId === linkId && i.mapping && i.mapping.kind === kind; });
+};
+
 GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker) {
   if (!conditionResource.subject || !conditionResource.code){
     return;
@@ -510,7 +524,7 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
 
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
 
-  if (conditionResource.code){
+  if (conditionResource.code && this._hasReservedLegendItem('disorders', 'legendCondition')){
     let conditionToAdd = fhirTerminologyHelper.getDisorderFromCodeableConcept(conditionResource.code, false);
 
     if (conditionToAdd){
@@ -562,7 +576,7 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
         break;
       }
     }
-    if (!foundCode) {
+    if (!foundCode && this._hasReservedLegendItem('hpo_positive', 'legendObservation')) {
       let phenotype = fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, true);
       if (phenotype) {
         foundCode = true;
@@ -573,7 +587,7 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
         }
       }
     }
-    if (!foundCode) {
+    if (!foundCode && this._hasReservedLegendItem('candidate_genes', 'legendObservation')) {
       let gene = fhirTerminologyHelper.getGeneFromCodeableConcept(observationResource.valueCodeableConcept, true);
       if (gene) {
         foundCode = true;
@@ -1734,6 +1748,21 @@ GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
   }
 };
 
+// Converts a reserved-legend item's raw ID array (nodeProperties.disorders/candidateGenes/
+// hpoTerms - plain strings, not {system,code,display}) into the answer shape every other
+// item already produces, via the SAME terminology-helper CodeableConcept methods
+// addConditions/addObservations use for the "real" resource - so the single-valueCoding
+// QuestionnaireResponse entry is a faithful (if necessarily single-coding) summary of it.
+GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, rawIds) {
+  var target = RESERVED_LEGEND_TARGETS[linkId];
+  var fhirTerminologyHelper = editor.getFhirTerminologyHelper();
+  return (rawIds || []).map(function (id) {
+    var cc = fhirTerminologyHelper[target.ccMethod](id);
+    var coding = cc && cc.coding && cc.coding[0];
+    return coding ? { system: coding.system, code: coding.code, display: coding.display } : { code: id, display: id };
+  });
+};
+
 GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
   var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
   if (!questionnaireConfig) {
@@ -1748,10 +1777,12 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     let value;
     if (item.mapping && item.mapping.kind === 'field') {
       value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
+    } else if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') && RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey]);
     } else {
       value = storedAnswers[item.linkId];
     }
-    if (value === undefined || value === null || value === '') {
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
       continue;
     }
     const values = Array.isArray(value) ? value : [value];
@@ -1789,6 +1820,13 @@ GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, que
 // supports $extract even when one exists). mapsToField items don't need handling here - they
 // already wrote straight into nodeProperties via the pre-existing property setter, which
 // buildPedigreeIndividual/addConditions/addObservations already serialise unconditionally.
+// mapsToLegendCondition/mapsToLegendObservation items for the three RESERVED_LEGEND_TARGETS
+// linkIds (disorders/candidate_genes/hpo_positive) ALSO don't need handling here - addConditions/
+// addObservations already derive their Condition/Observation resources directly from
+// nodeProperties using the full (potentially multi-coding) CodeableConcept from the terminology
+// helper; re-deriving them from the QR's necessarily-lossy single-valueCoding answer would
+// produce a second, inferior, duplicate set of resources. Only a genuinely new
+// implementer-defined legend item (not one of the three reserved linkIds) is derived here.
 GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse = function (qr, ref, condtions, observations) {
   if (!qr) {
     return;
@@ -1804,7 +1842,41 @@ GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse = function (qr, ref,
 
   for (const qrItem of qr.item) {
     const item = itemsByLinkId[qrItem.linkId];
-    if (!item || !item.mapping || (item.mapping.kind !== 'condition' && item.mapping.kind !== 'observation')) {
+    if (!item || !item.mapping) {
+      continue;
+    }
+
+    if (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') {
+      if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
+        continue;
+      }
+      for (const answerEntry of qrItem.answer) {
+        const value = this.fhirValueToAnswer(item.itemType, answerEntry);
+        if (!value || !value.code) {
+          continue;
+        }
+        const code = { coding: [{ system: value.system, code: value.code, display: value.display }] };
+        if (item.mapping.kind === 'legendCondition') {
+          condtions[ref].push({
+            'resourceType': 'Condition',
+            'id': generateUUID(),
+            'subject': { 'reference': this.patRefAsRef(ref) },
+            'code': code
+          });
+        } else {
+          observations[ref].push({
+            'resourceType': 'Observation',
+            'id': generateUUID(),
+            'status': 'preliminary',
+            'subject': { 'reference': this.patRefAsRef(ref) },
+            'valueCodeableConcept': code
+          });
+        }
+      }
+      continue;
+    }
+
+    if (item.mapping.kind !== 'condition' && item.mapping.kind !== 'observation') {
       continue;
     }
     const value = this.fhirValueToAnswer(item.itemType, qrItem.answer[0]);

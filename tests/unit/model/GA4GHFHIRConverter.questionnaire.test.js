@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
+import { parseQuestionnaire } from 'pedigree/questionnaire/questionnaireParser';
+import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
 const DIABETES_CODE = { coding: [{ system: 'http://snomed.info/sct', code: '73211009', display: 'Diabetes mellitus' }] };
@@ -237,5 +239,191 @@ describe('GA4GH FHIR export -> import round trip with questionnaire answers', ()
     expect(resources.some(r => r.resourceType === 'QuestionnaireResponse')).toBe(false);
     const composition = resources.find(r => r.resourceType === 'Composition');
     expect(composition.section.some(s => s.code.coding[0].code === 'questionnaire-responses')).toBe(false);
+  });
+});
+
+describe('mapsToLegendCondition / mapsToLegendObservation - reserved linkIds (disorders/candidate_genes/hpo_positive)', () => {
+  const reservedConfig = {
+    canonicalUrl: 'http://example.org/Questionnaire/reserved|1.0',
+    items: [
+      { linkId: 'disorders', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } },
+      { linkId: 'candidate_genes', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendObservation' } },
+      { linkId: 'hpo_positive', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendObservation' } },
+    ],
+  };
+
+  const reservedTerminologyHelper = {
+    getCodeableConceptFromDisorder: vi.fn((id) => ({ coding: [{ system: 'http://snomed.info/sct', code: id, display: 'Disorder-' + id }] })),
+    getCodeableConceptFromGene: vi.fn((id) => ({ coding: [{ system: 'http://www.genenames.org', code: id, display: 'Gene-' + id }] })),
+    getCodeableConceptFromPhenotype: vi.fn((id) => ({ coding: [{ system: 'http://purl.obolibrary.org/obo/hp.owl', code: id, display: 'Phenotype-' + id }] })),
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', {
+      getFhirTerminologyHelper: () => reservedTerminologyHelper,
+      getQuestionnaireConfig: () => reservedConfig,
+    });
+  });
+
+  it('buildQuestionnaireResponse sources disorders/genes/hpo answers from the nodeProperties bag, not questionnaireAnswers', () => {
+    const nodeProperties = { disorders: ['73211009'], candidateGenes: ['BRCA1'], hpoTerms: ['HP:0001'] };
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties);
+    const byLinkId = Object.fromEntries(qr.item.map(i => [i.linkId, i]));
+    expect(byLinkId.disorders.answer).toEqual([{ valueCoding: { system: 'http://snomed.info/sct', code: '73211009', display: 'Disorder-73211009' } }]);
+    expect(byLinkId.candidate_genes.answer).toEqual([{ valueCoding: { system: 'http://www.genenames.org', code: 'BRCA1', display: 'Gene-BRCA1' } }]);
+    expect(byLinkId.hpo_positive.answer).toEqual([{ valueCoding: { system: 'http://purl.obolibrary.org/obo/hp.owl', code: 'HP:0001', display: 'Phenotype-HP:0001' } }]);
+  });
+
+  it('buildQuestionnaireResponse omits disorders/genes/hpo entries when the node has none', () => {
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', {});
+    expect(qr).toBeNull();
+  });
+
+  it('deriveResourcesFromQuestionnaireResponse does NOT re-derive Condition/Observation resources for reserved linkIds (addConditions/addObservations already did)', () => {
+    const nodeProperties = { disorders: ['73211009'], candidateGenes: ['BRCA1'] };
+    const conditions = { 'Patient/1': [] };
+    const observations = { 'Patient/1': [] };
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {});
+    GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/1', conditions, observations);
+    expect(conditions['Patient/1'].length).toBe(0);
+    expect(observations['Patient/1'].length).toBe(0);
+  });
+
+  it('extractDataFromCondition populates generic disorders when the effective Questionnaire declares a disorders legendCondition item', () => {
+    const nodeData = { properties: {} };
+    const nodeDataLookup = { 'Patient/1': nodeData };
+    reservedTerminologyHelper.getDisorderFromCodeableConcept = vi.fn(() => 'diabetes');
+    GA4GHFHIRConverter.extractDataFromCondition({ resourceType: 'Condition', subject: { reference: 'Patient/1' }, code: { coding: [{ system: 'http://snomed.info/sct', code: '73211009' }] } }, nodeDataLookup, {}, {});
+    expect(nodeData.properties.disorders).toEqual(['diabetes']);
+  });
+
+  it('extractDataFromCondition does NOT populate generic disorders when the effective Questionnaire has no disorders legendCondition item', () => {
+    vi.stubGlobal('editor', {
+      getFhirTerminologyHelper: () => reservedTerminologyHelper,
+      getQuestionnaireConfig: () => ({ canonicalUrl: 'x', items: [{ linkId: 'notes', itemType: 'string', fieldType: 'text', mapping: null }] }),
+    });
+    const nodeData = { properties: {} };
+    const nodeDataLookup = { 'Patient/1': nodeData };
+    reservedTerminologyHelper.getDisorderFromCodeableConcept = vi.fn(() => 'diabetes');
+    GA4GHFHIRConverter.extractDataFromCondition({ resourceType: 'Condition', subject: { reference: 'Patient/1' }, code: { coding: [{ system: 'http://snomed.info/sct', code: '73211009' }] } }, nodeDataLookup, {}, {});
+    expect(nodeData.properties.disorders).toBeUndefined();
+  });
+
+  it('extractDataFromObservation populates generic hpoTerms/candidateGenes only when the corresponding legendObservation item is declared', () => {
+    const nodeData = { properties: {} };
+    const nodeDataLookup = { 'Patient/1': nodeData };
+    reservedTerminologyHelper.getPhenotypeFromCodeableConcept = vi.fn(() => 'HP:0001');
+    GA4GHFHIRConverter.extractDataFromObservation({
+      resourceType: 'Observation', subject: { reference: 'Patient/1' },
+      valueCodeableConcept: { coding: [{ system: 'http://purl.obolibrary.org/obo/hp.owl', code: 'HP:0001' }] },
+    }, nodeDataLookup, {}, {});
+    expect(nodeData.properties.hpoTerms).toEqual(['HP:0001']);
+  });
+});
+
+describe('mapsToLegendCondition / mapsToLegendObservation - a genuinely new custom (non-reserved) legend item', () => {
+  const customConfig = {
+    canonicalUrl: 'http://example.org/Questionnaire/custom|1.0',
+    items: [
+      { linkId: 'comorbidities', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', { getQuestionnaireConfig: () => customConfig });
+  });
+
+  it('buildQuestionnaireResponse reads the answer directly from questionnaireAnswers (already {system,code,display}-shaped)', () => {
+    const nodeProperties = { questionnaireAnswers: { comorbidities: [{ system: 'http://example.org', code: 'X1', display: 'Condition X1' }] } };
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties);
+    expect(qr.item[0].answer).toEqual([{ valueCoding: { system: 'http://example.org', code: 'X1', display: 'Condition X1' } }]);
+  });
+
+  it('deriveResourcesFromQuestionnaireResponse produces one Condition per selected term for a non-reserved legendCondition item', () => {
+    const nodeProperties = { questionnaireAnswers: { comorbidities: [
+      { system: 'http://example.org', code: 'X1', display: 'Condition X1' },
+      { system: 'http://example.org', code: 'X2', display: 'Condition X2' },
+    ] } };
+    const conditions = { 'Patient/1': [] };
+    const observations = { 'Patient/1': [] };
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {});
+    GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/1', conditions, observations);
+    expect(conditions['Patient/1'].length).toBe(2);
+    expect(conditions['Patient/1'][0].code).toEqual({ coding: [{ system: 'http://example.org', code: 'X1', display: 'Condition X1' }] });
+    expect(conditions['Patient/1'][1].code).toEqual({ coding: [{ system: 'http://example.org', code: 'X2', display: 'Condition X2' }] });
+  });
+});
+
+describe('invokesAction items never produce a QuestionnaireResponse item entry', () => {
+  it('an action item is excluded even when other items on the node are answered', () => {
+    vi.stubGlobal('editor', {
+      getQuestionnaireConfig: () => ({
+        canonicalUrl: 'http://example.org/Questionnaire/actions|1.0',
+        items: [
+          { linkId: 'link_patient', itemType: 'display', fieldType: 'button-action', mapping: { kind: 'action', action: 'linkPatient' } },
+          { linkId: 'notes', itemType: 'string', fieldType: 'text', mapping: null },
+        ],
+      }),
+    });
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { questionnaireAnswers: { notes: 'hello' } });
+    expect(qr.item.map(i => i.linkId)).toEqual(['notes']);
+  });
+});
+
+describe('DEFAULT_QUESTIONNAIRE end-to-end GA4GH export/import round trip', () => {
+  const defaultConfig = parseQuestionnaire(DEFAULT_QUESTIONNAIRE);
+  const realisticTerminologyHelper = {
+    getCodeableConceptFromDisorder: (id) => ({ coding: [{ system: 'http://snomed.info/sct', code: id, display: 'Disorder-' + id }] }),
+    getCodeableConceptFromGene: (id) => ({ coding: [{ system: 'http://www.genenames.org', code: id, display: 'Gene-' + id }] }),
+    getCodeableConceptFromPhenotype: (id) => ({ coding: [{ system: 'http://purl.obolibrary.org/obo/hp.owl', code: id, display: 'Phenotype-' + id }] }),
+    getDisorderFromCodeableConcept: (code) => {
+      const c = code.coding.find((x) => x.system === 'http://snomed.info/sct');
+      return c ? c.code : undefined;
+    },
+    getPhenotypeFromCodeableConcept: (code) => {
+      const c = code.coding.find((x) => x.system === 'http://purl.obolibrary.org/obo/hp.owl');
+      return c ? c.code : undefined;
+    },
+    getGeneFromCodeableConcept: (code) => {
+      const c = code.coding.find((x) => x.system === 'http://www.genenames.org');
+      return c ? c.code : undefined;
+    },
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', {
+      getFhirTerminologyHelper: () => realisticTerminologyHelper,
+      getQuestionnaireConfig: () => defaultConfig,
+      getDisorderLegend: () => ({ getTerm: (id) => ({ getID: () => id, getName: () => 'Disorder-' + id }) }),
+    });
+  });
+
+  it('exports and reimports disorders/genes/hpo (legend-mapped) and carrierStatus/comments (scalar mapsToField) unchanged', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    baseGraph.properties[0].disorders = ['73211009'];
+    baseGraph.properties[0].candidateGenes = ['BRCA1'];
+    baseGraph.properties[0].hpoTerms = ['HP:0001'];
+    baseGraph.properties[0].carrierStatus = 'carrier';
+    baseGraph.properties[0].comments = 'a clinical note';
+    const pedigree = { GG: baseGraph };
+
+    const exported = GA4GHFHIRConverter.exportAsFHIR(pedigree, 'all', null, null);
+    const parsed = JSON.parse(exported);
+    const resources = parsed.entry.map(e => e.resource);
+
+    // exactly one Condition (disorder) and exactly two Observations (gene, hpo) for John -
+    // no duplicate derivation from the dual-written QuestionnaireResponse.
+    const johnRef = resources.find(r => r.resourceType === 'Patient' && r.name && r.name[0] && r.name[0].given && r.name[0].given[0] === 'John');
+    const johnConditions = resources.filter(r => r.resourceType === 'Condition' && r.subject.reference === johnRef.id);
+    expect(johnConditions.length).toBe(1);
+    expect(johnConditions[0].code.coding[0].code).toBe('73211009');
+
+    const reimported = GA4GHFHIRConverter.initFromFHIR(exported);
+    const johnProperties = Object.values(reimported.properties).find(p => p.fName === 'John');
+    expect(johnProperties.disorders).toEqual(['73211009']);
+    expect(johnProperties.candidateGenes).toEqual(['BRCA1']);
+    expect(johnProperties.hpoTerms).toEqual(['HP:0001']);
+    expect(johnProperties.carrierStatus).toBe('carrier');
+    expect(johnProperties.comments).toBe('a clinical note');
   });
 });

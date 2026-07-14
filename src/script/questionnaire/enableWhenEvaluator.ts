@@ -1,3 +1,5 @@
+import { evaluateGraphPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
+
 function extractAnswerValue(condition: any): any {
   if (condition.hasOwnProperty('answerBoolean')) {
     return condition.answerBoolean;
@@ -27,7 +29,16 @@ function currentAnswerValue(answer: any): any {
   return answer;
 }
 
-function evaluateCondition(condition: any, answers: any): boolean {
+function evaluateCondition(condition: any, answers: any, context: any): boolean {
+  if (condition.predicate) {
+    if (!context || !context.node || !context.graph) {
+      console.warn('enableWhen condition references predicate "' + condition.predicate + '" but no graph/app-state context was provided - treating as unsatisfied');
+      return false;
+    }
+    const result = evaluateGraphPredicate(condition.predicate, context.node, context.graph, context.patientProvider);
+    return condition.negate ? !result : result;
+  }
+
   const current = currentAnswerValue(answers[condition.question]);
   const expected = extractAnswerValue(condition);
 
@@ -53,12 +64,16 @@ function evaluateCondition(condition: any, answers: any): boolean {
 
 /**
  * Returns true if the item's conditions are satisfied (i.e. it should be shown).
+ *
+ * `context`, when provided, is `{node, graph, patientProvider}` - required only when a
+ * condition references a graph/app-state predicate (see graphPredicateEvaluator.ts) instead
+ * of another item's answer.
  */
-export function evaluateEnableWhen(enableWhen: any, enableBehavior: any, answers: any): boolean {
+export function evaluateEnableWhen(enableWhen: any, enableBehavior: any, answers: any, context?: any): boolean {
   if (!enableWhen || enableWhen.length === 0) {
     return true;
   }
-  const results = enableWhen.map((condition: any) => evaluateCondition(condition, answers));
+  const results = enableWhen.map((condition: any) => evaluateCondition(condition, answers, context));
   if (enableBehavior === 'any') {
     return results.some((r: boolean) => r);
   }

@@ -6,6 +6,14 @@ function mappingExtension(kind) {
   return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: kind };
 }
 
+function actionExtension(action) {
+  return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-action', valueCode: action };
+}
+
+function predicateExtension(predicate) {
+  return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate', valueCode: predicate };
+}
+
 describe('parseQuestionnaire', () => {
   it('maps supported item types to the expected field types', () => {
     const questionnaire = {
@@ -35,26 +43,91 @@ describe('parseQuestionnaire', () => {
     expect(byLinkId.q9.fieldType).toBe('questionnaire-choice-picker');
   });
 
-  it('flattens group items into a heading pseudo-field followed by children, preserving order', () => {
+  it('an inline-answerOption choice item with the standard radio-button itemControl extension renders as radio, not select', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'q1', type: 'choice', answerOption: [{ valueString: 'A' }], columns: 3,
+        extension: [{
+          url: 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl',
+          valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] },
+        }],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].fieldType).toBe('radio');
+    expect(items[0].columns).toBe(3);
+  });
+
+  it('flattens a NESTED group item into a heading pseudo-field followed by children, preserving order', () => {
     const questionnaire = {
       resourceType: 'Questionnaire',
       item: [
-        { linkId: 'before', type: 'string' },
         {
-          linkId: 'grp',
+          linkId: 'tab1',
           type: 'group',
-          text: 'Section',
+          text: 'Tab 1',
           item: [
-            { linkId: 'child1', type: 'string' },
-            { linkId: 'child2', type: 'boolean' },
+            { linkId: 'before', type: 'string' },
+            {
+              linkId: 'grp',
+              type: 'group',
+              text: 'Section',
+              item: [
+                { linkId: 'child1', type: 'string' },
+                { linkId: 'child2', type: 'boolean' },
+              ],
+            },
+            { linkId: 'after', type: 'string' },
           ],
         },
-        { linkId: 'after', type: 'string' },
       ],
     };
-    const { items } = parseQuestionnaire(questionnaire);
+    const { items, tabs } = parseQuestionnaire(questionnaire);
     expect(items.map(i => i.linkId)).toEqual(['before', 'grp', 'child1', 'child2', 'after']);
     expect(items.find(i => i.linkId === 'grp').fieldType).toBe('heading');
+    expect(tabs).toEqual([{ key: 'tab1', label: 'Tab 1' }]);
+  });
+
+  describe('top-level tab derivation', () => {
+    it('each top-level group becomes a tab, keyed by linkId and labelled by text', () => {
+      const questionnaire = {
+        resourceType: 'Questionnaire',
+        item: [
+          { linkId: 'personal', type: 'group', text: 'Personal', item: [{ linkId: 'first_name', type: 'string' }] },
+          { linkId: 'clinical', type: 'group', text: 'Clinical', item: [{ linkId: 'notes', type: 'text' }] },
+        ],
+      };
+      const { items, tabs } = parseQuestionnaire(questionnaire);
+      expect(tabs).toEqual([{ key: 'personal', label: 'Personal' }, { key: 'clinical', label: 'Clinical' }]);
+      expect(items.map(i => i.linkId)).toEqual(['first_name', 'notes']);
+      expect(items.find(i => i.linkId === 'first_name').tab).toEqual({ key: 'personal', label: 'Personal' });
+    });
+
+    it('two top-level groups sharing a display label produce two distinct tabs', () => {
+      const questionnaire = {
+        resourceType: 'Questionnaire',
+        item: [
+          { linkId: 'g1', type: 'group', text: 'Details', item: [{ linkId: 'f1', type: 'string' }] },
+          { linkId: 'g2', type: 'group', text: 'Details', item: [{ linkId: 'f2', type: 'string' }] },
+        ],
+      };
+      const { tabs } = parseQuestionnaire(questionnaire);
+      expect(tabs).toEqual([{ key: 'g1', label: 'Details' }, { key: 'g2', label: 'Details' }]);
+    });
+
+    it('a non-group top-level item is placed on an implicit "General" tab, with a warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const questionnaire = {
+        resourceType: 'Questionnaire',
+        item: [{ linkId: 'stray', type: 'string' }],
+      };
+      const { items, tabs } = parseQuestionnaire(questionnaire);
+      expect(tabs).toEqual([{ key: 'general', label: 'General' }]);
+      expect(items[0].tab).toEqual({ key: 'general', label: 'General' });
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
   });
 
   it('skips unsupported item types and logs a warning, without failing the rest of the parse', () => {
@@ -173,11 +246,16 @@ describe('parseQuestionnaire', () => {
     const questionnaire = {
       resourceType: 'Questionnaire',
       item: [{
-        linkId: 'grp',
+        linkId: 'tab1',
         type: 'group',
-        code: [coding],
-        extension: [mappingExtension('mapsToCondition')],
-        item: [{ linkId: 'child', type: 'string' }],
+        text: 'Tab 1',
+        item: [{
+          linkId: 'grp',
+          type: 'group',
+          code: [coding],
+          extension: [mappingExtension('mapsToCondition')],
+          item: [{ linkId: 'child', type: 'string' }],
+        }],
       }],
     };
     const { items } = parseQuestionnaire(questionnaire);
@@ -187,7 +265,8 @@ describe('parseQuestionnaire', () => {
 
   it('MAPS_TO_FIELD_TARGETS covers every terminal segment used by the supported item.definition targets', () => {
     expect(Object.keys(MAPS_TO_FIELD_TARGETS).sort()).toEqual(
-      ['birthDate', 'carrierStatus', 'comments', 'deceasedDateTime', 'family', 'gender', 'gestationAge', 'given', 'identifier', 'lifeStatus'].sort()
+      ['birthDate', 'carrierStatus', 'childlessStatus', 'comments', 'deceasedDateTime', 'evaluated', 'family',
+        'gender', 'gestationAge', 'given', 'identifier', 'isAdopted', 'lifeStatus', 'lostContact', 'monozygotic'].sort()
     );
   });
 
@@ -197,21 +276,226 @@ describe('parseQuestionnaire', () => {
   });
 });
 
+describe('mapsToLegendCondition / mapsToLegendObservation mapping', () => {
+  it('parses a valid legend-mapped item as a questionnaire-legend-picker with the right mapping kind', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'diagnoses', type: 'choice', repeats: true, answerValueSet: 'http://example.org/vs',
+        extension: [mappingExtension('mapsToLegendCondition')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].fieldType).toBe('questionnaire-legend-picker');
+    expect(items[0].mapping).toEqual({ kind: 'legendCondition' });
+  });
+
+  it('parses mapsToLegendObservation the same way, with kind legendObservation', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'findings', type: 'open-choice', repeats: true, answerValueSet: 'http://example.org/vs',
+        extension: [mappingExtension('mapsToLegendObservation')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].fieldType).toBe('questionnaire-legend-picker');
+    expect(items[0].mapping).toEqual({ kind: 'legendObservation' });
+  });
+
+  it('rejects a legend mapping when the item is not repeats=true', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'diagnoses', type: 'choice', repeats: false, answerValueSet: 'http://example.org/vs',
+        extension: [mappingExtension('mapsToLegendCondition')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].mapping).toBeNull();
+    expect(items[0].fieldType).toBe('questionnaire-choice-picker');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('rejects a legend mapping when there is no answerValueSet', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'diagnoses', type: 'choice', repeats: true,
+        extension: [mappingExtension('mapsToLegendCondition')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].mapping).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('rejects a legend mapping on a non-choice type', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'diagnoses', type: 'string', repeats: true, answerValueSet: 'http://example.org/vs',
+        extension: [mappingExtension('mapsToLegendCondition')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].mapping).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+describe('invokesAction mapping', () => {
+  it('parses a valid action item as a button-action field with the action name', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'link_patient', type: 'display', text: 'Link to patient',
+        extension: [mappingExtension('invokesAction'), actionExtension('linkPatient')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].fieldType).toBe('button-action');
+    expect(items[0].mapping).toEqual({ kind: 'action', action: 'linkPatient' });
+    expect(items[0].buttonLabel).toBe('Link to patient');
+  });
+
+  it('does not render an item with an unrecognised action name', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'mystery', type: 'display', text: 'Do something',
+        extension: [mappingExtension('invokesAction'), actionExtension('deleteEverything')],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items.length).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('does not render an item declaring invokesAction with no questionnaire-action extension at all', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{ linkId: 'mystery', type: 'display', text: 'Do something', extension: [mappingExtension('invokesAction')] }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items.length).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+describe('predicate-based enableWhen conditions', () => {
+  it('parses a condition carrying the predicate extension into {predicate, negate}', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'q1', type: 'string',
+        enableWhen: [{ extension: [predicateExtension('isFetus')] }],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].enableWhen).toEqual([{ predicate: 'isFetus', negate: false }]);
+  });
+
+  it('carries a sibling negate:true flag through onto the parsed predicate condition', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'q1', type: 'string',
+        enableWhen: [{ extension: [predicateExtension('isFetus')], negate: true }],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].enableWhen).toEqual([{ predicate: 'isFetus', negate: true }]);
+  });
+
+  it('leaves an ordinary item-answer condition unchanged when no predicate extension is present', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'q1', type: 'string',
+        enableWhen: [{ question: 'q0', operator: '=', answerBoolean: true }],
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].enableWhen).toEqual([{ question: 'q0', operator: '=', answerBoolean: true }]);
+  });
+
+  it('parses a disabledWhen condition list the same way as enableWhen', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'q1', type: 'boolean',
+        disabledWhen: [{ extension: [predicateExtension('isTwinWithConsistentGender')] }],
+        disabledBehavior: 'any',
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].disabledWhen).toEqual([{ predicate: 'isTwinWithConsistentGender', negate: false }]);
+    expect(items[0].disabledBehavior).toBe('any');
+  });
+
+  it('parses a per-option disablingPredicate directly on the item', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'gender', type: 'choice', answerOption: [{ valueString: 'M' }],
+        disablingPredicate: 'possibleGenders', disablingPredicateTarget: 'inactive',
+      }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].disablingPredicate).toBe('possibleGenders');
+    expect(items[0].disablingPredicateTarget).toBe('inactive');
+  });
+
+  it('defaults disablingPredicateTarget to "inactive" when not specified', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{ linkId: 'q1', type: 'string' }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].disablingPredicate).toBeNull();
+    expect(items[0].disablingPredicateTarget).toBe('inactive');
+  });
+});
+
 describe('smart demo questionnaire fixture (tests/fixtures/smart/questionnaire.json)', () => {
-  it('parses without warnings, in document order, with the expected mappings', () => {
+  it('parses without warnings, with the full Personal/Clinical/Family-history-intake tabs and expected mappings', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const questionnaireResource = smartDemoQuestionnaireBundle.entry[0].resource;
-    const { items, canonicalUrl } = parseQuestionnaire(questionnaireResource);
+    const { items, canonicalUrl, tabs } = parseQuestionnaire(questionnaireResource);
 
     expect(warnSpy).not.toHaveBeenCalled();
     expect(canonicalUrl).toBe('https://aehrc.github.io/open-pedigree/Questionnaire/demo|1.0');
+    expect(tabs).toEqual([
+      { key: 'personal_tab', label: 'Personal' },
+      { key: 'clinical_tab', label: 'Clinical' },
+      { key: 'intake_group', label: 'Family history intake' },
+    ]);
     expect(items.map(i => i.linkId)).toEqual([
-      'clinical_notes', 'intake_group', 'diabetes', 'smoking_status', 'research_consent', 'consent_notes',
+      'gender', 'first_name', 'last_name', 'link_patient', 'external_id', 'state',
+      'carrier', 'disorders', 'comments',
+      'diabetes', 'smoking_status', 'research_consent', 'consent_notes',
     ]);
 
     const byLinkId = Object.fromEntries(items.map(i => [i.linkId, i]));
-    expect(byLinkId.clinical_notes.mapping).toEqual({ kind: 'field', field: 'comments' });
-    expect(byLinkId.intake_group.fieldType).toBe('heading');
+    expect(byLinkId.gender.mapping).toEqual({ kind: 'field', field: 'gender' });
+    expect(byLinkId.gender.fieldType).toBe('radio');
+    expect(byLinkId.link_patient.mapping).toEqual({ kind: 'action', action: 'linkPatient' });
+    expect(byLinkId.state.disablingPredicate).toBe('lifeStatusAvailability');
+    expect(byLinkId.carrier.disablingPredicateTarget).toBe('disabled');
+    expect(byLinkId.disorders.mapping).toEqual({ kind: 'legendCondition' });
+    expect(byLinkId.disorders.fieldType).toBe('questionnaire-legend-picker');
+    expect(byLinkId.comments.mapping).toEqual({ kind: 'field', field: 'comments' });
     expect(byLinkId.diabetes.mapping.kind).toBe('condition');
     expect(byLinkId.smoking_status.mapping.kind).toBe('observation');
     expect(byLinkId.research_consent.mapping).toBeNull();

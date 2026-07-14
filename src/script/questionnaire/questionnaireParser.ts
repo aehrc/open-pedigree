@@ -1,4 +1,7 @@
 export const MAPPING_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
+export const PREDICATE_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate';
+export const ACTION_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-action';
+export const SUPPORTED_ACTIONS = ['linkPatient', 'importClinicalData'];
 
 // FHIR StructureDefinition canonical URLs used in item.definition for mapsToField items.
 // Patient.* targets are real, resolvable Patient elements. PedigreeIndividual.* targets don't
@@ -16,17 +19,24 @@ const PEDIGREE_INDIVIDUAL_SD = 'https://github.com/aehrc/open-pedigree/Structure
 // propertyBagKey is the key this property is stored under in Person.getProperties() / the
 // graph model's properties bag (pedigree.GG.properties[index]) - used by GA4GHFHIRConverter,
 // which only ever sees the plain properties bag, never a live Person instance.
+// getter/setter name every mapsToField target's real Person property. Used by generateNodeMenu()
+// to wire the field descriptor's 'function', and by Person.getSummary() to read the current value.
 export const MAPS_TO_FIELD_TARGETS: any = {
-  'gender':           { propertyBagKey: 'gender' },
-  'given':            { propertyBagKey: 'fName' },
-  'family':           { propertyBagKey: 'lName' },
-  'identifier':       { propertyBagKey: 'externalID' },
-  'birthDate':        { propertyBagKey: 'dob' },
-  'deceasedDateTime': { propertyBagKey: 'dod' },
-  'lifeStatus':        { propertyBagKey: 'lifeStatus' },
-  'gestationAge':      { propertyBagKey: 'gestationAge' },
-  'carrierStatus':     { propertyBagKey: 'carrierStatus' },
-  'comments':          { propertyBagKey: 'comments' }
+  'gender':           { propertyBagKey: 'gender',        getter: 'getGender',          setter: 'setGender' },
+  'given':            { propertyBagKey: 'fName',         getter: 'getFirstName',       setter: 'setFirstName' },
+  'family':           { propertyBagKey: 'lName',         getter: 'getLastName',        setter: 'setLastName' },
+  'identifier':       { propertyBagKey: 'externalID',    getter: 'getExternalID',      setter: 'setExternalID' },
+  'birthDate':        { propertyBagKey: 'dob',           getter: 'getBirthDate',       setter: 'setBirthDate' },
+  'deceasedDateTime': { propertyBagKey: 'dod',           getter: 'getDeathDate',       setter: 'setDeathDate' },
+  'lifeStatus':        { propertyBagKey: 'lifeStatus',     getter: 'getLifeStatus',      setter: 'setLifeStatus' },
+  'gestationAge':      { propertyBagKey: 'gestationAge',   getter: 'getGestationAge',    setter: 'setGestationAge' },
+  'carrierStatus':     { propertyBagKey: 'carrierStatus',  getter: 'getCarrierStatus',   setter: 'setCarrierStatus' },
+  'comments':          { propertyBagKey: 'comments',       getter: 'getComments',        setter: 'setComments' },
+  'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus' },
+  'isAdopted':         { propertyBagKey: 'isAdopted',      getter: 'getAdopted',         setter: 'setAdopted' },
+  'monozygotic':       { propertyBagKey: 'monozygotic',    getter: 'getMonozygotic',     setter: 'setMonozygotic' },
+  'evaluated':         { propertyBagKey: 'evaluated',      getter: 'getEvaluated',       setter: 'setEvaluated' },
+  'lostContact':       { propertyBagKey: 'lostContact',    getter: 'getLostContact',     setter: 'setLostContact' }
 };
 
 // Reference item.definition values for each supported mapsToField target, for use by
@@ -42,10 +52,45 @@ export const MAPS_TO_FIELD_DEFINITIONS: any = {
   'lifeStatus':       PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.lifeStatus',
   'gestationAge':     PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.gestationAge',
   'carrierStatus':    PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.carrierStatus',
-  'comments':         PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.comments'
+  'comments':         PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.comments',
+  'childlessStatus':  PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.childlessStatus',
+  'isAdopted':        PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.isAdopted',
+  'monozygotic':      PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.monozygotic',
+  'evaluated':        PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.evaluated',
+  'lostContact':      PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.lostContact'
 };
 
 const SUPPORTED_ITEM_TYPES = ['string', 'text', 'boolean', 'date', 'integer', 'decimal', 'choice', 'open-choice', 'group'];
+
+// The three legend-backed fields that exist independently of the Questionnaire mechanism
+// (DisorderLegend/GeneLegend/PhenotypeLegend, configured via disorderOptions/geneOptions/
+// phenotypeOptions). The built-in default Questionnaire declares these under the SAME linkIds
+// so they keep using their existing terminology config, real Person setters/getters (which
+// carry disorders-specific business logic - e.g. the "affected" auto-removal rule - that a
+// generic legend item doesn't have), and existing GA4GH Condition/Observation generation
+// (addConditions/addObservations), rather than the generic per-linkId mechanism built for a
+// genuinely new implementer-defined legend field. See design D15's Risks section.
+export const RESERVED_LEGEND_TARGETS: any = {
+  'disorders':       { propertyBagKey: 'disorders',     setter: 'setDisorders', getter: 'getDisorders',    ccMethod: 'getCodeableConceptFromDisorder' },
+  'candidate_genes': { propertyBagKey: 'candidateGenes', setter: 'setGenes',     getter: 'getGenes',        ccMethod: 'getCodeableConceptFromGene' },
+  'hpo_positive':    { propertyBagKey: 'hpoTerms',       setter: 'setHPO',       getter: 'getPhenotypes',   ccMethod: 'getCodeableConceptFromPhenotype' }
+};
+
+// Standard FHIR extension for a rendering hint (radio buttons vs a dropdown) on an inline
+// answerOption choice item - https://hl7.org/fhir/R4/extension-questionnaire-itemcontrol.html.
+// Unlike the mapping/predicate/action extensions, this one IS drawn from the FHIR spec, since
+// FHIR already has a standard way to express it.
+const ITEM_CONTROL_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl';
+const ITEM_CONTROL_SYSTEM = 'http://hl7.org/fhir/questionnaire-item-control';
+
+function hasRadioItemControl(item: any): boolean {
+  if (!item.extension) {
+    return false;
+  }
+  const ext = item.extension.find((e: any) => e.url === ITEM_CONTROL_EXTENSION_URL);
+  const coding = ext && ext.valueCodeableConcept && ext.valueCodeableConcept.coding;
+  return !!(coding && coding.some((c: any) => c.system === ITEM_CONTROL_SYSTEM && c.code === 'radio-button'));
+}
 
 function itemTypeToFieldType(item: any): any {
   switch (item.type) {
@@ -58,11 +103,19 @@ function itemTypeToFieldType(item: any): any {
   case 'date':
     return 'date-picker';
   case 'integer':
+    // A non-standard `item.range` sibling property (see the disablingPredicate/columns
+    // properties below) opts into rendering as a bounded numeric dropdown (NodeMenu's
+    // 'select' + range) instead of a free-entry number field - needed to reproduce
+    // gestation_age's existing widget exactly (see defaultQuestionnaire.ts).
+    return item.range ? 'select' : 'number';
   case 'decimal':
     return 'number';
   case 'choice':
   case 'open-choice':
-    return item.answerValueSet ? 'questionnaire-choice-picker' : 'select';
+    if (item.answerValueSet) {
+      return 'questionnaire-choice-picker';
+    }
+    return hasRadioItemControl(item) ? 'radio' : 'select';
   case 'group':
     return 'heading';
   default:
@@ -117,8 +170,57 @@ function parseMappingExtension(item: any): any {
     return { kind: kind === 'mapsToCondition' ? 'condition' : 'observation', code: { coding: item.code } };
   }
 
+  if (kind === 'mapsToLegendCondition' || kind === 'mapsToLegendObservation') {
+    if (item.type === 'group') {
+      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare ' + kind + ' - ignoring mapping');
+      return null;
+    }
+    if (!item.repeats || (item.type !== 'choice' && item.type !== 'open-choice') || !item.answerValueSet) {
+      console.warn('Questionnaire item ' + item.linkId + ' declares ' + kind + ' but is not a repeats=true choice/open-choice item with an answerValueSet - ignoring mapping');
+      return null;
+    }
+    return { kind: kind === 'mapsToLegendCondition' ? 'legendCondition' : 'legendObservation' };
+  }
+
+  if (kind === 'invokesAction') {
+    if (item.type === 'group') {
+      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare invokesAction - ignoring mapping');
+      return null;
+    }
+    var actionExt = item.extension.find((ext: any) => ext.url === ACTION_EXTENSION_URL);
+    var action = actionExt && actionExt.valueCode;
+    if (!action || SUPPORTED_ACTIONS.indexOf(action) === -1) {
+      console.warn('Questionnaire item ' + item.linkId + ' declares invokesAction but has no recognised questionnaire-action extension - item will not be rendered');
+      return { kind: 'invalidAction' };
+    }
+    return { kind: 'action', action: action };
+  }
+
   console.warn('Questionnaire item ' + item.linkId + ' declares an unrecognised mapping kind "' + kind + '" - ignoring mapping');
   return null;
+}
+
+/**
+ * Converts a raw FHIR enableWhen/disabledWhen condition into its evaluator-ready form: a
+ * condition carrying the predicate extension becomes {predicate, negate}, referencing a named
+ * graph/app-state predicate (see graphPredicateEvaluator.ts) instead of a sibling item's
+ * answer. `negate` is a non-standard sibling boolean (not part of the FHIR condition element)
+ * letting a predicate be combined as its inverse - needed to express rules like "enabled only
+ * when neither X nor Y holds" via De Morgan's with enableBehavior 'all'.
+ */
+function parseCondition(condition: any): any {
+  const predicateExt = condition.extension && condition.extension.find((ext: any) => ext.url === PREDICATE_EXTENSION_URL);
+  if (predicateExt && predicateExt.valueCode) {
+    return { predicate: predicateExt.valueCode, negate: !!condition.negate };
+  }
+  return condition;
+}
+
+function parseConditions(conditions: any): any {
+  if (!conditions) {
+    return undefined;
+  }
+  return conditions.map(parseCondition);
 }
 
 function parseAnswerOptions(item: any): any {
@@ -139,15 +241,28 @@ function parseAnswerOptions(item: any): any {
   });
 }
 
-function walkItems(items: any, out: any): void {
+function walkItems(items: any, out: any, tab: any): void {
   for (const item of items) {
     if (!item.linkId) {
       continue;
     }
-    const fieldType = itemTypeToFieldType(item);
-    if (fieldType === null) {
-      console.warn('Questionnaire item ' + item.linkId + ' has unsupported type "' + item.type + '" - skipping');
+
+    const mapping = parseMappingExtension(item);
+    if (mapping && mapping.kind === 'invalidAction') {
       continue;
+    }
+
+    let fieldType;
+    if (mapping && mapping.kind === 'action') {
+      fieldType = 'button-action';
+    } else if (mapping && (mapping.kind === 'legendCondition' || mapping.kind === 'legendObservation')) {
+      fieldType = 'questionnaire-legend-picker';
+    } else {
+      fieldType = itemTypeToFieldType(item);
+      if (fieldType === null) {
+        console.warn('Questionnaire item ' + item.linkId + ' has unsupported type "' + item.type + '" - skipping');
+        continue;
+      }
     }
 
     const parsed: any = {
@@ -155,24 +270,56 @@ function walkItems(items: any, out: any): void {
       label: item.text || item.linkId,
       itemType: item.type,
       fieldType: fieldType,
+      tab: tab,
       repeats: !!item.repeats,
       answerValueSet: item.answerValueSet,
       answerOption: parseAnswerOptions(item),
-      enableWhen: item.enableWhen,
+      enableWhen: parseConditions(item.enableWhen),
       enableBehavior: item.enableBehavior || 'all',
-      mapping: parseMappingExtension(item)
+      disabledWhen: parseConditions(item.disabledWhen),
+      disabledBehavior: item.disabledBehavior || 'all',
+      disablingPredicate: item.disablingPredicate || null,
+      disablingPredicateTarget: item.disablingPredicateTarget || 'inactive',
+      columns: item.columns,
+      range: item.range,
+      nullValue: item.nullValue,
+      mapping: mapping,
+      buttonLabel: item.text
     };
     out.push(parsed);
 
     if (item.item && item.item.length > 0) {
-      walkItems(item.item, out);
+      walkItems(item.item, out, tab);
+    }
+  }
+}
+
+/**
+ * Derives node-menu tabs from the Questionnaire's top-level items: each top-level `group`
+ * becomes a tab (keyed by linkId, labelled by text); a non-group top-level item is placed on
+ * an implicit "General" tab (with a warning) - see questionnaire-source-of-truth design D13.
+ */
+function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
+  const GENERAL_TAB = { key: 'general', label: 'General' };
+  for (const item of topLevelItems) {
+    if (item.type === 'group') {
+      const tab = { key: item.linkId, label: item.text || item.linkId };
+      tabOrder.push(tab);
+      walkItems(item.item || [], out, tab);
+    } else {
+      if (tabOrder.indexOf(GENERAL_TAB) === -1) {
+        tabOrder.push(GENERAL_TAB);
+      }
+      console.warn('Questionnaire item ' + item.linkId + ' is a top-level item that is not a group - placing it on an implicit "General" tab');
+      walkItems([item], out, GENERAL_TAB);
     }
   }
 }
 
 export function parseQuestionnaire(questionnaire: any): any {
   const items: any[] = [];
-  walkItems(questionnaire.item || [], items);
+  const tabs: any[] = [];
+  walkTopLevelItems(questionnaire.item || [], items, tabs);
 
   let canonicalUrl = questionnaire.url;
   if (canonicalUrl && questionnaire.version) {
@@ -181,7 +328,8 @@ export function parseQuestionnaire(questionnaire: any): any {
 
   return {
     canonicalUrl: canonicalUrl,
-    items: items
+    items: items,
+    tabs: tabs
   };
 }
 
