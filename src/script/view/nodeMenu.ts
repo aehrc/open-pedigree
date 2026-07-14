@@ -112,7 +112,9 @@ export default class NodeMenu {
 
         this.tabHeaders[tabName] = document.createElement('dd');
         this.tabHeaders[tabName].className = activeClass;
-        this.tabHeaders[tabName].innerHTML = '<a>' + tabDisplayLabel + '</a>';
+        var tabLink = document.createElement('a');
+        tabLink.textContent = tabDisplayLabel;
+        this.tabHeaders[tabName].appendChild(tabLink);
         var _this = this;
         var switchTab = function(tabName: any) {
           return function() {
@@ -176,7 +178,9 @@ export default class NodeMenu {
     // unconditionally on every value-set in _setFieldValue['disease-picker'], since Selectize
     // rebuilds its .item elements from scratch each time and would otherwise wipe this out.
     this._updateDisorderColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-disorders .item[data-value="' + id + '"]')).forEach(function(item: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-disorders .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
         var colorBubble = item.querySelector('.disorder-color');
         if (!colorBubble) {
           colorBubble = document.createElement('span');
@@ -196,7 +200,9 @@ export default class NodeMenu {
     // Update gene colors (see disorder colors above for why this is also applied unconditionally
     // in _setFieldValue['gene-picker']).
     this._updateGeneColor = function(this: any, id: any, color: any) {
-      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes .item[data-value="' + id + '"]')).forEach(function(item: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-candidate_genes .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
         var colorBubble = item.querySelector('.disorder-color');
         if (!colorBubble) {
           colorBubble = document.createElement('span');
@@ -220,7 +226,9 @@ export default class NodeMenu {
     // this is also applied unconditionally in _setFieldValue['questionnaire-legend-picker'].)
     this._updateQuestionnaireLegendColor = function(this: any, linkId: any, id: any, color: any) {
       var fieldLinkId = String(linkId).replace(/^legend-/, '');
-      Array.from(this.menuBox.querySelectorAll('.field-' + fieldLinkId + ' .item[data-value="' + id + '"]')).forEach(function(item: any) {
+      Array.from(this.menuBox.querySelectorAll('.field-' + CSS.escape(fieldLinkId) + ' .item[data-value]')).filter(function(item: any) {
+        return item.dataset.value === id;
+      }).forEach(function(item: any) {
         var colorBubble = item.querySelector('.disorder-color');
         if (!colorBubble) {
           colorBubble = document.createElement('span');

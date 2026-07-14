@@ -300,7 +300,9 @@ function walkItems(items: any, out: any, tab: any): void {
  * an implicit "General" tab (with a warning) - see questionnaire-source-of-truth design D13.
  */
 function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
-  const GENERAL_TAB = { key: 'general', label: 'General' };
+  // Prefixed/suffixed with underscores to avoid colliding with a real top-level group
+  // whose linkId happens to be "general".
+  const GENERAL_TAB = { key: '__general__', label: 'General' };
   for (const item of topLevelItems) {
     if (item.type === 'group') {
       const tab = { key: item.linkId, label: item.text || item.linkId };

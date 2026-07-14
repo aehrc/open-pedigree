@@ -1850,7 +1850,7 @@ GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse = function (qr, ref,
       if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
         continue;
       }
-      for (const answerEntry of qrItem.answer) {
+      for (const answerEntry of qrItem.answer || []) {
         const value = this.fhirValueToAnswer(item.itemType, answerEntry);
         if (!value || !value.code) {
           continue;
@@ -1877,6 +1877,9 @@ GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse = function (qr, ref,
     }
 
     if (item.mapping.kind !== 'condition' && item.mapping.kind !== 'observation') {
+      continue;
+    }
+    if (!qrItem.answer || qrItem.answer.length === 0) {
       continue;
     }
     const value = this.fhirValueToAnswer(item.itemType, qrItem.answer[0]);

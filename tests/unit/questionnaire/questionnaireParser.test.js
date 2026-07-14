@@ -123,8 +123,8 @@ describe('parseQuestionnaire', () => {
         item: [{ linkId: 'stray', type: 'string' }],
       };
       const { items, tabs } = parseQuestionnaire(questionnaire);
-      expect(tabs).toEqual([{ key: 'general', label: 'General' }]);
-      expect(items[0].tab).toEqual({ key: 'general', label: 'General' });
+      expect(tabs).toEqual([{ key: '__general__', label: 'General' }]);
+      expect(items[0].tab).toEqual({ key: '__general__', label: 'General' });
       expect(warnSpy).toHaveBeenCalled();
       warnSpy.mockRestore();
     });
