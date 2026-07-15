@@ -65,3 +65,33 @@ describe('FHIRPatientProvider with fhirBaseUrl (no regression)', () => {
         expect(provider._fhirBaseUrl).toBe('https://fhir.example.com/r4');
     });
 });
+
+describe('FHIRPatientProvider.openClinicalImportModal', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('calls onImported with a single {linkId: "disorders", value} entry derived from Condition.code', async () => {
+        const conditionBundle = {
+            entry: [
+                { resource: { resourceType: 'Condition', code: { coding: [{ code: '73211009', display: 'Diabetes mellitus' }] } } },
+            ],
+        };
+        const smartClient = makeSmartClient();
+        smartClient.request = vi.fn().mockResolvedValue(conditionBundle);
+
+        const provider = new FHIRPatientProvider({ smartClient });
+        const onImported = vi.fn();
+        provider.openClinicalImportModal(0, 'Patient/p1', onImported);
+
+        // Let the Condition fetch promise resolve and the modal populate its checkbox list.
+        await new Promise(r => setTimeout(r, 20));
+
+        const importBtn = Array.from(document.querySelectorAll('.clinical-import-modal button'))
+            .find(btn => btn.textContent === 'Import selected');
+        expect(importBtn).toBeTruthy();
+        importBtn.click();
+
+        expect(onImported).toHaveBeenCalledWith([
+            { linkId: 'disorders', value: [{ id: '73211009', name: 'Diabetes mellitus' }] },
+        ]);
+    });
+});
