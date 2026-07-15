@@ -47,16 +47,16 @@ export default class SmartPatientProvider extends AbstractPatientProvider {
         return hasScope(this._client, 'user/Patient.read');
     }
 
-    lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void {
-        this._delegate.lookupPatient(fhirRef, onSuccess, onError);
+    lookupPatient(patientRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void {
+        this._delegate.lookupPatient(patientRef, onSuccess, onError);
     }
 
-    openPatientPickerModal(nodeId: number, onSelected: (fhirRef: string, details: any) => void): void {
+    openPatientPickerModal(nodeId: number, onSelected: (patientRef: string, details: any) => void): void {
         this._delegate.openPatientPickerModal(nodeId, onSelected);
     }
 
-    openClinicalImportModal(nodeId: number, fhirRef: string, onImported: (disorders: {id: string, name: string}[]) => void): void {
-        this._delegate.openClinicalImportModal(nodeId, fhirRef, onImported);
+    openClinicalImportModal(nodeId: number, patientRef: string, onImported: (answers: {linkId: string, value: any}[]) => void): void {
+        this._delegate.openClinicalImportModal(nodeId, patientRef, onImported);
     }
 
     async prepopulateProband(probandNodeId: number): Promise<void> {
@@ -68,12 +68,12 @@ export default class SmartPatientProvider extends AbstractPatientProvider {
             }
             const patient = await this._client.patient.read();
             if (!patient || !patient.id) return;
-            const fhirRef = 'Patient/' + patient.id;
+            const patientRef = 'Patient/' + patient.id;
             const displayName = extractDisplayName(patient);
             const nameParts = displayName.split(' ');
             const firstName = nameParts[0] || displayName;
             const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
-            const properties: any = { setLinkedPatientRef: fhirRef, setFirstName: firstName };
+            const properties: any = { setLinkedPatientRef: patientRef, setFirstName: firstName };
             if (lastName) properties.setLastName = lastName;
             if (patient.gender === 'male') properties.setGender = 'M';
             else if (patient.gender === 'female') properties.setGender = 'F';

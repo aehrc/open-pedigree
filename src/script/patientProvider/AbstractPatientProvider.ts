@@ -8,9 +8,9 @@ export default abstract class AbstractPatientProvider {
         return this.isConfigured() && (nodeId === 0 ? this.canLinkProband() : this.canSearchFamilyMembers());
     }
 
-    abstract lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void;
+    abstract lookupPatient(patientRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void;
 
-    abstract openPatientPickerModal(nodeId: number, onSelected: (fhirRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void;
+    abstract openPatientPickerModal(nodeId: number, onSelected: (patientRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void;
 
-    abstract openClinicalImportModal(nodeId: number, fhirRef: string, onImported: (disorders: {id: string, name: string}[]) => void): void;
+    abstract openClinicalImportModal(nodeId: number, patientRef: string, onImported: (answers: {linkId: string, value: any}[]) => void): void;
 }
