@@ -377,17 +377,31 @@ export default class PedigreeEditor {
       if (item.fieldType === 'button-action') {
         descriptor.buttonLabel = item.buttonLabel;
         descriptor.action = item.mapping && _this._questionnaireActions[item.mapping.action];
-      } else if (RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
-        descriptor.function = RESERVED_LEGEND_TARGETS[item.linkId].setter;
-      } else if (item.mapping && item.mapping.kind === 'field') {
-        descriptor.function = MAPS_TO_FIELD_TARGETS[item.mapping.field].setter;
       } else if (item.fieldType !== 'heading') {
-        descriptor.function = 'setQuestionnaireAnswer_' + item.linkId;
+        descriptor.function = _this._resolveQuestionnaireSetter(item.linkId);
       }
 
       fields.push(descriptor);
     });
     return { fields: fields, tabs: this._questionnaireConfig.tabs };
+  }
+
+  /**
+   * Resolves the real Person setter method name for a Questionnaire linkId, using the same
+   * priority `_buildFieldDescriptors()` uses when rendering the form: a reserved legend target
+   * (disorders/candidate_genes/hpo_positive), then a mapsToField target, then the item's generic
+   * synthesized `setQuestionnaireAnswer_<linkId>` setter. Also used by `importClinicalData` (see
+   * design D2 of generalize-patient-provider-import) to dispatch imported answers generically.
+   */
+  _resolveQuestionnaireSetter(linkId: any): any {
+    if (RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId)) {
+      return RESERVED_LEGEND_TARGETS[linkId].setter;
+    }
+    var item = this._questionnaireConfig && this._questionnaireConfig.items.find(function(i: any) { return i.linkId === linkId; });
+    if (item && item.mapping && item.mapping.kind === 'field') {
+      return MAPS_TO_FIELD_TARGETS[item.mapping.field].setter;
+    }
+    return 'setQuestionnaireAnswer_' + linkId;
   }
 
   /**
@@ -398,8 +412,8 @@ export default class PedigreeEditor {
     linkPatient: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getPatientProvider().openPatientPickerModal(nodeId,
-        function(fhirRef: string, details: any) {
-          var properties: any = { setLinkedPatientRef: fhirRef, setFirstName: details.firstName };
+        function(patientRef: string, details: any) {
+          var properties: any = { setLinkedPatientRef: patientRef, setFirstName: details.firstName };
           if (details.lastName)   properties.setLastName   = details.lastName;
           if (details.gender)     properties.setGender     = details.gender;
           if (details.birthDate)  properties.setBirthDate  = details.birthDate;
@@ -413,21 +427,34 @@ export default class PedigreeEditor {
     importClinicalData: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
       var node = (window as any).editor.getView().getNode(nodeId);
-      var fhirRef = node && node.getLinkedPatientRef ? node.getLinkedPatientRef() : '';
-      if (!fhirRef) {
+      var patientRef = node && node.getLinkedPatientRef ? node.getLinkedPatientRef() : '';
+      if (!patientRef) {
         return;
       }
-      (window as any).editor.getPatientProvider().openClinicalImportModal(nodeId, fhirRef,
-        function(disorders: any[]) {
-          if (!disorders || disorders.length === 0) {
+      (window as any).editor.getPatientProvider().openClinicalImportModal(nodeId, patientRef,
+        function(answers: {linkId: string, value: any}[]) {
+          if (!answers || answers.length === 0) {
             return;
           }
           var n = (window as any).editor.getView().getNode(nodeId);
-          var existing = (n && n.getDisorders) ? n.getDisorders().slice(0) : [];
-          var existingIds = new Set(existing);
-          var merged = existing.concat(disorders.filter((d: any) => !existingIds.has(d.id)).map((d: any) => d.id));
+          var properties: any = {};
+          answers.forEach(function(answer: any) {
+            var linkId = answer.linkId;
+            var setterName = (window as any).editor._resolveQuestionnaireSetter(linkId);
+            if (RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId)) {
+              var target = RESERVED_LEGEND_TARGETS[linkId];
+              var existing = (n && n[target.getter]) ? n[target.getter]().slice(0) : [];
+              var existingIds = new Set(existing);
+              var incoming = (answer.value || [])
+                .filter(function(v: any) { return !existingIds.has(v.id); })
+                .map(function(v: any) { return v.id; });
+              properties[setterName] = existing.concat(incoming);
+            } else {
+              properties[setterName] = answer.value;
+            }
+          });
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: { setDisorders: merged } }
+            detail: { nodeID: nodeId, properties: properties }
           }));
         }
       );

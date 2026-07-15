@@ -37,8 +37,8 @@ function extractPatientDetails(patient: any): {firstName: string, lastName?: str
     return details;
 }
 
-function patientIdFromRef(fhirRef: string): string {
-    return fhirRef.startsWith('Patient/') ? fhirRef.slice('Patient/'.length) : fhirRef;
+function patientIdFromRef(patientRef: string): string {
+    return patientRef.startsWith('Patient/') ? patientRef.slice('Patient/'.length) : patientRef;
 }
 
 export default class FHIRPatientProvider extends AbstractPatientProvider {
@@ -67,13 +67,13 @@ export default class FHIRPatientProvider extends AbstractPatientProvider {
             .then(r => { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); });
     }
 
-    lookupPatient(fhirRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void {
-        this._request(this._fhirBaseUrl + '/' + fhirRef)
+    lookupPatient(patientRef: string, onSuccess: (displayName: string) => void, onError: (reason: string) => void): void {
+        this._request(this._fhirBaseUrl + '/' + patientRef)
             .then(patient => onSuccess(extractPatientDisplayName(patient)))
             .catch((e: any) => onError(String(e)));
     }
 
-    openPatientPickerModal(nodeId: number, onSelected: (fhirRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void {
+    openPatientPickerModal(nodeId: number, onSelected: (patientRef: string, details: {firstName: string, lastName?: string, gender?: string, birthDate?: string, lifeStatus?: string}) => void): void {
         const container = document.createElement('div');
         container.className = 'patient-picker-modal';
 
@@ -137,8 +137,8 @@ export default class FHIRPatientProvider extends AbstractPatientProvider {
         input.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') doSearch(); });
     }
 
-    openClinicalImportModal(nodeId: number, fhirRef: string, onImported: (disorders: {id: string, name: string}[]) => void): void {
-        const patientId = patientIdFromRef(fhirRef);
+    openClinicalImportModal(nodeId: number, patientRef: string, onImported: (answers: {linkId: string, value: any}[]) => void): void {
+        const patientId = patientIdFromRef(patientRef);
         const container = document.createElement('div');
         container.className = 'clinical-import-modal';
         container.textContent = 'Loading conditions…';
@@ -196,7 +196,7 @@ export default class FHIRPatientProvider extends AbstractPatientProvider {
                         .filter((cb: any) => cb.checked)
                         .map((cb: any) => ({ id: cb._disorder.id, name: cb._disorder.name }));
                     modal.closeDialog();
-                    onImported(selected);
+                    onImported([{ linkId: 'disorders', value: selected }]);
                 });
                 container.appendChild(importBtn);
             })

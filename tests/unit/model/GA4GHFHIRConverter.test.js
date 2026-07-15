@@ -48,4 +48,29 @@ describe('GA4GHFHIRConverter.exportAsFHIR', () => {
     expect(composition).toBeDefined();
     expect(patients.length).toBe(3); // John, Jane, child
   });
+
+  // See generalize-patient-provider-import design D5: a REDCap-shaped (or any other non-FHIR)
+  // linkedPatientRef must not leak into the exported Patient reference - only a Patient/<id>
+  // reference is honoured, everything else falls back to default reference generation.
+  it('a Patient/-prefixed linkedPatientRef is used as the exported Patient id', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(simpleGG);
+    baseGraph.properties[0].linkedPatientRef = 'Patient/42';
+    const pedigree = { GG: baseGraph };
+
+    const result = JSON.parse(GA4GHFHIRConverter.exportAsFHIR(pedigree, 'all', null, null));
+    const patients = result.entry.map(e => e.resource).filter(r => r.resourceType === 'Patient');
+    expect(patients.some(p => p.id === '42')).toBe(true);
+  });
+
+  it('a non-Patient/-prefixed linkedPatientRef (e.g. REDCap-shaped) is excluded from the exported reference', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(simpleGG);
+    baseGraph.properties[0].linkedPatientRef = 'record:5/instance:2';
+    const pedigree = { GG: baseGraph };
+
+    const result = JSON.parse(GA4GHFHIRConverter.exportAsFHIR(pedigree, 'all', null, null));
+    const patients = result.entry.map(e => e.resource).filter(r => r.resourceType === 'Patient');
+    expect(patients.some(p => p.id === 'record:5/instance:2')).toBe(false);
+    // Falls back to a generated urn:uuid: reference rather than the REDCap-shaped ref.
+    expect(patients.some(p => /^urn:uuid:[0-9a-f-]{36}$/i.test(p.id))).toBe(true);
+  });
 });
