@@ -412,8 +412,8 @@ export default class PedigreeEditor {
     linkPatient: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getPatientProvider().openPatientPickerModal(nodeId,
-        function(fhirRef: string, details: any) {
-          var properties: any = { setLinkedPatientRef: fhirRef, setFirstName: details.firstName };
+        function(patientRef: string, details: any) {
+          var properties: any = { setLinkedPatientRef: patientRef, setFirstName: details.firstName };
           if (details.lastName)   properties.setLastName   = details.lastName;
           if (details.gender)     properties.setGender     = details.gender;
           if (details.birthDate)  properties.setBirthDate  = details.birthDate;
