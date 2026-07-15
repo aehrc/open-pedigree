@@ -28,5 +28,5 @@
 
 ## 6. Merge
 
-- [ ] 6.1 Merge into `develop`
-- [ ] 6.2 Merge into `develop_redcap_em` (per branch model — no REDCap-specific logic in this change, applies to both)
+- [x] 6.1 Merge into `develop`
+- [x] 6.2 Merge into `develop_redcap_em` (per branch model — no REDCap-specific logic in this change, applies to both)
