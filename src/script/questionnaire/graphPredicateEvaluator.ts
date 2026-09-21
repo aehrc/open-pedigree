@@ -19,19 +19,25 @@ export const WHOLE_ITEM_PREDICATES: any = {
   canLinkPatient: (node: any, graph: any, patientProvider: any) => patientProvider.canLinkPatient(node.getID()),
   canImportClinicalData: (node: any, graph: any, patientProvider: any) =>
     patientProvider.canImportClinicalData() && !!node.getLinkedPatientRef(),
+  canLinkRecord: (node: any, graph: any, patientProvider: any, recordLinkProvider: any) =>
+    recordLinkProvider.isConfigured() && recordLinkProvider.canLink(node.getID()),
+  canCreateNewRecord: (node: any, graph: any, patientProvider: any, recordLinkProvider: any) =>
+    recordLinkProvider.isConfigured() && recordLinkProvider.canCreateNew(node.getID()),
+  canEditLinkedRecord: (node: any, graph: any, patientProvider: any, recordLinkProvider: any) =>
+    recordLinkProvider.isConfigured() && !!node.getLinkedRecordRef(),
 };
 
 /**
  * Evaluates a named whole-item graph/app-state predicate against the given node.
  * Returns false (and logs a warning) for an unrecognised predicate name.
  */
-export function evaluateGraphPredicate(name: any, node: any, graph: any, patientProvider: any): boolean {
+export function evaluateGraphPredicate(name: any, node: any, graph: any, patientProvider: any, recordLinkProvider?: any): boolean {
   const fn = WHOLE_ITEM_PREDICATES[name];
   if (!fn) {
     console.warn('Unrecognised graph/app-state predicate "' + name + '" - treating as unsatisfied');
     return false;
   }
-  return !!fn(node, graph, patientProvider);
+  return !!fn(node, graph, patientProvider, recordLinkProvider);
 }
 
 // Per-option predicates resolve to the subset of an item's own answer options that should be

@@ -1,7 +1,26 @@
 export const MAPPING_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
 export const PREDICATE_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate';
 export const ACTION_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-action';
-export const SUPPORTED_ACTIONS = ['linkPatient', 'importClinicalData'];
+export const SUPPORTED_ACTIONS = ['linkPatient', 'importClinicalData', 'linkRecord', 'createNewRecord', 'editRecord'];
+
+// The three built-in record-link-provider actions (see record-link-provider design D1/D2) -
+// used by Person.getSummary() to know which action items should read their display value from
+// getLinkedRecordRef() rather than the patient-provider subsystem's getLinkedPatientRef().
+export const RECORD_LINK_ACTIONS = ['linkRecord', 'createNewRecord', 'editRecord'];
+
+// A non-standard boolean-presence extension (see record-link-provider design D4) marking a
+// Questionnaire item as sourced from a linked external record - distinct from any
+// host-application-specific "data source" extension (e.g. redcap_pedigree_editor's own
+// questionnaire-redcap-source), since it carries no information about *where* the data comes
+// from, only that it does, and is meaningful with no recordLinkProvider configured at all.
+export const LINKED_RECORD_SOURCE_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source';
+
+// Reserved tab (see record-link-provider design D6) that linked-record-sourced items are
+// regrouped onto regardless of their authored tab/group, and that pedigree.ts's
+// _buildFieldDescriptors() attaches the Link/Create-new/Edit action items to. Prefixed/suffixed
+// with underscores to avoid colliding with a real authored group, matching GENERAL_TAB's
+// convention below.
+export const LINKED_RECORD_TAB = { key: '__linked_record__', label: 'Linked Record' };
 
 // FHIR StructureDefinition canonical URLs used in item.definition for mapsToField items.
 // Patient.* targets are real, resolvable Patient elements. PedigreeIndividual.* targets don't
@@ -90,6 +109,13 @@ function hasRadioItemControl(item: any): boolean {
   const ext = item.extension.find((e: any) => e.url === ITEM_CONTROL_EXTENSION_URL);
   const coding = ext && ext.valueCodeableConcept && ext.valueCodeableConcept.coding;
   return !!(coding && coding.some((c: any) => c.system === ITEM_CONTROL_SYSTEM && c.code === 'radio-button'));
+}
+
+function hasLinkedRecordSourceExtension(item: any): boolean {
+  if (!item.extension) {
+    return false;
+  }
+  return item.extension.some((e: any) => e.url === LINKED_RECORD_SOURCE_EXTENSION_URL);
 }
 
 function itemTypeToFieldType(item: any): any {
@@ -241,7 +267,12 @@ function parseAnswerOptions(item: any): any {
   });
 }
 
-function walkItems(items: any, out: any, tab: any): void {
+// `parentGroup` is the nearest enclosing group's {key, label} - the top-level group itself for
+// items authored directly under it, or the nearest nested group for deeper items - used by
+// pedigree.ts's _buildFieldDescriptors() to sub-head linked-record-sourced items regrouped onto
+// LINKED_RECORD_TAB (see record-link-provider design D6). null only for the GENERAL_TAB
+// fallback's ungrouped stray top-level item.
+function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
   for (const item of items) {
     if (!item.linkId) {
       continue;
@@ -284,12 +315,15 @@ function walkItems(items: any, out: any, tab: any): void {
       range: item.range,
       nullValue: item.nullValue,
       mapping: mapping,
-      buttonLabel: item.text
+      buttonLabel: item.text,
+      parentGroup: parentGroup,
+      linkedRecordSource: hasLinkedRecordSourceExtension(item)
     };
     out.push(parsed);
 
     if (item.item && item.item.length > 0) {
-      walkItems(item.item, out, tab);
+      const childParentGroup = item.type === 'group' ? { key: item.linkId, label: item.text || item.linkId } : parentGroup;
+      walkItems(item.item, out, tab, childParentGroup);
     }
   }
 }
@@ -307,13 +341,13 @@ function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
     if (item.type === 'group') {
       const tab = { key: item.linkId, label: item.text || item.linkId };
       tabOrder.push(tab);
-      walkItems(item.item || [], out, tab);
+      walkItems(item.item || [], out, tab, tab);
     } else {
       if (tabOrder.indexOf(GENERAL_TAB) === -1) {
         tabOrder.push(GENERAL_TAB);
       }
       console.warn('Questionnaire item ' + item.linkId + ' is a top-level item that is not a group - placing it on an implicit "General" tab');
-      walkItems([item], out, GENERAL_TAB);
+      walkItems([item], out, GENERAL_TAB, null);
     }
   }
 }

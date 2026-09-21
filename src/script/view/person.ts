@@ -2,7 +2,7 @@ import { ChildlessBehavior } from 'pedigree/view/abstractNode';
 import AbstractPerson from 'pedigree/view/abstractPerson';
 import PersonVisuals from 'pedigree/view/personVisuals';
 import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
-import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
 
 declare const editor: any;
@@ -65,6 +65,7 @@ export default class Person extends AbstractPerson {
   _evaluated: any;
   _lostContact: any;
   _linkedPatientRef: any;
+  _linkedRecordRef: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -223,6 +224,7 @@ export default class Person extends AbstractPerson {
     this._evaluated = false;
     this._lostContact = false;
     this._linkedPatientRef = '';
+    this._linkedRecordRef = '';
     this._questionnaireAnswers = {};
   }
 
@@ -242,6 +244,14 @@ export default class Person extends AbstractPerson {
 
   setLinkedPatientRef(ref: string): void {
     this._linkedPatientRef = ref;
+  }
+
+  getLinkedRecordRef(): string {
+    return this._linkedRecordRef || '';
+  }
+
+  setLinkedRecordRef(ref: string): void {
+    this._linkedRecordRef = ref;
   }
 
   /**
@@ -995,7 +1005,8 @@ export default class Person extends AbstractPerson {
 
     var graph = editor.getGraph();
     var patientProvider = editor.getPatientProvider();
-    var context = { node: this, graph: graph, patientProvider: patientProvider };
+    var recordLinkProvider = editor.getRecordLinkProvider();
+    var context = { node: this, graph: graph, patientProvider: patientProvider, recordLinkProvider: recordLinkProvider };
     var _this = this;
 
     config.items.forEach(function(item: any) {
@@ -1018,7 +1029,7 @@ export default class Person extends AbstractPerson {
       } else if (item.mapping && item.mapping.kind === 'field') {
         value = (_this as any)[MAPS_TO_FIELD_TARGETS[item.mapping.field].getter]();
       } else if (item.mapping && item.mapping.kind === 'action') {
-        value = _this.getLinkedPatientRef();
+        value = RECORD_LINK_ACTIONS.indexOf(item.mapping.action) !== -1 ? _this.getLinkedRecordRef() : _this.getLinkedPatientRef();
       } else {
         value = _this.getQuestionnaireAnswer(item.linkId);
       }
@@ -1036,6 +1047,14 @@ export default class Person extends AbstractPerson {
         } else {
           inactive = disabledValues;
         }
+      }
+
+      // A linked-record-sourced item is always disabled, independent of (and in addition to)
+      // disabledWhen/disablingPredicate - see record-link-provider design D5. Static parse-time
+      // fact, not evaluated against current answers/graph state, so it cannot be overridden by
+      // an authored disabledWhen that evaluates to "not disabled".
+      if (item.linkedRecordSource) {
+        disabled = true;
       }
 
       summary[item.linkId] = { value: value, inactive: inactive, disabled: disabled };
@@ -1112,6 +1131,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedPatientRef() != '') {
       info['linkedPatientRef'] = this.getLinkedPatientRef();
     }
+    if (this.getLinkedRecordRef() != '') {
+      info['linkedRecordRef'] = this.getLinkedRecordRef();
+    }
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
@@ -1182,6 +1204,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedPatientRef') && this.getLinkedPatientRef() != info.linkedPatientRef) {
         this.setLinkedPatientRef(info.linkedPatientRef);
+      }
+      if (info.hasOwnProperty('linkedRecordRef') && this.getLinkedRecordRef() != info.linkedRecordRef) {
+        this.setLinkedRecordRef(info.linkedRecordRef);
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;

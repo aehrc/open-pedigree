@@ -276,6 +276,54 @@ describe('parseQuestionnaire', () => {
   });
 });
 
+describe('linkedRecordSource extension (record-link-provider)', () => {
+  function linkedRecordSourceExtension() {
+    return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' };
+  }
+
+  it('parses an item carrying the extension to linkedRecordSource: true', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{ linkId: 'q1', type: 'string', extension: [linkedRecordSourceExtension()] }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].linkedRecordSource).toBe(true);
+  });
+
+  it('parses an item without the extension to a falsy linkedRecordSource', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{ linkId: 'q1', type: 'string' }],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    expect(items[0].linkedRecordSource).toBeFalsy();
+  });
+
+  it('tracks the immediate parent group (top-level or nested) as parentGroup for regrouping', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [
+        {
+          linkId: 'demographics', type: 'group', text: 'Demographics',
+          item: [
+            { linkId: 'directChild', type: 'string' },
+            {
+              linkId: 'subsection', type: 'group', text: 'Sub Section',
+              item: [{ linkId: 'nestedChild', type: 'string' }],
+            },
+          ],
+        },
+        { linkId: 'stray', type: 'string' },
+      ],
+    };
+    const { items } = parseQuestionnaire(questionnaire);
+    const byLinkId = Object.fromEntries(items.map(i => [i.linkId, i]));
+    expect(byLinkId.directChild.parentGroup).toEqual({ key: 'demographics', label: 'Demographics' });
+    expect(byLinkId.nestedChild.parentGroup).toEqual({ key: 'subsection', label: 'Sub Section' });
+    expect(byLinkId.stray.parentGroup).toBeNull();
+  });
+});
+
 describe('mapsToLegendCondition / mapsToLegendObservation mapping', () => {
   it('parses a valid legend-mapped item as a questionnaire-legend-picker with the right mapping kind', () => {
     const questionnaire = {

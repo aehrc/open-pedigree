@@ -28,7 +28,8 @@ import {PhenotypeTermType} from 'pedigree/terminology/phenotypeTerm';
 import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import BioportalTerminology from './terminology/BioportalTerminology';
 import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider';
-import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
+import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 
@@ -60,6 +61,7 @@ export default class PedigreeEditor {
   _closing: any;
   _controller: any;
   _patientProvider: any;
+  _recordLinkProvider: any;
   _questionnaireConfig: any;
   _questionnaireTerminologies: any;
   _questionnaireLegends: any;
@@ -85,17 +87,18 @@ export default class PedigreeEditor {
     this._hpoServiceUrl  = options.hpoServiceUrl  || '';
 
     this._patientProvider = options.patientProvider || new EmptyPatientProvider();
+    this._recordLinkProvider = options.recordLinkProvider || new EmptyRecordLinkProvider();
 
     (window as any).editor = this;
 
     this._questionnaireTerminologies = {};
     this._questionnaireLegends = {};
     if (options.questionnaireLocal) {
-      this._questionnaireConfig = parseQuestionnaire(options.questionnaireLocal);
+      this._questionnaireConfig = this._parseQuestionnaireConfig(options.questionnaireLocal);
     } else {
       // Always an effective Questionnaire (see questionnaire-source-of-truth design D14) -
       // the built-in default until/unless a questionnaireUrl fetch resolves.
-      this._questionnaireConfig = parseQuestionnaire(DEFAULT_QUESTIONNAIRE);
+      this._questionnaireConfig = this._parseQuestionnaireConfig(DEFAULT_QUESTIONNAIRE);
     }
 
     this._graphModel = DynamicPositionedGraph.makeEmpty(PedigreeEditorParameters.attributes.layoutRelativePersonWidth, PedigreeEditorParameters.attributes.layoutRelativeOtherWidth);
@@ -257,7 +260,7 @@ export default class PedigreeEditor {
         if (!questionnaire || questionnaire.resourceType !== 'Questionnaire') {
           throw new Error('Resource at questionnaireUrl is not a Questionnaire');
         }
-        _this._questionnaireConfig = parseQuestionnaire(questionnaire);
+        _this._questionnaireConfig = _this._parseQuestionnaireConfig(questionnaire);
         _this._questionnaireTerminologies = {};
         _this._questionnaireLegends = {};
         _this._initialiseQuestionnaireTerminologies(options);
@@ -331,12 +334,54 @@ export default class PedigreeEditor {
    * existing property directly and are not rendered separately.
    */
   /**
+   * Wraps parseQuestionnaire() with the three built-in record-link-provider action items
+   * (linkRecord/createNewRecord/editRecord - see record-link-provider design D1/D2), appended
+   * onto the reserved LINKED_RECORD_TAB so they flow through the same generic
+   * enableWhen/getSummary()/dispatch machinery as every other Questionnaire-driven action
+   * (mirroring linkPatient/importClinicalData exactly). Kept out of parseQuestionnaire() itself
+   * so the parser's own output stays a pure function of the raw Questionnaire.
+   */
+  _parseQuestionnaireConfig(questionnaire: any): any {
+    var config = parseQuestionnaire(questionnaire);
+    var actionItem = function(linkId: string, label: string, predicate: string): any {
+      return {
+        linkId: linkId,
+        label: label,
+        itemType: 'display',
+        fieldType: 'button-action',
+        tab: LINKED_RECORD_TAB,
+        repeats: false,
+        mapping: { kind: 'action', action: linkId },
+        enableWhen: [{ predicate: predicate, negate: false }],
+        enableBehavior: 'all',
+        disabledWhen: undefined,
+        disabledBehavior: 'all',
+        disablingPredicate: null,
+        disablingPredicateTarget: 'inactive',
+        buttonLabel: label,
+        parentGroup: null,
+        linkedRecordSource: false
+      };
+    };
+    config.items = config.items.concat([
+      actionItem('linkRecord', 'Link to existing record', 'canLinkRecord'),
+      actionItem('createNewRecord', 'Create new linked record', 'canCreateNewRecord'),
+      actionItem('editRecord', 'Edit linked record', 'canEditLinkedRecord')
+    ]);
+    return config;
+  }
+
+  /**
    * Builds NodeMenu field descriptors (and the tabs array) entirely from the parsed
    * effective Questionnaire config - see questionnaire-source-of-truth design D13.
    * - `invokesAction` items dispatch to a named function in `_questionnaireActions`.
    * - `RESERVED_LEGEND_TARGETS` items (disorders/candidate_genes/hpo_positive) and
    *   `mapsToField` items dispatch straight to their existing real Person setter.
    * - Everything else dispatches through the synthesized `setQuestionnaireAnswer_<linkId>`.
+   * - Items marked `linkedRecordSource` are regrouped onto LINKED_RECORD_TAB (sub-headed by
+   *   their original parentGroup), and that whole tab (regrouped items and the built-in
+   *   link/create-new/edit actions alike) is omitted entirely unless `recordLinkProvider` is
+   *   configured - see record-link-provider design D6 and the linked-record-tab capability.
    */
   _buildFieldDescriptors(): any {
     if (!this._questionnaireConfig) {
@@ -344,12 +389,33 @@ export default class PedigreeEditor {
     }
     var _this = this;
     var fields: any[] = [];
+    var recordLinkConfigured = this.getRecordLinkProvider().isConfigured();
+    var seenLinkedRecordGroups: any = {};
+
     this._questionnaireConfig.items.forEach(function(item: any) {
+      if (item.tab && item.tab.key === LINKED_RECORD_TAB.key && !recordLinkConfigured) {
+        return;
+      }
+
+      var tab = item.tab;
+      if (recordLinkConfigured && item.linkedRecordSource) {
+        tab = LINKED_RECORD_TAB;
+        if (item.parentGroup && !seenLinkedRecordGroups[item.parentGroup.key]) {
+          fields.push({
+            'name': '__linked_record_heading_' + item.parentGroup.key,
+            'label': item.parentGroup.label,
+            'type': 'heading',
+            'tab': LINKED_RECORD_TAB
+          });
+          seenLinkedRecordGroups[item.parentGroup.key] = true;
+        }
+      }
+
       var descriptor: any = {
         'name': item.linkId,
         'label': item.label,
         'type': item.fieldType,
-        'tab': item.tab,
+        'tab': tab,
         'linkId': item.linkId,
         'repeats': item.repeats
       };
@@ -383,7 +449,13 @@ export default class PedigreeEditor {
 
       fields.push(descriptor);
     });
-    return { fields: fields, tabs: this._questionnaireConfig.tabs };
+
+    var tabs = this._questionnaireConfig.tabs.slice();
+    if (recordLinkConfigured) {
+      tabs.push(LINKED_RECORD_TAB);
+    }
+
+    return { fields: fields, tabs: tabs };
   }
 
   /**
@@ -458,8 +530,71 @@ export default class PedigreeEditor {
           }));
         }
       );
+    },
+    linkRecord: function(menu: any): void {
+      var nodeId = menu.targetNode.getID();
+      (window as any).editor.getRecordLinkProvider().openPicker(nodeId,
+        function(recordRef: string, _details: any) {
+          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef } }
+          }));
+        }
+      );
+    },
+    createNewRecord: function(menu: any): void {
+      var nodeId = menu.targetNode.getID();
+      (window as any).editor.getRecordLinkProvider().createNew(nodeId,
+        function(answers: {linkId: string, value: any}[]) {
+          (window as any).editor._dispatchQuestionnaireAnswers(nodeId, answers);
+        }
+      );
+    },
+    editRecord: function(menu: any): void {
+      var nodeId = menu.targetNode.getID();
+      var node = (window as any).editor.getView().getNode(nodeId);
+      var recordRef = node && node.getLinkedRecordRef ? node.getLinkedRecordRef() : '';
+      if (!recordRef) {
+        return;
+      }
+      (window as any).editor.getRecordLinkProvider().openEditor(nodeId,
+        function(answers: {linkId: string, value: any}[]) {
+          (window as any).editor._dispatchQuestionnaireAnswers(nodeId, answers);
+        }
+      );
     }
   };
+
+  /**
+   * Dispatches an `{linkId, value}[]` answer bag through the same per-linkId setter-resolution
+   * priority `importClinicalData` uses (see record-link-provider design D3) - shared by
+   * `createNewRecord`/`editRecord`, which reuse the exact answer-bag shape and dispatch path
+   * `generalize-patient-provider-import` established for patient-provider's onImported.
+   */
+  _dispatchQuestionnaireAnswers(nodeId: any, answers: {linkId: string, value: any}[]): void {
+    if (!answers || answers.length === 0) {
+      return;
+    }
+    var n = (window as any).editor.getView().getNode(nodeId);
+    var properties: any = {};
+    answers.forEach(function(answer: any) {
+      var linkId = answer.linkId;
+      var setterName = (window as any).editor._resolveQuestionnaireSetter(linkId);
+      if (RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId)) {
+        var target = RESERVED_LEGEND_TARGETS[linkId];
+        var existing = (n && n[target.getter]) ? n[target.getter]().slice(0) : [];
+        var existingIds = new Set(existing);
+        var incoming = (answer.value || [])
+          .filter(function(v: any) { return !existingIds.has(v.id); })
+          .map(function(v: any) { return v.id; });
+        properties[setterName] = existing.concat(incoming);
+      } else {
+        properties[setterName] = answer.value;
+      }
+    });
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+      detail: { nodeID: nodeId, properties: properties }
+    }));
+  }
 
   getQuestionnaireConfig(): any {
     return this._questionnaireConfig;
@@ -592,6 +727,10 @@ export default class PedigreeEditor {
 
   getPatientProvider(): any {
     return this._patientProvider;
+  }
+
+  getRecordLinkProvider(): any {
+    return this._recordLinkProvider;
   }
 
   getTemplateSelector(): any {
