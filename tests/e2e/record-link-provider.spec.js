@@ -40,7 +40,7 @@ const LINKED_RECORD_QUESTIONNAIRE = {
 
 const VISIBLE_MENU = '.menu-box:visible';
 
-async function loadEditor(page, { recordLinkProvider } = {}) {
+async function loadEditor(page, { recordLinkProvider, questionnaire } = {}) {
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
@@ -70,7 +70,7 @@ async function loadEditor(page, { recordLinkProvider } = {}) {
     const newEditor = window.OpenPedigree.initialiseEditor(options);
     window.editor = newEditor;
     newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
-  }, { q: LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider });
+  }, { q: questionnaire || LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider });
   await page.waitForTimeout(300);
 }
 
@@ -131,6 +131,56 @@ test('with a recordLinkProvider configured, linked-record items from two differe
   // The editable item on the same authored tab as ext_field_a is unaffected.
   await expect(page.locator(`${VISIBLE_MENU} #tab_demographics .field-notes`)).toBeAttached();
   await expect(page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-notes`)).toHaveCount(0);
+
+  // The Link/Create-new/Edit actions render at the top of the tab, before the regrouped
+  // read-only fields (per linked-record-tab/spec.md), not after.
+  const fieldOrder = await page.locator(`${VISIBLE_MENU} #tab___linked_record__ > div`).evaluateAll(
+    (divs) => divs.map((d) => Array.from(d.classList).find((c) => c.startsWith('field-') && c !== 'field-box'))
+  );
+  expect(fieldOrder.indexOf('field-linkRecord')).toBeLessThan(fieldOrder.indexOf('field-ext_field_a'));
+  expect(fieldOrder.indexOf('field-createNewRecord')).toBeLessThan(fieldOrder.indexOf('field-ext_field_a'));
+  expect(fieldOrder.indexOf('field-editRecord')).toBeLessThan(fieldOrder.indexOf('field-ext_field_a'));
+});
+
+const NESTED_INTERRUPTED_GROUP_QUESTIONNAIRE = {
+  resourceType: 'Questionnaire',
+  url: 'http://example.org/Questionnaire/e2e-linked-record-nested-interrupted-test',
+  version: '1.0',
+  item: [{
+    linkId: 'demographics', type: 'group', text: 'Demographics',
+    item: [
+      { linkId: 'ext_a', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+      { linkId: 'ext_b', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+      {
+        linkId: 'subsection', type: 'group', text: 'Sub Section',
+        item: [
+          { linkId: 'ext_c1', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+        ],
+      },
+      // Authored as a direct Demographics child AFTER the nested Sub Section, so it lands
+      // after ext_c1 in document order despite belonging to Demographics, not Sub Section.
+      { linkId: 'ext_d', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+    ],
+  }],
+};
+
+test('a group interrupted by a nested subgroup gets its own heading again, rather than mislabeling the later item under the subgroup', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: NESTED_INTERRUPTED_GROUP_QUESTIONNAIRE });
+  await openNodeMenuForProband(page);
+
+  const headingLabels = await page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-heading .field-name`).allTextContents();
+  expect(headingLabels).toEqual(['Demographics', 'Sub Section', 'Demographics']);
+
+  const fieldOrder = await page.locator(`${VISIBLE_MENU} #tab___linked_record__ > div`).evaluateAll(
+    (divs) => divs.map((d) => Array.from(d.classList).find((c) => c.startsWith('field-') && c !== 'field-box'))
+  );
+  const demographicsHeadingIndices = fieldOrder
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => c && c.startsWith('field-__linked_record_heading_demographics'))
+    .map(({ i }) => i);
+  expect(demographicsHeadingIndices.length).toBe(2);
+  expect(fieldOrder.indexOf('field-ext_d')).toBeGreaterThan(demographicsHeadingIndices[1]);
+  expect(fieldOrder.indexOf('field-ext_d')).toBeGreaterThan(fieldOrder.indexOf('field-ext_c1'));
 });
 
 test('the Edit action is only shown once a record is linked; Link/Create-new are gated by canLink/canCreateNew', async ({ page }) => {

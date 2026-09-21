@@ -363,11 +363,15 @@ export default class PedigreeEditor {
         linkedRecordSource: false
       };
     };
-    config.items = config.items.concat([
+    // Prepended, not appended: the linked-record-tab capability requires the actions to render
+    // "at the top, followed by the read-only linked items" - since _buildFieldDescriptors()
+    // renders LINKED_RECORD_TAB fields in overall _questionnaireConfig.items array order, these
+    // three must sort before every (possibly-regrouped) linkedRecordSource item.
+    config.items = [
       actionItem('linkRecord', 'Link to existing record', 'canLinkRecord'),
       actionItem('createNewRecord', 'Create new linked record', 'canCreateNewRecord'),
       actionItem('editRecord', 'Edit linked record', 'canEditLinkedRecord')
-    ]);
+    ].concat(config.items);
     return config;
   }
 
@@ -390,7 +394,13 @@ export default class PedigreeEditor {
     var _this = this;
     var fields: any[] = [];
     var recordLinkConfigured = this.getRecordLinkProvider().isConfigured();
-    var seenLinkedRecordGroups: any = {};
+    // Tracks the parentGroup.key of the most recently emitted linkedRecordSource item (not a
+    // "seen ever" set) so a new sub-heading is emitted whenever the run of consecutive
+    // linkedRecordSource items changes group - including a group reappearing non-contiguously
+    // (e.g. interrupted by a nested subgroup's own linkedRecordSource items), which otherwise
+    // would misattribute the later item under the wrong (in-between) heading.
+    var lastLinkedRecordGroupKey: any = undefined;
+    var linkedRecordHeadingCounts: any = {};
 
     this._questionnaireConfig.items.forEach(function(item: any) {
       if (item.tab && item.tab.key === LINKED_RECORD_TAB.key && !recordLinkConfigured) {
@@ -400,14 +410,18 @@ export default class PedigreeEditor {
       var tab = item.tab;
       if (recordLinkConfigured && item.linkedRecordSource) {
         tab = LINKED_RECORD_TAB;
-        if (item.parentGroup && !seenLinkedRecordGroups[item.parentGroup.key]) {
-          fields.push({
-            'name': '__linked_record_heading_' + item.parentGroup.key,
-            'label': item.parentGroup.label,
-            'type': 'heading',
-            'tab': LINKED_RECORD_TAB
-          });
-          seenLinkedRecordGroups[item.parentGroup.key] = true;
+        var groupKey = item.parentGroup ? item.parentGroup.key : null;
+        if (groupKey !== lastLinkedRecordGroupKey) {
+          if (item.parentGroup) {
+            var occurrence = linkedRecordHeadingCounts[groupKey] = (linkedRecordHeadingCounts[groupKey] || 0) + 1;
+            fields.push({
+              'name': '__linked_record_heading_' + groupKey + '_' + occurrence,
+              'label': item.parentGroup.label,
+              'type': 'heading',
+              'tab': LINKED_RECORD_TAB
+            });
+          }
+          lastLinkedRecordGroupKey = groupKey;
         }
       }
 

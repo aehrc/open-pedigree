@@ -23,7 +23,7 @@ The editor SHALL accept a `recordLinkProvider` option in `initialiseEditor()`, i
 
 #### Scenario: openPicker links a node to an external record
 - **WHEN** a provider implementation calls `onLinked(recordRef, details)` from within its own picker UI
-- **THEN** the editor SHALL store `recordRef` on the node and make it available for subsequent `openEditor`/lookup calls
+- **THEN** the editor SHALL store `recordRef` on the node (`Person.setLinkedRecordRef`/`getLinkedRecordRef`), retrievable by any provider method via `window.editor.getView().getNode(nodeId).getLinkedRecordRef()` - the same pattern `SmartPatientProvider` already uses to read node state from inside a concrete provider. `openEditor`/`canLink`/`canCreateNew` deliberately stay nodeId-only (no separate `recordRef` parameter) so all three remain uniform; a provider that needs the current ref to know which record to edit looks it up itself rather than being handed it
 
 ---
 
