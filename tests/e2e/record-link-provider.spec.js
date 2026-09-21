@@ -28,6 +28,11 @@ const LINKED_RECORD_QUESTIONNAIRE = {
           linkId: 'ext_field_b', type: 'string', text: 'External field B',
           extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
         },
+        {
+          linkId: 'disorders', type: 'choice', text: 'Disorders', repeats: true,
+          answerValueSet: 'http://purl.bioontology.org/ontology/OMIM',
+          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: 'mapsToLegendCondition' }],
+        },
       ],
     },
   ],
@@ -79,6 +84,27 @@ async function openNodeMenuForProband(page) {
   });
 }
 
+// Dispatches a real click inside the visible menu box, bypassing Playwright's actionability
+// checks - see the full-flow test below for why (an unrelated fixed-position dialog container
+// can intercept a real pointer click, matching questionnaire-source-of-truth.spec.js's radio test).
+async function clickInVisibleMenu(page, selector) {
+  await page.evaluate((sel) => {
+    const visibleMenu = Array.from(document.querySelectorAll('.menu-box'))
+      .find((el) => getComputedStyle(el).display !== 'none');
+    visibleMenu.querySelector(sel).dispatchEvent(new Event('click', { bubbles: true }));
+  }, selector);
+}
+
+async function switchToLinkedRecordTab(page) {
+  await page.evaluate(() => {
+    const visibleMenu = Array.from(document.querySelectorAll('.menu-box'))
+      .find((el) => getComputedStyle(el).display !== 'none');
+    Array.from(visibleMenu.querySelectorAll('.tabs dd a'))
+      .find((a) => a.textContent === 'Linked Record')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+  });
+}
+
 test('with no recordLinkProvider configured, the reserved tab is absent but linked-record items still render disabled on their original tab', async ({ page }) => {
   await loadEditor(page);
   await openNodeMenuForProband(page);
@@ -127,25 +153,13 @@ test('full flow: linking a node then editing it dispatches answers that update t
   await loadEditor(page, { recordLinkProvider: true });
   const personId = await openNodeMenuForProband(page);
 
-  // The action buttons/regrouped fields live on the (initially inactive) Linked Record tab -
-  // dispatch clicks directly (see questionnaire-source-of-truth.spec.js's radio test for why:
-  // an unrelated fixed-position dialog container can intercept Playwright's real pointer clicks).
-  await page.evaluate(() => {
-    const visibleMenu = Array.from(document.querySelectorAll('.menu-box'))
-      .find((el) => getComputedStyle(el).display !== 'none');
-    Array.from(visibleMenu.querySelectorAll('.tabs dd a'))
-      .find((a) => a.textContent === 'Linked Record')
-      .dispatchEvent(new Event('click', { bubbles: true }));
-  });
+  // The action buttons/regrouped fields live on the (initially inactive) Linked Record tab.
+  await switchToLinkedRecordTab(page);
 
   await page.evaluate(() => {
     window.__pendingLink = { ref: 'Record/42', details: {} };
   });
-  await page.evaluate(() => {
-    const visibleMenu = Array.from(document.querySelectorAll('.menu-box'))
-      .find((el) => getComputedStyle(el).display !== 'none');
-    visibleMenu.querySelector('.field-linkRecord button').dispatchEvent(new Event('click', { bubbles: true }));
-  });
+  await clickInVisibleMenu(page, '.field-linkRecord button');
   await page.waitForTimeout(100);
 
   const linkedRef = await page.evaluate(
@@ -158,13 +172,82 @@ test('full flow: linking a node then editing it dispatches answers that update t
   await page.evaluate(() => {
     window.__pendingEditAnswers = [{ linkId: 'ext_field_a', value: 'value from REDCap' }];
   });
-  await page.evaluate(() => {
-    const visibleMenu = Array.from(document.querySelectorAll('.menu-box'))
-      .find((el) => getComputedStyle(el).display !== 'none');
-    visibleMenu.querySelector('.field-editRecord button').dispatchEvent(new Event('click', { bubbles: true }));
-  });
+  await clickInVisibleMenu(page, '.field-editRecord button');
   await page.waitForTimeout(100);
 
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('value from REDCap');
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toBeDisabled();
+});
+
+test('editRecord dispatching a reserved-legend-target answer (disorders) merges rather than overwrites, matching importClinicalData', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true });
+  const personId = await openNodeMenuForProband(page);
+
+  await page.evaluate((id) => {
+    window.editor.getView().getNode(parseInt(id, 10)).setDisorders(['111111']);
+    window.editor.getView().getNode(parseInt(id, 10)).setLinkedRecordRef('Record/42');
+    window.editor.getNodeMenu().update();
+  }, personId);
+
+  await switchToLinkedRecordTab(page);
+  await page.evaluate(() => {
+    window.__pendingEditAnswers = [
+      { linkId: 'disorders', value: [{ id: '111111', name: 'Existing' }, { id: '222222', name: 'New disorder' }] },
+    ];
+  });
+  await clickInVisibleMenu(page, '.field-editRecord button');
+  await page.waitForTimeout(100);
+
+  const disorders = await page.evaluate(
+    (id) => window.editor.getView().getNode(parseInt(id, 10)).getDisorders(),
+    personId
+  );
+  expect(disorders.sort()).toEqual(['111111', '222222']);
+});
+
+test('a patientProvider and a recordLinkProvider configured together gate their own actions independently, with no interference', async ({ page }) => {
+  page.on('dialog', dialog => dialog.dismiss());
+  await page.goto('/localEditor.html');
+  await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+
+  await page.evaluate(() => {
+    document.querySelectorAll('#work-area').forEach((el) => el.remove());
+    const base = window.OpenPedigree.defaultQuestionnaire;
+    const newEditor = window.OpenPedigree.initialiseEditor({
+      questionnaireLocal: base,
+      // Deliberately opposite capability flags from the recordLinkProvider below, to prove
+      // neither provider's gating leaks into the other's actions.
+      patientProvider: {
+        isConfigured: () => true,
+        canLinkPatient: () => true,
+        canImportClinicalData: () => false,
+        canLinkProband: () => true,
+        canSearchFamilyMembers: () => true,
+        lookupPatient: () => {},
+        openPatientPickerModal: () => {},
+        openClinicalImportModal: () => {},
+      },
+      recordLinkProvider: {
+        isConfigured: () => true,
+        canLink: () => false,
+        canCreateNew: () => true,
+        openPicker: () => {},
+        openEditor: () => {},
+        createNew: () => {},
+      },
+    });
+    window.editor = newEditor;
+    newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
+  });
+  await page.waitForTimeout(300);
+  await openNodeMenuForProband(page);
+
+  // patientProvider: canLinkPatient true -> link_patient visible; canImportClinicalData false -> import_from_record hidden.
+  await expect(page.locator(`${VISIBLE_MENU} .field-link_patient`)).not.toHaveClass(/hidden/);
+  await expect(page.locator(`${VISIBLE_MENU} .field-import_from_record`)).toHaveClass(/hidden/);
+
+  await switchToLinkedRecordTab(page);
+  // recordLinkProvider: canLink false -> linkRecord hidden; canCreateNew true -> createNewRecord visible.
+  await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord`)).toHaveClass(/hidden/);
+  await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord`)).not.toHaveClass(/hidden/);
 });

@@ -190,4 +190,24 @@ describe('Person construction with no Questionnaire configured', () => {
     expect(person.setQuestionnaireAnswer_notes).toBeUndefined();
     expect(person.getProperties().questionnaireAnswers).toBeUndefined();
   });
+
+  it('getProperties()/assignProperties() round-trips linkedRecordRef (record-link-provider)', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    expect(person.getLinkedRecordRef()).toBe('');
+
+    person.setLinkedRecordRef('Record/1');
+    expect(person.getLinkedRecordRef()).toBe('Record/1');
+
+    const exported = person.getProperties();
+    expect(exported.linkedRecordRef).toBe('Record/1');
+
+    const restored = new Person(0, 0, 2, { gender: 'F' });
+    restored.assignProperties(exported);
+    expect(restored.getLinkedRecordRef()).toBe('Record/1');
+  });
+
+  it('omits linkedRecordRef from getProperties() when never set', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    expect(person.getProperties().linkedRecordRef).toBeUndefined();
+  });
 });
