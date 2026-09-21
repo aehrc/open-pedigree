@@ -14,38 +14,35 @@ Use **OpenSpec** for all non-trivial changes:
 
 ## Branch Model
 
-```
-master                  — stable releases only; tagged v<major>.<minor>
-  ├── develop           — generic open-pedigree (upstream-compatible, SMART on FHIR target)
-  └── develop_redcap_em — REDCap EM layer; stays in sync with develop
+Trunk-based, matching the pattern the workspace's other module repos have adopted:
 
-feature/<name>          — branched from develop; merged into BOTH develop and develop_redcap_em
+```
+main                     — the only long-lived branch
+<type>/<description>     — branched from main, PR back to main; <type> matches
+                            the PR's eventual Conventional Commits type
+                            (feature/, fix/, chore/, docs/, test/, ci/, ...)
 ```
 
 ### Rules
 
-- **Always branch from `develop`**, not from `develop_redcap_em` or `master`.
-- **Merge feature branches into both** `develop` and `develop_redcap_em` to keep them in sync. The library contains no hard REDCap dependencies in the JS — REDCap-specific behaviour is wired at runtime via options (`backend`, `patientProvider`, terminology options). A feature that works generically belongs in both.
-- **`develop_redcap_em` only diverges** if JS code is genuinely REDCap-only with no generic use case. This has not occurred yet.
-- **`master`** only receives PRs from `develop` or `develop_redcap_em` at release time.
-- See `docs/branch-delta.md` for the full history of what exists on each branch and upcoming features.
+- **Always branch from `main`.** There's no `develop` or `develop_redcap_em` to choose between any more — the library has no hard REDCap dependencies in the JS (REDCap-specific behaviour is wired at runtime via options: `backend`, `patientProvider`, terminology options), and `redcap_pedigree_editor` consumes a pinned, versioned GitHub Release build of this repo rather than a REDCap-specific branch. A feature branch that works generically is the only kind there is now.
+- **PRs into `main` are squash-merge only**, commit message = PR title + description, so `main` has exactly one clean commit per PR.
+- **PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `chore:`, etc.) — enforced by `.github/workflows/pr-title-lint.yml`, since `release-please` parses these off `main` to compute the next version and changelog.
+- **Releasing is automated by `release-please`** (`.github/workflows/release-please.yml`, `release-type: node` since `package.json` has a real version field): it maintains a standing release PR batching everything merged since the last release, and merging that PR bumps the version, tags `main` (`open-pedigree-v<version>`), and creates a GitHub Release — whose auto-generated source zip is what downstream consumers (e.g. `pedigree-editor-github-release-embed`) pull.
+- **Branch protection on `main`**: requires the `build` status check and one approving review; repo admins can bypass both to merge solo (`enforce_admins: false`) — deliberate, since GitHub never allows self-approval regardless of admin status, and this repo doesn't reliably have a second reviewer.
+- `docs/branch-delta.md` documents the retired git-flow-era `master`/`develop`/`develop_redcap_em` split for historical reference only — it isn't maintained under this model and shouldn't be treated as current.
 
 ### Day-to-day
 
 ```bash
-# Start a new feature
-git checkout develop && git pull
-git checkout -b feature/my-feature
+# Start new work
+git checkout main && git pull
+git checkout -b fix/my-thing
 
-# ... implement, commit ...
+# ... make changes, commit ...
 
-# Merge into develop
-git checkout develop
-git merge --no-ff feature/my-feature
-
-# Merge into develop_redcap_em to keep in sync
-git checkout develop_redcap_em
-git merge --no-ff feature/my-feature
+git push -u origin fix/my-thing
+# Open PR → main on GitHub, titled per Conventional Commits
 ```
 
 ## Commands
