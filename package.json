@@ -1,5 +1,5 @@
 {
-  "name": "@phenotips/open-pedigree",
+  "name": "@aehrc/open-pedigree",
   "version": "1.0.0",
   "description": "A free and open-source genetics pedigree tool powered by PhenoTips®",
   "main": "src/app.js",
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phenotips/open-pedigree.git"
+    "url": "git+https://github.com/aehrc/open-pedigree.git"
   },
   "keywords": [
     "pedigree",
@@ -24,9 +24,9 @@
   "author": "PhenoTips <hello@phenotips.com>",
   "license": "LGPL-2.1-only",
   "bugs": {
-    "url": "https://github.com/phenotips/open-pedigree/issues"
+    "url": "https://github.com/aehrc/open-pedigree/issues"
   },
-  "homepage": "https://github.com/phenotips/open-pedigree#readme",
+  "homepage": "https://github.com/aehrc/open-pedigree#readme",
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.5",
