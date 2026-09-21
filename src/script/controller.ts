@@ -58,7 +58,7 @@ export default class Controller {
       }
     };
 
-    if (disconnectedList.length <= 1 || event.detail.hasOwnProperty('noUndoRedo')) {
+    if (disconnectedList.length <= 1 || event.detail?.hasOwnProperty('noUndoRedo')) {
       removeSelected();
       return;
     }
