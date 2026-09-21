@@ -67,7 +67,7 @@ export default class PedigreeEditor {
   constructor(options: any) {
     options = options || {};
 
-    var returnUrl = options.returnUrl || 'https://github.com/phenotips/open-pedigree';
+    var returnUrl = options.returnUrl || 'https://github.com/aehrc/open-pedigree';
 
     var patientDataUrl = options.patientDataUrl || '';
     var backend = options.backend || {};

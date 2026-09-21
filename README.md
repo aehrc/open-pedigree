@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/phenotips/open-pedigree/actions/workflows/ci.yml">
-    <img src="https://github.com/phenotips/open-pedigree/actions/workflows/ci.yml/badge.svg?branch=master" alt="Build status">
+  <a href="https://github.com/aehrc/open-pedigree/actions/workflows/ci.yml">
+    <img src="https://github.com/aehrc/open-pedigree/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build status">
   </a>
   <a href="https://opensource.org/licenses/LGPL-2.1" target="_blank">
     <img src="https://img.shields.io/badge/license-LGPL--2.1-blue.svg" alt="LGPL-2.1">
@@ -46,7 +46,7 @@ Open Pedigree is a robust browser-based genomic pedigree drawing solution using 
 
 Quickly get started with open pedigree on your computer:
 ```
-git clone git@github.com:phenotips/open-pedigree.git
+git clone git@github.com:aehrc/open-pedigree.git
 cd open-pedigree
 npm install
 npm start

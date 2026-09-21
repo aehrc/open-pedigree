@@ -698,7 +698,10 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   }
   if (patientResource.identifier) {
     for (let i = 0; i < patientResource.identifier.length; i++) {
-      if (patientResource.identifier[i].system === 'https://github.com/phenotips/open-pedigree?externalID') {
+      // Accept both the old (phenotips-scoped, pre-fork) and current system URI so
+      // pedigrees exported before this rename still round-trip correctly.
+      if (patientResource.identifier[i].system === 'https://github.com/aehrc/open-pedigree?externalID'
+          || patientResource.identifier[i].system === 'https://github.com/phenotips/open-pedigree?externalID') {
         properties.externalID = patientResource.identifier[i].value;
         break;
       }
@@ -1356,7 +1359,7 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   if (nodeProperties.externalID) {
     patientResource.identifier = [
       {
-        "system": 'https://github.com/phenotips/open-pedigree?externalID',
+        "system": 'https://github.com/aehrc/open-pedigree?externalID',
         "value": nodeProperties.externalID
       }
     ];

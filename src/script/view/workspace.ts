@@ -168,7 +168,7 @@ export default class Workspace {
 
     var titleLink = document.createElement('a');
     titleLink.className = 'title';
-    titleLink.href = 'https://github.com/phenotips/open-pedigree';
+    titleLink.href = 'https://github.com/aehrc/open-pedigree';
     titleLink.textContent = 'Open Pedigree';
     menu.appendChild(titleLink);
 
