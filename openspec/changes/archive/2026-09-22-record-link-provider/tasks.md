@@ -32,6 +32,6 @@
 
 ## 6. Regression and merge
 
-- [x] 6.1 Run full unit + e2e suite; confirm no regressions to `patient-provider`/existing Questionnaire scenarios — 199/199 unit tests, 36/36 e2e tests (32 pre-existing + 4 new in `tests/e2e/record-link-provider.spec.js`) all pass
-- [ ] 6.2 Add/update `openspec/specs/` entries for the three new capabilities (sync on archive)
-- [ ] 6.3 Merge into `main` (per the trunk-based model established in `trunk-based-workflow-migration` — this change should be sequenced after that one lands)
+- [x] 6.1 Run full unit + e2e suite; confirm no regressions to `patient-provider`/existing Questionnaire scenarios — final count after two rounds of adversarial `/code-review` fixes: 201/201 unit tests, 40/40 e2e tests all pass
+- [x] 6.2 Add/update `openspec/specs/` entries for the three new capabilities (sync on archive) — created `openspec/specs/record-link-provider/`, `linked-record-tab/`, `linked-record-questionnaire-rendering/`
+- [ ] 6.3 Merge into `main` (via PR #26 - CI green, folded into the same PR rather than a separate archive chore PR per David's request)
