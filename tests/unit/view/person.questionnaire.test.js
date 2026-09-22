@@ -141,6 +141,45 @@ describe('Person + questionnaire-fields integration', () => {
   });
 });
 
+describe('linkedRecordSource always-disabled rendering (record-link-provider)', () => {
+  const linkedRecordConfig = {
+    canonicalUrl: undefined,
+    items: [
+      {
+        linkId: 'linked_item', itemType: 'string', fieldType: 'text', repeats: false, mapping: null,
+        linkedRecordSource: true,
+        disabledWhen: [{ question: 'toggle', operator: '=', answerBoolean: true }],
+        disabledBehavior: 'all',
+      },
+      {
+        linkId: 'ordinary_item', itemType: 'string', fieldType: 'text', repeats: false, mapping: null,
+        disabledWhen: [{ question: 'toggle', operator: '=', answerBoolean: true }],
+        disabledBehavior: 'all',
+      },
+      { linkId: 'toggle', itemType: 'boolean', fieldType: 'checkbox', repeats: false, mapping: null },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', makeMockEditor(linkedRecordConfig));
+  });
+
+  it('is always disabled even when its own disabledWhen would otherwise evaluate to "not disabled"', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    person.setQuestionnaireAnswer('toggle', true); // satisfies disabledWhen -> would otherwise be disabled:false
+    expect(person.getSummary().ordinary_item.disabled).toBe(false); // sanity-check the condition is indeed satisfied
+    expect(person.getSummary().linked_item.disabled).toBe(true);
+  });
+
+  it('leaves disabledWhen behavior unchanged for items without linkedRecordSource', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    person.setQuestionnaireAnswer('toggle', true);
+    expect(person.getSummary().ordinary_item.disabled).toBe(false);
+    person.setQuestionnaireAnswer('toggle', false);
+    expect(person.getSummary().ordinary_item.disabled).toBe(true);
+  });
+});
+
 describe('Person construction with no Questionnaire configured', () => {
   beforeEach(() => {
     vi.stubGlobal('editor', makeMockEditor(null));
@@ -150,5 +189,25 @@ describe('Person construction with no Questionnaire configured', () => {
     const person = new Person(0, 0, 1, { gender: 'F' });
     expect(person.setQuestionnaireAnswer_notes).toBeUndefined();
     expect(person.getProperties().questionnaireAnswers).toBeUndefined();
+  });
+
+  it('getProperties()/assignProperties() round-trips linkedRecordRef (record-link-provider)', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    expect(person.getLinkedRecordRef()).toBe('');
+
+    person.setLinkedRecordRef('Record/1');
+    expect(person.getLinkedRecordRef()).toBe('Record/1');
+
+    const exported = person.getProperties();
+    expect(exported.linkedRecordRef).toBe('Record/1');
+
+    const restored = new Person(0, 0, 2, { gender: 'F' });
+    restored.assignProperties(exported);
+    expect(restored.getLinkedRecordRef()).toBe('Record/1');
+  });
+
+  it('omits linkedRecordRef from getProperties() when never set', () => {
+    const person = new Person(0, 0, 1, { gender: 'F' });
+    expect(person.getProperties().linkedRecordRef).toBeUndefined();
   });
 });

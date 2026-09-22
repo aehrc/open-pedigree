@@ -9,8 +9,8 @@ export default defineConfig({
   resolve: {
     extensions: ['.ts', '.js'],
     alias: {
-      'pedigree': path.resolve(__dirname, 'src/script/'),
-      'vendor': path.resolve(__dirname, 'public/vendor/'),
+      'pedigree': path.resolve(import.meta.dirname, 'src/script/'),
+      'vendor': path.resolve(import.meta.dirname, 'public/vendor/'),
     },
   },
 });

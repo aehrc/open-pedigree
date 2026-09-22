@@ -75,6 +75,34 @@ describe('evaluateGraphPredicate (whole-item predicates)', () => {
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
+
+  describe('record-link-provider predicates', () => {
+    it('canLinkRecord requires both isConfigured() and canLink(id)', () => {
+      const configured = { isConfigured: () => true, canLink: () => true };
+      const notConfigured = { isConfigured: () => false, canLink: () => true };
+      const cannotLink = { isConfigured: () => true, canLink: () => false };
+      expect(evaluateGraphPredicate('canLinkRecord', makeNode(), {}, {}, configured)).toBe(true);
+      expect(evaluateGraphPredicate('canLinkRecord', makeNode(), {}, {}, notConfigured)).toBe(false);
+      expect(evaluateGraphPredicate('canLinkRecord', makeNode(), {}, {}, cannotLink)).toBe(false);
+    });
+
+    it('canCreateNewRecord requires both isConfigured() and canCreateNew(id)', () => {
+      const configured = { isConfigured: () => true, canCreateNew: () => true };
+      const notConfigured = { isConfigured: () => false, canCreateNew: () => true };
+      expect(evaluateGraphPredicate('canCreateNewRecord', makeNode(), {}, {}, configured)).toBe(true);
+      expect(evaluateGraphPredicate('canCreateNewRecord', makeNode(), {}, {}, notConfigured)).toBe(false);
+    });
+
+    it('canEditLinkedRecord requires both isConfigured() and a linked record ref on the node', () => {
+      const configured = { isConfigured: () => true };
+      const notConfigured = { isConfigured: () => false };
+      const linked = makeNode({ getLinkedRecordRef: () => 'Record/1' });
+      const unlinked = makeNode({ getLinkedRecordRef: () => '' });
+      expect(evaluateGraphPredicate('canEditLinkedRecord', linked, {}, {}, configured)).toBe(true);
+      expect(evaluateGraphPredicate('canEditLinkedRecord', unlinked, {}, {}, configured)).toBe(false);
+      expect(evaluateGraphPredicate('canEditLinkedRecord', linked, {}, {}, notConfigured)).toBe(false);
+    });
+  });
 });
 
 describe('evaluatePerOptionPredicate (per-option predicates)', () => {

@@ -35,7 +35,7 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
       console.warn('enableWhen condition references predicate "' + condition.predicate + '" but no graph/app-state context was provided - treating as unsatisfied');
       return false;
     }
-    const result = evaluateGraphPredicate(condition.predicate, context.node, context.graph, context.patientProvider);
+    const result = evaluateGraphPredicate(condition.predicate, context.node, context.graph, context.patientProvider, context.recordLinkProvider);
     return condition.negate ? !result : result;
   }
 
@@ -65,9 +65,9 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
 /**
  * Returns true if the item's conditions are satisfied (i.e. it should be shown).
  *
- * `context`, when provided, is `{node, graph, patientProvider}` - required only when a
- * condition references a graph/app-state predicate (see graphPredicateEvaluator.ts) instead
- * of another item's answer.
+ * `context`, when provided, is `{node, graph, patientProvider, recordLinkProvider}` - required
+ * only when a condition references a graph/app-state predicate (see graphPredicateEvaluator.ts)
+ * instead of another item's answer.
  */
 export function evaluateEnableWhen(enableWhen: any, enableBehavior: any, answers: any, context?: any): boolean {
   if (!enableWhen || enableWhen.length === 0) {
