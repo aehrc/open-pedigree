@@ -558,7 +558,10 @@ export default class PedigreeEditor {
     createNewRecord: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
-        function(answers: {linkId: string, value: any}[]) {
+        function(recordRef: string, answers: {linkId: string, value: any}[]) {
+          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef } }
+          }));
           (window as any).editor._dispatchQuestionnaireAnswers(nodeId, answers);
         }
       );

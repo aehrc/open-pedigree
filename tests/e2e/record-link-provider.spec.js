@@ -62,7 +62,7 @@ async function loadEditor(page, { recordLinkProvider, questionnaire } = {}) {
           window.__pendingEditAnswers && onDone(window.__pendingEditAnswers);
         },
         createNew: (_nodeId, onCreated) => {
-          window.__pendingCreateAnswers && onCreated(window.__pendingCreateAnswers);
+          window.__pendingCreate && onCreated(window.__pendingCreate.ref, window.__pendingCreate.answers);
         },
       };
     }
@@ -227,6 +227,31 @@ test('full flow: linking a node then editing it dispatches answers that update t
 
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('value from REDCap');
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toBeDisabled();
+});
+
+test('createNewRecord sets the node\'s linkedRecordRef from onCreated\'s recordRef, making Edit reachable afterward', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true });
+  const personId = await openNodeMenuForProband(page);
+  await switchToLinkedRecordTab(page);
+
+  await expect(page.locator(`${VISIBLE_MENU} .field-editRecord`)).toHaveClass(/hidden/);
+
+  await page.evaluate(() => {
+    window.__pendingCreate = {
+      ref: 'Record/99',
+      answers: [{ linkId: 'ext_field_a', value: 'set at creation' }],
+    };
+  });
+  await clickInVisibleMenu(page, '.field-createNewRecord button');
+  await page.waitForTimeout(100);
+
+  const linkedRef = await page.evaluate(
+    (id) => window.editor.getView().getNode(parseInt(id, 10)).getLinkedRecordRef(),
+    personId
+  );
+  expect(linkedRef).toBe('Record/99');
+  await expect(page.locator(`${VISIBLE_MENU} .field-editRecord`)).not.toHaveClass(/hidden/);
+  await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('set at creation');
 });
 
 test('editRecord dispatching a reserved-legend-target answer (disorders) merges rather than overwrites, matching importClinicalData', async ({ page }) => {

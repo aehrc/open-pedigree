@@ -36,6 +36,8 @@ A single interface trying to serve both "search a FHIR Patient and import a Cond
 
 `onDone`/`onCreated` use exactly the same shape `generalize-patient-provider-import` established for `onImported`, and dispatch through the same `_resolveQuestionnaireSetter` priority (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`) already used by `importClinicalData`. No second dispatch mechanism is introduced.
 
+**Implementation note added during `/code-review` (fixes a confirmed bug):** `onCreated` additionally takes `recordRef` as its first argument — `onCreated(recordRef, answers)` — mirroring `openPicker`'s `onLinked(recordRef, details)`. Without it, a node linked via "Create new" could never have `linkedRecordRef` set (the generic answer-bag dispatch has no path to `setLinkedRecordRef`, since it isn't a `mapsToField`/reserved-legend target), permanently blocking `canEditLinkedRecord`/the Edit action for that node. `onDone` doesn't need this: it edits an already-linked record, so the editor already has the ref from the prior `openPicker`/`createNew` call.
+
 *Alternative considered:* a distinct answer shape tailored to "a full record," e.g. keyed by REDCap field name. Rejected — `linkId`-keying is already generic and already resolves correctly regardless of mapping kind; inventing a second shape would only exist to be REDCap-specific, which contradicts keeping this contract generic.
 
 ### D4 — A new, generic (non-REDCap-named) extension marks an item as linked-record-sourced

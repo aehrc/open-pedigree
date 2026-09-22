@@ -13,5 +13,9 @@ export default abstract class AbstractRecordLinkProvider {
 
     abstract openEditor(nodeId: number, onDone: (answers: {linkId: string, value: any}[]) => void): void;
 
-    abstract createNew(nodeId: number, onCreated: (answers: {linkId: string, value: any}[]) => void): void;
+    // onCreated's first argument mirrors openPicker's onLinked(recordRef, ...): a brand-new
+    // record has its own ref the moment it's created, and the editor needs it immediately to
+    // set the node's linkedRecordRef - unlike openEditor's onDone, which edits an
+    // already-linked record whose ref the editor already has.
+    abstract createNew(nodeId: number, onCreated: (recordRef: string, answers: {linkId: string, value: any}[]) => void): void;
 }

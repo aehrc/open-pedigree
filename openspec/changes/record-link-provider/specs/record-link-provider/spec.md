@@ -28,15 +28,16 @@ The editor SHALL accept a `recordLinkProvider` option in `initialiseEditor()`, i
 ---
 
 ### Requirement: openEditor and createNew dispatch answers through the existing setter-resolution path
-`onDone` (from `openEditor`) and `onCreated` (from `createNew`) SHALL both receive an array of `{linkId: string, value: any}` entries, dispatched through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`).
+`onDone` (from `openEditor`) SHALL receive an array of `{linkId: string, value: any}` entries, and `onCreated` (from `createNew`) SHALL receive `(recordRef: string, answers: {linkId: string, value: any}[])` - the `answers` array in both cases dispatched through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`). `onCreated`'s `recordRef` argument SHALL be stored on the node the same way `openPicker`'s `onLinked` stores its `recordRef` - a newly-created record has its own ref the instant it exists, and without it the node could never satisfy the `canEditLinkedRecord` predicate (linked-record-provider's "Capability flags gate node-menu actions" requirement) afterward.
 
 #### Scenario: openEditor's onDone updates node properties
 - **WHEN** a provider calls `onDone([{ linkId: "gender", value: "F" }])` for an item mapped via `mapsToField` to `gender`
 - **THEN** the node's gender SHALL be set via the existing `setGender` dispatch, identically to how `patient-provider`'s import dispatches the same entry shape
 
-#### Scenario: createNew's onCreated behaves identically to onDone
-- **WHEN** a provider calls `onCreated([{ linkId: "custom_note", value: "some text" }])` after creating a brand-new linked record
-- **THEN** the dispatch behavior SHALL be identical to an equivalent `onDone` call with the same entries
+#### Scenario: createNew's onCreated stores the new record's ref and behaves identically to onDone for the rest
+- **WHEN** a provider calls `onCreated("Record/99", [{ linkId: "custom_note", value: "some text" }])` after creating a brand-new linked record
+- **THEN** the node's linked record ref SHALL be set to `"Record/99"` (making `canEditLinkedRecord` satisfiable for that node from then on)
+- **AND** the `answers` array's dispatch behavior SHALL be identical to an equivalent `onDone` call with the same entries
 
 ---
 

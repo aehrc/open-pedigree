@@ -1,6 +1,6 @@
 ## 1. AbstractRecordLinkProvider contract (D1, D2, D3)
 
-- [x] 1.1 Create `src/script/recordLinkProvider/AbstractRecordLinkProvider.ts` with `isConfigured()`, `canLink(nodeId)`, `canCreateNew(nodeId)`, `openPicker(nodeId, onLinked)`, `openEditor(nodeId, onDone)`, `createNew(nodeId, onCreated)`, where `onDone`/`onCreated` are typed `(answers: {linkId: string, value: any}[]) => void`
+- [x] 1.1 Create `src/script/recordLinkProvider/AbstractRecordLinkProvider.ts` with `isConfigured()`, `canLink(nodeId)`, `canCreateNew(nodeId)`, `openPicker(nodeId, onLinked)`, `openEditor(nodeId, onDone)`, `createNew(nodeId, onCreated)`, where `onDone` is typed `(answers: {linkId: string, value: any}[]) => void` and `onCreated` is typed `(recordRef: string, answers: {linkId: string, value: any}[]) => void` — see design.md's D3 note added post-review: without `recordRef`, a create-new'd node could never satisfy `canEditLinkedRecord` afterward
 - [x] 1.2 Create `src/script/recordLinkProvider/EmptyRecordLinkProvider.ts`: `isConfigured()`/`canLink()`/`canCreateNew()` all return `false`; other methods no-op
 - [x] 1.3 `pedigree.ts`: add `_recordLinkProvider`, read `options.recordLinkProvider || new EmptyRecordLinkProvider()`, add `getRecordLinkProvider()` accessor (mirror `_patientProvider`/`getPatientProvider()` exactly)
 
