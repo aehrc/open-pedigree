@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.0.1...open-pedigree-v1.1.0) (2026-09-22)
+
+
+### Features
+
+* add AbstractRecordLinkProvider and Linked Record tab ([#26](https://github.com/aehrc/open-pedigree/issues/26)) ([610ee73](https://github.com/aehrc/open-pedigree/commit/610ee7341abf79b2318b4d4d072ad4540259ec75))
+
+
+### Bug Fixes
+
+* resolve remaining npm audit findings (9 -&gt; 0) ([#22](https://github.com/aehrc/open-pedigree/issues/22)) ([96b3c83](https://github.com/aehrc/open-pedigree/commit/96b3c83fa6ea03aedc2855e0b2c77cba6941d23b))
+
 ## [1.0.1](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.0.0...open-pedigree-v1.0.1) (2026-09-21)
 
 
