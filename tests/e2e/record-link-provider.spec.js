@@ -40,12 +40,12 @@ const LINKED_RECORD_QUESTIONNAIRE = {
 
 const VISIBLE_MENU = '.menu-box:visible';
 
-async function loadEditor(page, { recordLinkProvider, questionnaire } = {}) {
+async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabels } = {}) {
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
-  await page.evaluate(({ q, hasProvider }) => {
+  await page.evaluate(({ q, hasProvider, labels }) => {
     // See questionnaire-fields.spec.js for why #work-area (not just #canvas) needs removing.
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
 
@@ -65,12 +65,15 @@ async function loadEditor(page, { recordLinkProvider, questionnaire } = {}) {
           window.__pendingCreate && onCreated(window.__pendingCreate.ref, window.__pendingCreate.answers);
         },
       };
+      if (labels) {
+        options.recordLinkProvider.getActionLabel = (action) => labels[action];
+      }
     }
 
     const newEditor = window.OpenPedigree.initialiseEditor(options);
     window.editor = newEditor;
     newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
-  }, { q: questionnaire || LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider });
+  }, { q: questionnaire || LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider, labels: actionLabels || null });
   await page.waitForTimeout(300);
 }
 
@@ -325,4 +328,25 @@ test('a patientProvider and a recordLinkProvider configured together gate their 
   // recordLinkProvider: canLink false -> linkRecord hidden; canCreateNew true -> createNewRecord visible.
   await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord`)).toHaveClass(/hidden/);
   await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord`)).not.toHaveClass(/hidden/);
+});
+
+test('a provider can relabel its actions via getActionLabel; actions it does not relabel keep the default', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, actionLabels: { editRecord: 'Edit in REDCap' } });
+  const personId = await openNodeMenuForProband(page);
+  await page.evaluate((id) => {
+    window.editor.getView().getNode(parseInt(id, 10)).setLinkedRecordRef('Record/1');
+    window.editor.getNodeMenu().update();
+  }, personId);
+
+  await expect(page.locator(`${VISIBLE_MENU} .field-editRecord button`)).toHaveText('Edit in REDCap');
+  await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
+  await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord button`)).toHaveText('Create new linked record');
+});
+
+test('a blank or non-string getActionLabel result keeps the default label', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, actionLabels: { linkRecord: '   ', createNewRecord: 42 } });
+  await openNodeMenuForProband(page);
+
+  await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
+  await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord button`)).toHaveText('Create new linked record');
 });

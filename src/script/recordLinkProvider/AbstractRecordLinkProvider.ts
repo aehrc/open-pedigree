@@ -4,6 +4,9 @@
 // `(window as any).editor.getView().getNode(nodeId).getLinkedRecordRef()`, the same pattern
 // SmartPatientProvider already uses to read node state from inside a concrete provider. See
 // record-link-provider design.md's D2 note for the full reasoning.
+// The node menu's record-link actions (the Linked Record tab's buttons).
+export type RecordLinkAction = 'linkRecord' | 'createNewRecord' | 'editRecord';
+
 export default abstract class AbstractRecordLinkProvider {
     abstract isConfigured(): boolean;
     abstract canLink(nodeId: number): boolean;
@@ -18,4 +21,12 @@ export default abstract class AbstractRecordLinkProvider {
     // set the node's linkedRecordRef - unlike openEditor's onDone, which edits an
     // already-linked record whose ref the editor already has.
     abstract createNew(nodeId: number, onCreated: (recordRef: string, answers: {linkId: string, value: any}[]) => void): void;
+
+    // Optional: a host-specific button label for one of the record-link actions (e.g. a REDCap
+    // host's "Edit in REDCap"), or undefined to keep the editor's generic default. Not abstract,
+    // and the editor only calls it if present - hosts may supply a duck-typed provider object
+    // that doesn't extend this class.
+    getActionLabel(_action: RecordLinkAction): string | undefined {
+        return undefined;
+    }
 }

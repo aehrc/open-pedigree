@@ -343,7 +343,16 @@ export default class PedigreeEditor {
    */
   _parseQuestionnaireConfig(questionnaire: any): any {
     var config = parseQuestionnaire(questionnaire);
-    var actionItem = function(linkId: string, label: string, predicate: string): any {
+    var provider: any = this.getRecordLinkProvider();
+    // A provider may relabel its actions (AbstractRecordLinkProvider.getActionLabel); anything
+    // other than a non-blank string keeps the generic default. Checked by presence, since a host
+    // can pass a duck-typed provider that doesn't extend AbstractRecordLinkProvider.
+    var labelFor = function(action: string, fallback: string): string {
+      var custom = provider && typeof provider.getActionLabel === 'function' ? provider.getActionLabel(action) : undefined;
+      return (typeof custom === 'string' && custom.trim() !== '') ? custom : fallback;
+    };
+    var actionItem = function(linkId: string, defaultLabel: string, predicate: string): any {
+      var label = labelFor(linkId, defaultLabel);
       return {
         linkId: linkId,
         label: label,
