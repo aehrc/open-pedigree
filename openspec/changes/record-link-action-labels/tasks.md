@@ -8,6 +8,7 @@
 - [x] 2.1 e2e: a provider relabels one action, and the others keep their defaults
 - [x] 2.2 e2e: a blank or non-string label keeps the default
 - [x] 2.3 Mutation check: ignoring the override fails 2.1
+- [x] 2.4 e2e: a provider without the method keeps all defaults; a throwing hook keeps defaults and the editor still loads
 
 ## 3. Release
 

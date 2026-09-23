@@ -5,7 +5,7 @@
 ## What Changes
 
 - `AbstractRecordLinkProvider` gains an optional, non-abstract `getActionLabel(action)` (`action`: `'linkRecord' | 'createNewRecord' | 'editRecord'`), returning a label or `undefined`. The base implementation returns `undefined`.
-- `_parseQuestionnaireConfig()` uses a provider's non-blank string label for each action, else the existing generic default. It checks that the method exists before calling it, since hosts may pass a duck-typed provider object that doesn't extend the class, like `redcap_pedigree_editor`'s.
+- `_parseQuestionnaireConfig()` uses a provider's non-blank string label for each action, else the existing generic default. It checks that the method exists before calling it: the class isn't exported from the bundle, so hosts outside this repo (like `redcap_pedigree_editor`) pass a duck-typed provider object. Labels are resolved when the Questionnaire is parsed, not per node. A throwing hook is caught, and the default label is used, so it can't stop the editor loading or discard a fetched Questionnaire.
 - Non-breaking: providers without the method, and `EmptyRecordLinkProvider`, keep today's labels.
 
 ## Capabilities

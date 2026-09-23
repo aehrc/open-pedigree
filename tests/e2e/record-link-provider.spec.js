@@ -65,7 +65,9 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
           window.__pendingCreate && onCreated(window.__pendingCreate.ref, window.__pendingCreate.answers);
         },
       };
-      if (labels) {
+      if (labels === 'throw') {
+        options.recordLinkProvider.getActionLabel = () => { throw new Error('getActionLabel failed'); };
+      } else if (labels) {
         options.recordLinkProvider.getActionLabel = (action) => labels[action];
       }
     }
@@ -345,6 +347,27 @@ test('a provider can relabel its actions via getActionLabel; actions it does not
 
 test('a blank or non-string getActionLabel result keeps the default label', async ({ page }) => {
   await loadEditor(page, { recordLinkProvider: true, actionLabels: { linkRecord: '   ', createNewRecord: 42 } });
+  await openNodeMenuForProband(page);
+
+  await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
+  await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord button`)).toHaveText('Create new linked record');
+});
+
+test('a provider without getActionLabel keeps all the default labels', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true });
+  const personId = await openNodeMenuForProband(page);
+  await page.evaluate((id) => {
+    window.editor.getView().getNode(parseInt(id, 10)).setLinkedRecordRef('Record/1');
+    window.editor.getNodeMenu().update();
+  }, personId);
+
+  await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
+  await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord button`)).toHaveText('Create new linked record');
+  await expect(page.locator(`${VISIBLE_MENU} .field-editRecord button`)).toHaveText('Edit linked record');
+});
+
+test('a getActionLabel that throws keeps the default labels and does not stop the editor loading', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, actionLabels: 'throw' });
   await openNodeMenuForProband(page);
 
   await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
