@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { retireAutoCreatedEditor } from './helpers/singleEditor';
 
 const CUSTOM_LEGEND_QUESTIONNAIRE = {
   resourceType: 'Questionnaire',
@@ -42,6 +43,7 @@ async function loadEditorWithQuestionnaire(page, questionnaire, options = {}) {
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(({ q, opts }) => {
     // See questionnaire-fields.spec.js for why #work-area (not just #canvas) needs removing:
     // the initial page-load editor's menu-box lives outside #canvas and would otherwise leak
@@ -118,6 +120,7 @@ test('the disorders field shows a colour swatch for a selected disorder', async 
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     window.editor = window.OpenPedigree.initialiseEditor({});
@@ -145,6 +148,7 @@ test('a per-option predicate greys out specific radio options while leaving othe
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const newEditor = window.OpenPedigree.initialiseEditor({});
@@ -215,6 +219,7 @@ test('questionnaireUrl fetch success rebuilds the entire node menu from the fetc
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const newEditor = window.OpenPedigree.initialiseEditor({ questionnaireUrl: 'http://example.org/fhir/Questionnaire/remote-demo' });
@@ -251,6 +256,7 @@ test('questionnaireUrl fetch failure falls back to the built-in default Question
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const newEditor = window.OpenPedigree.initialiseEditor({ questionnaireUrl: 'http://example.org/fhir/Questionnaire/broken-demo' });
@@ -271,6 +277,7 @@ test('a graph-state predicate (isFetus) toggles field visibility live as life st
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const newEditor = window.OpenPedigree.initialiseEditor({});
