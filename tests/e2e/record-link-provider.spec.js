@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { retireAutoCreatedEditor } from './helpers/singleEditor';
 
 // Covers record-link-provider: a new AbstractRecordLinkProvider sibling to
 // AbstractPatientProvider (link/create-new/edit lifecycle for a linked external record), the
@@ -45,6 +46,7 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(({ q, hasProvider, labels, termUrl }) => {
     // See questionnaire-fields.spec.js for why #work-area (not just #canvas) needs removing.
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
@@ -75,16 +77,6 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
       }
     }
 
-    // localEditor.html already created an editor whose Controller listens on document; left
-    // alone, every setproperty event would be handled twice (once per Controller), hiding
-    // bugs and doubling undo steps. Its listeners call this.handleX(e), so shadowing those
-    // methods on the old instance retires it.
-    const oldController = window.editor && window.editor.getController && window.editor.getController();
-    if (oldController) {
-      Object.getOwnPropertyNames(Object.getPrototypeOf(oldController))
-        .filter((name) => name.startsWith('handle'))
-        .forEach((name) => { oldController[name] = () => {}; });
-    }
     const newEditor = window.OpenPedigree.initialiseEditor(options);
     window.editor = newEditor;
     newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
@@ -306,6 +298,7 @@ test('a patientProvider and a recordLinkProvider configured together gate their 
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(() => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const base = window.OpenPedigree.defaultQuestionnaire;

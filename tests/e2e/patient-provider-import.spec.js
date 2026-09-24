@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { retireAutoCreatedEditor } from './helpers/singleEditor';
 
 // Covers generalize-patient-provider-import: importClinicalData's onImported callback now
 // receives an array of {linkId, value} entries (instead of an always-disorders list) and
@@ -15,6 +16,7 @@ async function loadEditorWithFakeProvider(page) {
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(({ extraItem }) => {
     // See tests/e2e/questionnaire-fields.spec.js for why the initial page load's work-area is
     // removed before building a fresh editor for the test.

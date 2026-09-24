@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import { retireAutoCreatedEditor } from './helpers/singleEditor';
 
 // Every fixture's items are wrapped in a top-level group - under the questionnaire-source-of-truth
 // model, a top-level group becomes a node-menu tab (keyed by linkId, labelled by text); a
@@ -63,6 +64,7 @@ async function loadEditorWithQuestionnaire(page, questionnaire, options = {}) {
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
+  await retireAutoCreatedEditor(page);
   await page.evaluate(({ q, opts }) => {
     // The initial page load's PedigreeEditor (built from the now-always-present default
     // Questionnaire) creates its own #work-area/#canvas/.menu-box - remove it entirely rather

@@ -53,10 +53,14 @@ npm start            # Dev server at http://localhost:9000/ (webpack-dev-server,
 npm run build        # Production build → dist/pedigree.min.js
 ```
 
-There is no test suite. Linting uses ESLint (`.eslintrc`):
 ```bash
-npx eslint src/
+npm test             # Unit tests (vitest, tests/unit/**/*.test.js, jsdom)
+npm run test:e2e     # End-to-end tests (Playwright, tests/e2e/; starts the dev server if needed)
+npm run typecheck    # tsc --noEmit (has known pre-existing errors; compare before/after rather than expecting zero)
+npx eslint src/      # Lint
 ```
+
+e2e tests that build their own editor over `localEditor.html`'s must call `retireAutoCreatedEditor(page)` (`tests/e2e/helpers/singleEditor.js`) first, or the page's original Controller also handles every property change.
 
 ## Architecture
 
