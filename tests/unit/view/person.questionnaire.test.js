@@ -211,3 +211,58 @@ describe('Person construction with no Questionnaire configured', () => {
     expect(person.getProperties().linkedRecordRef).toBeUndefined();
   });
 });
+
+describe('Person linked-record snapshot (linked-record-round-trip)', () => {
+  beforeEach(() => {
+    globalThis.editor = makeMockEditor(combinedConfig);
+  });
+
+  it('starts empty and round-trips through getProperties/assignProperties', () => {
+    const p = new Person(0, 0, 1, { gender: 'M' });
+    expect(p.getLinkedRecordSnapshot()).toEqual({});
+    expect(p.getProperties().linkedRecordSnapshot).toBeUndefined();
+
+    p.setLinkedRecordRef('record:1/instance:1');
+    p.setLinkedRecordSnapshot({ first_name: 'Alice', disorders: [{ id: 'D1', name: 'One' }] });
+    const saved = p.getProperties();
+
+    const reloaded = new Person(0, 0, 2, { gender: 'M' });
+    reloaded.assignProperties(saved);
+    expect(reloaded.getLinkedRecordRef()).toBe('record:1/instance:1');
+    expect(reloaded.getLinkedRecordSnapshot()).toEqual({ first_name: 'Alice', disorders: [{ id: 'D1', name: 'One' }] });
+  });
+
+  it('does not reset the snapshot itself when the ref changes - the link actions send the reset, so undo can restore it', () => {
+    const p = new Person(0, 0, 1, { gender: 'M' });
+    p.setLinkedRecordRef('record:1/instance:1');
+    p.setLinkedRecordSnapshot({ first_name: 'Alice' });
+    p.setLinkedRecordRef('record:1/instance:2');
+    expect(p.getLinkedRecordSnapshot()).toEqual({ first_name: 'Alice' });
+  });
+});
+
+describe('Person legend entry removal', () => {
+  beforeEach(() => {
+    const legend = { removeCase: vi.fn(), addCase: vi.fn(), getTerm: (id) => ({ getID: () => id, getName: () => id }) };
+    const base = makeMockEditor(combinedConfig);
+    globalThis.editor = new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'getPhenotypeLegend' || prop === 'getGeneLegend') {
+          return () => legend;
+        }
+        return base[prop];
+      },
+    });
+  });
+
+  // Both used Prototype.js's Array#without, which no longer exists - removal threw.
+  it('removes a phenotype and a gene without throwing', () => {
+    const p = new Person(0, 0, 1, { gender: 'M' });
+    p._phenotypes = ['HP_C_0001250', 'HP_C_0002'];
+    p._candidateGenes = ['ADA2', 'BRCA1'];
+    expect(() => p.removePhenotype('HP_C_0001250')).not.toThrow();
+    expect(() => p.removeGene('ADA2')).not.toThrow();
+    expect(p.getPhenotypes()).toEqual(['HP_C_0002']);
+    expect(p.getGenes()).toEqual(['BRCA1']);
+  });
+});

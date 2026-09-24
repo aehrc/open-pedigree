@@ -66,6 +66,7 @@ export default class Person extends AbstractPerson {
   _lostContact: any;
   _linkedPatientRef: any;
   _linkedRecordRef: any;
+  _linkedRecordSnapshot: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -225,6 +226,7 @@ export default class Person extends AbstractPerson {
     this._lostContact = false;
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
+    this._linkedRecordSnapshot = {};
     this._questionnaireAnswers = {};
   }
 
@@ -251,7 +253,24 @@ export default class Person extends AbstractPerson {
   }
 
   setLinkedRecordRef(ref: string): void {
+    // The snapshot of what a record last sent is reset by the record-link actions, which send
+    // setLinkedRecordSnapshot({}) in the same event when the ref changes - not here, so an undo
+    // (which replays both properties) restores the old snapshot rather than an empty one.
     this._linkedRecordRef = ref;
+  }
+
+  /**
+   * What the linked record sent at its last refresh: linkId -> its last non-empty value. A
+   * refresh applies only the record's changes relative to this (linked-record-round-trip).
+   *
+   * @method getLinkedRecordSnapshot
+   */
+  getLinkedRecordSnapshot(): any {
+    return this._linkedRecordSnapshot || {};
+  }
+
+  setLinkedRecordSnapshot(snapshot: any): void {
+    this._linkedRecordSnapshot = snapshot || {};
   }
 
   /**
@@ -823,7 +842,7 @@ export default class Person extends AbstractPerson {
   removePhenotype(phenotypeID: any): void {
     if (this.hasPhenotype(phenotypeID)) {
       editor.getPhenotypeLegend().removeCase(phenotypeID, this.getID());
-      this._phenotypes = this.getPhenotypes().without(phenotypeID);
+      this._phenotypes = this.getPhenotypes().filter((p: any) => p !== phenotypeID);
     } else {
       alert('This person doesn\'t have the specified Phenotype term');
     }
@@ -888,7 +907,7 @@ export default class Person extends AbstractPerson {
   removeGene(geneID: any): void {
     if (this.hasGene(geneID)) {
       editor.getGeneLegend().removeCase(geneID, this.getID());
-      this._candidateGenes = this.getGenes().without(geneID);
+      this._candidateGenes = this.getGenes().filter((g: any) => g !== geneID);
     } else {
       console.log('This person doesn\'t have the specified gene');
     }
@@ -1134,6 +1153,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedRecordRef() != '') {
       info['linkedRecordRef'] = this.getLinkedRecordRef();
     }
+    if (Object.keys(this.getLinkedRecordSnapshot()).length > 0) {
+      info['linkedRecordSnapshot'] = this.getLinkedRecordSnapshot();
+    }
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
@@ -1207,6 +1229,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedRecordRef') && this.getLinkedRecordRef() != info.linkedRecordRef) {
         this.setLinkedRecordRef(info.linkedRecordRef);
+      }
+      if (info.hasOwnProperty('linkedRecordSnapshot')) {
+        this.setLinkedRecordSnapshot(info.linkedRecordSnapshot);
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;

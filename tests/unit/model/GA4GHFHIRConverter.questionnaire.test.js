@@ -427,3 +427,73 @@ describe('DEFAULT_QUESTIONNAIRE end-to-end GA4GH export/import round trip', () =
     expect(johnProperties.comments).toBe('a clinical note');
   });
 });
+
+describe('linked record round trip (linked-record-round-trip)', () => {
+  const LINK_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
+  const SNAPSHOT_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+
+  function johnGraph() {
+    return PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+  }
+
+  function johnPatient(exported) {
+    return JSON.parse(exported).entry.map(e => e.resource)
+      .find(r => r.resourceType === 'Patient' && (r.name || []).some(n => (n.given || []).includes('John')));
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', makeMockEditor(questionnaireConfig));
+  });
+
+  it('exports the linked record ref as a Patient extension and restores it on import', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+
+    expect(johnPatient(exported).extension).toContainEqual({ url: LINK_URL, valueString: 'record:1/instance:1' });
+    const reimported = GA4GHFHIRConverter.initFromFHIR(exported);
+    const john = Object.values(reimported.properties).find(p => p.fName === 'John');
+    expect(john.linkedRecordRef).toBe('record:1/instance:1');
+  });
+
+  it('leaves the link out of de-identified exports (same privacy gate as names)', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'minimal', null, null);
+    expect(exported).not.toContain('record:1/instance:1');
+  });
+
+  it('writes no link extension for an unlinked node', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: johnGraph() }, 'all', null, null);
+    const patients = JSON.parse(exported).entry.map(e => e.resource).filter(r => r.resourceType === 'Patient');
+    expect(patients.some(p => (p.extension || []).some(ext => ext.url === LINK_URL))).toBe(false);
+  });
+
+  it('exports the record snapshot as a Patient extension beside the link and restores it on import', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    baseGraph.properties[0].linkedRecordSnapshot = { notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] };
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+
+    const ext = johnPatient(exported).extension.find(e => e.url === SNAPSHOT_URL);
+    expect(JSON.parse(ext.valueString)).toEqual({ notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] });
+    const john = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find(p => p.fName === 'John');
+    expect(john.linkedRecordSnapshot).toEqual({ notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] });
+  });
+
+  it('loads a document without a snapshot (saved before this change) with none', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+    const john = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find(p => p.fName === 'John');
+    expect(john.linkedRecordSnapshot).toBeUndefined();
+  });
+
+  it('keeps the snapshot out of de-identified exports', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    baseGraph.properties[0].linkedRecordSnapshot = { notes: 'secret' };
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'minimal', null, null);
+    expect(exported).not.toContain('secret');
+  });
+});

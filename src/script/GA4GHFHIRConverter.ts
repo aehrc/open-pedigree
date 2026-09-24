@@ -2,6 +2,12 @@ import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 
+// A node's link to an external record (record-link-provider), on its Patient resource.
+export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
+// What the linked record sent at its last refresh (linked-record-round-trip), on the same
+// Patient resource, as JSON: application bookkeeping for the next refresh, not clinical data.
+export const LINKED_RECORD_SNAPSHOT_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+
 
 
 /**
@@ -689,6 +695,18 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (rawId && !uuidPattern.test(rawId)) {
     properties.linkedPatientRef = 'Patient/' + rawId;
+  }
+  for (const ext of (patientResource.extension || [])) {
+    if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
+      (properties as any).linkedRecordRef = ext.valueString;
+    }
+    if (ext.url === LINKED_RECORD_SNAPSHOT_EXTENSION_URL && ext.valueString) {
+      try {
+        (properties as any).linkedRecordSnapshot = JSON.parse(ext.valueString);
+      } catch (e) {
+        console.warn('Ignoring an unreadable linked-record snapshot extension', e);
+      }
+    }
   }
   properties.gender = 'U';
   if (patientResource.gender === 'male') {
@@ -1440,6 +1458,19 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
           'family': nodeProperties.lNameAtB
         };
         patientResource.name.push(name);
+      }
+    }
+    // Same privacy gate as names: a record reference identifies the person in another system.
+    if (nodeProperties.linkedRecordRef) {
+      patientResource.extension.push({
+        'url': LINKED_RECORD_REF_EXTENSION_URL,
+        'valueString': nodeProperties.linkedRecordRef
+      });
+      if (nodeProperties.linkedRecordSnapshot && Object.keys(nodeProperties.linkedRecordSnapshot).length > 0) {
+        patientResource.extension.push({
+          'url': LINKED_RECORD_SNAPSHOT_EXTENSION_URL,
+          'valueString': JSON.stringify(nodeProperties.linkedRecordSnapshot)
+        });
       }
     }
   }

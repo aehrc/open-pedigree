@@ -85,11 +85,29 @@ export default class Controller {
 
   handleSetProperty(event: any): void {
     var nodeID     = event.detail.nodeID;
-    var properties = event.detail.properties;
-    var undoEvent  = {'eventName': event.type, 'memo': {'nodeID': nodeID, 'properties': cloneObject(event.detail.properties)}};
-
     var node    = editor.getView().getNode(nodeID);
+    var properties = Controller._orderDatePair(node, event.detail.properties);
+    var undoEvent  = {'eventName': event.type, 'memo': {'nodeID': nodeID, 'properties': cloneObject(properties)}};
+    // Record each property's value from before this event only once: setters change other
+    // properties as side effects (setLifeStatus clears the death date, and so on), so a later
+    // write would store a value from part-way through the event and undo couldn't restore it.
+    var remembered: any = {};
+    var remember = function(setter: string, value: any): void {
+      if (!remembered[setter]) {
+        remembered[setter] = true;
+        undoEvent.memo.properties[setter] = value;
+      }
+    };
+
     var changed = false;
+    // A linked-record refresh (Pedigree._dispatchLinkedRecordRefresh) has already worked out the
+    // real changes: compare strictly (0/''/false aren't "the same"). Twin-group rules apply as
+    // usual.
+    var isLinkedRecordRefresh = !!event.detail.linkedRecordRefresh;
+    if (isLinkedRecordRefresh) {
+      // Carried in the memo so undoing a refresh is also treated as one.
+      (undoEvent.memo as any).linkedRecordRefresh = true;
+    }
 
     var twinUpdate: any = undefined;
     var needUpdateAncestors = false;
@@ -108,7 +126,7 @@ export default class Controller {
 
         var propertyGetFunction =  propertySetFunction.replace('set','get');
         var oldValue = node[propertyGetFunction]();
-        if (oldValue == propValue) {
+        if (isLinkedRecordRefresh ? oldValue === propValue : oldValue == propValue) {
           continue;
         }
 
@@ -116,7 +134,7 @@ export default class Controller {
           oldValue = oldValue.slice(0);
         }
 
-        undoEvent.memo.properties[propertySetFunction] = oldValue;
+        remember(propertySetFunction, oldValue);
 
         if (propertySetFunction == 'setDeathDate' || propertySetFunction == 'setBirthDate') {
           if (propValue != '') {
@@ -129,19 +147,19 @@ export default class Controller {
         }
 
         if (propertySetFunction == 'setLifeStatus') {
-          undoEvent.memo.properties['setDeathDate']    = node.getDeathDate();
-          undoEvent.memo.properties['setGestationAge'] = node.getGestationAge();
-          undoEvent.memo.properties['setBirthDate']    = node.getBirthDate();
-          undoEvent.memo.properties['setAdopted']      = node.getAdopted();
+          remember('setDeathDate', node.getDeathDate());
+          remember('setGestationAge', node.getGestationAge());
+          remember('setBirthDate', node.getBirthDate());
+          remember('setAdopted', node.getAdopted());
         }
         if (propertySetFunction == 'setDeathDate') {
-          undoEvent.memo.properties['setLifeStatus'] = node.getLifeStatus();
+          remember('setLifeStatus', node.getLifeStatus());
         }
         if (propertySetFunction == 'setDisorders') {
-          undoEvent.memo.properties['setCarrierStatus'] = node.getCarrierStatus();
+          remember('setCarrierStatus', node.getCarrierStatus());
         }
         if (propertySetFunction == 'setCarrierStatus') {
-          undoEvent.memo.properties['setDisorders'] = node.getDisorders().slice(0);
+          remember('setDisorders', node.getDisorders().slice(0));
         }
 
         var field = propertySetFunction.replace(/^set/, '').toLowerCase();
@@ -158,7 +176,10 @@ export default class Controller {
           }
         }
 
-        changedValue = true;
+        // Bookkeeping, not a visible change: on its own it's no reason for an undo step.
+        if (propertySetFunction != 'setLinkedRecordSnapshot') {
+          changedValue = true;
+        }
 
         if (propertySetFunction == 'setGender') {
           if (node.getMonozygotic()) {
@@ -464,6 +485,35 @@ export default class Controller {
     if (!event.detail?.noUndoRedo) {
       editor.getActionStack().addState( event );
     }
+  }
+
+  /**
+   * setBirthDate rejects a birth date after the current death date, and setDeathDate a death
+   * date before the current birth date - so when an event sets both (a linked-record refresh, an
+   * undo replaying both, a form edit), apply the death date first if the new birth date is on or
+   * after the current death date, otherwise the birth date first. Only the two dates are
+   * reordered, where the first of them stands: other properties keep their positions - e.g. an
+   * undo memo restores setLifeStatus before the dates, so restoring a fetus status (which clears
+   * dates) doesn't wipe the dates just put back.
+   */
+  static _orderDatePair(node: any, properties: any): any {
+    if (!node || !properties || !properties.hasOwnProperty('setBirthDate') || !properties.hasOwnProperty('setDeathDate')) {
+      return properties;
+    }
+    var currentDeath = node.getDeathDate();
+    var newBirth = properties.setBirthDate ? new Date(properties.setBirthDate) : null;
+    var deathFirst = !!(currentDeath && newBirth && !isNaN(newBirth.getTime()) && newBirth.getTime() >= currentDeath.getTime());
+    var ordered: any = {};
+    var pair = deathFirst ? ['setDeathDate', 'setBirthDate'] : ['setBirthDate', 'setDeathDate'];
+    Object.keys(properties).forEach(function(setter) {
+      if (pair.indexOf(setter) === -1) {
+        ordered[setter] = properties[setter];
+      } else if (!ordered.hasOwnProperty(pair[0])) {
+        ordered[pair[0]] = properties[pair[0]];
+        ordered[pair[1]] = properties[pair[1]];
+      }
+    });
+    return ordered;
   }
 
   static _validatePropertyValue(nodeID: any, propertySetFunction: any, propValue: any): any {
