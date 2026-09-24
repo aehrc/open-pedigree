@@ -798,3 +798,28 @@ test('a refresh whose only value is rejected adds no undo step', async ({ page }
   expect(await undoSize()).toBe(before);
 });
 
+// An ordinary edit (not a refresh): the controller's date-pair ordering must not move the dates
+// ahead of setLifeStatus in an undo memo, or restoring a fetus status would wipe them again.
+test('undoing a life status change away from stillborn restores the status and both dates', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await page.evaluate((id) => {
+    const n = window.editor.getView().getNode(parseInt(id, 10));
+    n.setLifeStatus('stillborn');
+    n.setBirthDate('2000-01-01');
+    n.setDeathDate('2000-01-02');
+    window.editor.getGraph().setProperties(parseInt(id, 10), n.getProperties());
+  }, personId);
+  const before = await readRoundTripNode(page, personId);
+  expect(before).toMatchObject({ life: 'stillborn', dob: new Date('2000-01-01').toDateString(), dod: new Date('2000-01-02').toDateString() });
+  // undo() needs a state to step back to: give the stack a baseline edit first.
+  await setNodeProperty(page, personId, { setFirstName: 'Baseline' });
+  const undoSize = await page.evaluate(() => window.editor.getActionStack()._size());
+
+  await setNodeProperty(page, personId, { setLifeStatus: 'deceased' });
+  expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(undoSize + 1);
+  expect((await readRoundTripNode(page, personId)).life).toBe('deceased');
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'stillborn', dob: before.dob, dod: before.dod });
+});
+

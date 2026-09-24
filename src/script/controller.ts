@@ -491,8 +491,10 @@ export default class Controller {
    * setBirthDate rejects a birth date after the current death date, and setDeathDate a death
    * date before the current birth date - so when an event sets both (a linked-record refresh, an
    * undo replaying both, a form edit), apply the death date first if the new birth date is on or
-   * after the current death date, otherwise the birth date first. Other properties keep their
-   * order.
+   * after the current death date, otherwise the birth date first. Only the two dates are
+   * reordered, where the first of them stands: other properties keep their positions - e.g. an
+   * undo memo restores setLifeStatus before the dates, so restoring a fetus status (which clears
+   * dates) doesn't wipe the dates just put back.
    */
   static _orderDatePair(node: any, properties: any): any {
     if (!node || !properties || !properties.hasOwnProperty('setBirthDate') || !properties.hasOwnProperty('setDeathDate')) {
@@ -503,12 +505,12 @@ export default class Controller {
     var deathFirst = !!(currentDeath && newBirth && !isNaN(newBirth.getTime()) && newBirth.getTime() >= currentDeath.getTime());
     var ordered: any = {};
     var pair = deathFirst ? ['setDeathDate', 'setBirthDate'] : ['setBirthDate', 'setDeathDate'];
-    pair.forEach(function(setter) {
-      ordered[setter] = properties[setter];
-    });
     Object.keys(properties).forEach(function(setter) {
       if (pair.indexOf(setter) === -1) {
         ordered[setter] = properties[setter];
+      } else if (!ordered.hasOwnProperty(pair[0])) {
+        ordered[pair[0]] = properties[pair[0]];
+        ordered[pair[1]] = properties[pair[1]];
       }
     });
     return ordered;
