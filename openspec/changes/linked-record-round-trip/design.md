@@ -27,7 +27,7 @@ Persistence: `Person.getProperties()` includes `linkedRecordRef` and `questionna
 
 **D2. The snapshot is a Patient extension holding JSON.** URL `…/StructureDefinition/linked-record-snapshot`, `valueString` = JSON of `{ linkId: last value }`. It's written only alongside the link, under the same privacy gate, since it holds record values such as names. *Revised during implementation:* per-item markers on the QuestionnaireResponse were built first. Once the rule became "compare with what the record sent" (D4), the snapshot holds record-side values that the QR, which reflects node values, can't represent. So it's app bookkeeping in one extension, not clinical data.
 
-**D3. `Person` owns the snapshot** beside `_linkedRecordRef`. `setLinkedRecordRef` resets it when the ref changes. The record-link actions (`linkRecord`, `createNewRecord`) also send `setLinkedRecordSnapshot({})` in the same event, so the undo memo captures the old snapshot and undoing a relink restores both.
+**D3. `Person` owns the snapshot** beside `_linkedRecordRef`, but doesn't reset it itself. The record-link actions (`linkRecord`, `createNewRecord`) build their payload with `_linkedRecordRefProperties()`, which adds `setLinkedRecordSnapshot({})` only when the ref actually changes. So the undo memo captures the old snapshot, and undoing a relink restores both. *Revised in review round 2:* an auto-reset inside `setLinkedRecordRef` ran before the memo captured the snapshot, and it also fired on replay.
 
 **D4. Apply the record's changes: compare with the snapshot, not the node.** *Revised after the first review:* comparing the record's values against the node's never settles, because open-pedigree's setters normalise, reject and recompute:
 - gestation age reads back `null` for a live-born person, and an unborn person's is recomputed from the conception date
@@ -56,16 +56,20 @@ So `computeLinkedRecordRefresh` (pure, `linkedRecordRefresh.ts`) compares each a
 
 Clearing carrier status on a node that still has disorders leaves it "affected", because that's open-pedigree's model (disorders without a carrier status mean affected).
 
-**D6. The controller honours the refresh flag.** For flagged events, `handleSetProperty` compares strictly and doesn't copy the adopted flag to twins. Monozygotic gender and monozygosity still propagate, since those are group invariants. The flag is also written into the undo memo, so undoing a refresh is treated the same way. (Redo already reads `event.memo`, which a CustomEvent doesn't have, so redoing any `setproperty` throws on `main`. That's a separate bug and not addressed here.)
+**D6. The controller compares refresh events strictly.** Twin-group rules apply as for any edit. *Revised in review round 2:* an adopted-only twin exception left twin groups split, a state the rest of the controller never creates and silently undoes on the next edit. The flag is written into the undo memo, so undoing a refresh compares strictly too. (Redo already reads `event.memo`, which a CustomEvent doesn't have, so redoing any `setproperty` throws on `main`. That's a separate bug, not addressed here.)
 
-**D7. Side effects are put back once.** Before dispatching, the dispatcher notes which snapshot fields the node currently matches. After dispatching, any of those a setter's side effect has changed (e.g. clearing life status wipes the death date) are re-applied in one follow-up flagged event. Reserved legend IDs are matched through the legend's own `terminology.sanitizeID`. Separately, a fixed set-order for birth and death dates turned out to be unnecessary, since moving both later or both earlier works as-is (covered by e2e).
+**D7. Birth and death dates are applied in an order both setters accept.** `setBirthDate` rejects a birth after the current death date, and `setDeathDate` a death before the current birth date. When both move, the death date goes first if the new birth date is after the current death date, otherwise the birth date goes first. Other setter side effects and consistency rules (life status clearing the death date, a fetus losing its birth date) apply as for any edit and aren't reversed. *Revised in review round 2:* a "put side effects back" pass restored values open-pedigree deliberately clears, e.g. a birth date on a stillborn node.
+
+**D8. The answers are the record's full state.** The new snapshot is exactly what the refresh sent, so a linkId the provider leaves out, or one no longer in the Questionnaire, doesn't linger. Leaving a linkId out doesn't clear the node; only an explicit `null` does. Legend entries are keyed by `id`, else `code`, else the plain value.
 
 ## Risks / Trade-offs
 
 - [A new GA4GH extension that other GA4GH consumers ignore] → Harmless (unknown extensions are ignored). The document stays valid, and it's documented in the FHIR format notes.
 - [Existing saved pedigrees have no snapshot, so the first refresh after upgrading sets everything the record has (as if first linked) and clears nothing] → Conservative. From then on the snapshot exists. Release notes mention it.
-- [Clearing life status to `alive` when the record still has a death date] → D7 puts the death date back, and `setDeathDate` makes the person deceased again, following open-pedigree's own rule.
-- [The adopted-only twin exception diverges from the controller's normal behaviour] → Scoped by the event flag, and covered by e2e both ways (adopted not copied, monozygotic gender still copied).
+- [Inconsistent record data, e.g. life status emptied while a death date remains] → open-pedigree's own rules decide (clearing life status clears the death date). Fixing it is up to the record.
+- [Undoing a refresh while the record is unchanged] → The next refresh re-applies the record's values, which is consistent with the record being the source of truth. Undo is for diagram edits.
+- [The snapshot holds record values, e.g. a name the user later changed on the diagram] → It's written only with privacy "All data", which exports names anyway. De-identified exports carry no snapshot.
+- [Other e2e specs re-initialise the editor over `localEditor.html`'s, so two Controllers handle each event] → Fixed in `record-link-provider.spec.js`, whose results depended on it (it hid the date bug). The same pattern in `patient-provider-import`, `questionnaire-source-of-truth` and `questionnaire-fields` is a follow-up.
 
 ## Migration Plan
 

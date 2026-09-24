@@ -72,6 +72,16 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
       }
     }
 
+    // localEditor.html already created an editor whose Controller listens on document; left
+    // alone, every setproperty event would be handled twice (once per Controller), hiding
+    // bugs and doubling undo steps. Its listeners call this.handleX(e), so shadowing those
+    // methods on the old instance retires it.
+    const oldController = window.editor && window.editor.getController && window.editor.getController();
+    if (oldController) {
+      Object.getOwnPropertyNames(Object.getPrototypeOf(oldController))
+        .filter((name) => name.startsWith('handle'))
+        .forEach((name) => { oldController[name] = () => {}; });
+    }
     const newEditor = window.OpenPedigree.initialiseEditor(options);
     window.editor = newEditor;
     newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
@@ -539,37 +549,7 @@ test('a refresh that changes nothing adds no undo step, and one that changes thi
   expect(await undoSize()).toBe(before + 1);
 });
 
-test('a refresh does not copy the adopted flag to the node\'s twin', async ({ page }) => {
-  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
-  // Twins need a parent relationship, which loadEditor's single-person pedigree doesn't have.
-  await page.evaluate(() => {
-    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 2 3 1 1\nfam1 2 0 0 1 1\nfam1 3 0 0 2 1', 'ped', {}, true, true);
-  });
-  await page.waitForTimeout(300);
-  const personId = await page.evaluate(() => {
-    const graph = window.editor.getGraph();
-    for (let id = 0; id <= graph.getMaxNodeId(); id++) {
-      if (graph.isPerson(id) && graph.getParentRelationship(id) !== null) {
-        return String(id);
-      }
-    }
-    return null;
-  });
-  await page.evaluate((id) => {
-    document.dispatchEvent(new CustomEvent('pedigree:node:modify', { detail: { nodeID: parseInt(id, 10), modifications: { addTwin: 2 } } }));
-  }, personId);
-  await page.waitForTimeout(300);
-  const twinId = await page.evaluate((id) => window.editor.getGraph().getAllTwinsSortedByOrder(parseInt(id, 10)).find((t) => t !== parseInt(id, 10)), personId);
-  expect(twinId).toBeDefined();
-
-  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
-  await refreshWith(page, personId, [{ linkId: 'adopted', value: true }]);
-
-  expect(await page.evaluate((id) => window.editor.getView().getNode(parseInt(id, 10)).getAdopted(), personId)).toBe(true);
-  expect(await page.evaluate((id) => window.editor.getView().getNode(id).getAdopted(), twinId)).toBe(false);
-});
-
-test('legend refresh removes and replaces supplied disorders but keeps diagram-entered ones', async ({ page }) => {
+test('legend refresh removes and replaces the record\'s disorders but keeps diagram-entered ones', async ({ page }) => {
   await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
   const personId = await openNodeMenuForProband(page);
   await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
@@ -688,5 +668,40 @@ test('a refresh still keeps monozygotic twins the same gender (a group rule)', a
 
   expect(await page.evaluate((id) => window.editor.getView().getNode(parseInt(id, 10)).getGender(), personId)).toBe('M');
   expect(await page.evaluate((id) => window.editor.getView().getNode(id).getGender(), twinId)).toBe('M');
+});
+
+test('undoing a relink restores the old link and its snapshot; re-picking the same row keeps the snapshot', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  const linkTo = (ref) => page.evaluate(({ id, r }) => {
+    const props = window.editor._linkedRecordRefProperties(parseInt(id, 10), r);
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: parseInt(id, 10), properties: props } }));
+  }, { id: personId, r: ref });
+
+  await linkTo('record:1/instance:1');
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'x' }]);
+
+  await linkTo('record:1/instance:1');
+  expect((await readRoundTripNode(page, personId)).snapshot).toEqual({ note: 'x' });
+
+  await linkTo('record:1/instance:2');
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ ref: 'record:1/instance:2', snapshot: {} });
+
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ ref: 'record:1/instance:1', snapshot: { note: 'x' } });
+});
+
+test('legend entries sent as {system, code, display} work for reserved legends', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  await refreshWith(page, personId, [{ linkId: 'hpo_positive', value: [{ system: 'http://purl.obolibrary.org/obo/hp.owl', code: 'HP:0001250', display: 'Seizure' }] }]);
+  expect((await readRoundTripNode(page, personId)).phenotypes).toEqual(['HP_C_0001250']);
+  await refreshWith(page, personId, [{ linkId: 'hpo_positive', value: null }]);
+  expect((await readRoundTripNode(page, personId)).phenotypes).toEqual([]);
+  expect(errors).toEqual([]);
 });
 

@@ -113,10 +113,9 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
   const clears: Record<string, any> = {};
   const sets: Record<string, any> = {};
   const last = input.snapshot || {};
+  // The answers are the record's full state: the new snapshot is exactly what it sent now, so a
+  // linkId it left out (or one no longer in the Questionnaire) doesn't linger.
   const snapshot: LinkedRecordSnapshot = {};
-  Object.keys(last).forEach((linkId) => {
-    snapshot[linkId] = last[linkId];
-  });
 
   for (const answer of (input.answers || [])) {
     const linkId = answer.linkId;
@@ -177,7 +176,19 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
   Object.keys(clears).forEach((setter) => {
     properties[setter] = clears[setter];
   });
-  Object.keys(sets).forEach((setter) => {
+  // setBirthDate rejects a birth after the current death date, and setDeathDate a death before
+  // the current birth date - so when both move, apply the death date first if the new birth
+  // date is after the current death date, otherwise the birth date first.
+  const order = Object.keys(sets);
+  if (sets.hasOwnProperty('setBirthDate') && sets.hasOwnProperty('setDeathDate')) {
+    const currentDeath = normalise('setDeathDate', input.current('setDeathDate'));
+    const newBirth = normalise('setBirthDate', sets.setBirthDate);
+    const deathFirst = currentDeath !== '' && newBirth !== '' && new Date(newBirth).getTime() > new Date(currentDeath).getTime();
+    const rest = order.filter((setter) => setter !== 'setBirthDate' && setter !== 'setDeathDate');
+    order.length = 0;
+    order.push(...(deathFirst ? ['setDeathDate', 'setBirthDate'] : ['setBirthDate', 'setDeathDate']), ...rest);
+  }
+  order.forEach((setter) => {
     properties[setter] = sets[setter];
   });
 

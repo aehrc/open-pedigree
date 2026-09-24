@@ -253,12 +253,9 @@ export default class Person extends AbstractPerson {
   }
 
   setLinkedRecordRef(ref: string): void {
-    // A snapshot of what the previous record sent says nothing about a different record. The
-    // record-link actions also send setLinkedRecordSnapshot({}) alongside a new ref, so undoing
-    // a relink restores the old snapshot too.
-    if ((ref || '') !== (this._linkedRecordRef || '')) {
-      this._linkedRecordSnapshot = {};
-    }
+    // The snapshot of what a record last sent is reset by the record-link actions, which send
+    // setLinkedRecordSnapshot({}) in the same event when the ref changes - not here, so an undo
+    // (which replays both properties) restores the old snapshot rather than an empty one.
     this._linkedRecordRef = ref;
   }
 
@@ -1233,7 +1230,6 @@ export default class Person extends AbstractPerson {
       if (info.hasOwnProperty('linkedRecordRef') && this.getLinkedRecordRef() != info.linkedRecordRef) {
         this.setLinkedRecordRef(info.linkedRecordRef);
       }
-      // After the ref: setLinkedRecordRef() resets the snapshot when the ref changes.
       if (info.hasOwnProperty('linkedRecordSnapshot')) {
         this.setLinkedRecordSnapshot(info.linkedRecordSnapshot);
       }

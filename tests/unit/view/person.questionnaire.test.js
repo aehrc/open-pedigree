@@ -232,17 +232,12 @@ describe('Person linked-record snapshot (linked-record-round-trip)', () => {
     expect(reloaded.getLinkedRecordSnapshot()).toEqual({ first_name: 'Alice', disorders: [{ id: 'D1', name: 'One' }] });
   });
 
-  it('forgets the snapshot when relinked or unlinked, but not when set to the same ref', () => {
+  it('does not reset the snapshot itself when the ref changes - the link actions send the reset, so undo can restore it', () => {
     const p = new Person(0, 0, 1, { gender: 'M' });
     p.setLinkedRecordRef('record:1/instance:1');
     p.setLinkedRecordSnapshot({ first_name: 'Alice' });
-    p.setLinkedRecordRef('record:1/instance:1');
-    expect(p.getLinkedRecordSnapshot()).toEqual({ first_name: 'Alice' });
     p.setLinkedRecordRef('record:1/instance:2');
-    expect(p.getLinkedRecordSnapshot()).toEqual({});
-    p.setLinkedRecordSnapshot({ first_name: 'Alice' });
-    p.setLinkedRecordRef('');
-    expect(p.getLinkedRecordSnapshot()).toEqual({});
+    expect(p.getLinkedRecordSnapshot()).toEqual({ first_name: 'Alice' });
   });
 });
 

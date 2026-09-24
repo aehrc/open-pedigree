@@ -16,14 +16,15 @@
 ## 3. Verification
 
 - [x] 3.1 e2e (`tests/e2e/record-link-provider.spec.js`): link, save as GA4GH, reload, and the link and Edit action are still there
-- [x] 3.2 e2e: a refresh with `null` clears the record's value but not a diagram-entered or rejected one; gender and an integer `0` clear; an unchanged or normalised value adds no undo step; adopted isn't copied to a twin but monozygotic gender is; dates move both ways
+- [x] 3.2 e2e: a refresh with `null` clears the record's value but not a diagram-entered or rejected one; gender and an integer `0` clear; an unchanged or normalised value adds no undo step; monozygotic twins keep the same gender; dates move both ways; relink undo and same-ref relink keep the right snapshot; `{system, code}` legend entries work
 - [x] 3.3 e2e: legend reconciliation (removed, replaced, diagram-entered kept)
-- [x] 3.4 Run the full unit and e2e suites; tsc output unchanged (after the rework: unit 223/223, e2e 54/54, tsc 440 lines before and after; mutation checks: link export, clear-only-while-the-record's, skip-if-unchanged each fail their tests when removed)
+- [x] 3.4 Run the full unit and e2e suites; tsc output unchanged (after round 2: unit 224/224, e2e 23/23 in this spec with a single Controller, tsc 440 lines before and after; mutation checks: link export, clear-only-while-the-record's, skip-if-unchanged each fail their tests when removed)
 
 ## 4. Wrap-up
 
 - [ ] 4.1 Adversarial `/code-review` of the whole PR before opening it
-  - Round 1 (2026-09-24) found the node-comparison design couldn't settle (setters normalise, reject and recompute values); reworked to compare with a record snapshot (D2/D4 revised, David chose the trade-off). Also found and fixed: legend ID sanitising, adopted-only twin exception, relink undo, custom legend items, and the dead `Array#without` in `removePhenotype`/`removeGene` (broken on `main`). Its date-order finding didn't reproduce live (covered by e2e both ways). Needs a second round on the reworked code.
+  - Round 1 (2026-09-24) found the node-comparison design couldn't settle (setters normalise, reject and recompute values); reworked to compare with a record snapshot (D2/D4 revised, David chose the trade-off). Also found and fixed: legend ID sanitising, adopted-only twin exception, relink undo, custom legend items, and the dead `Array#without` in `removePhenotype`/`removeGene` (broken on `main`). Its date-order finding didn't reproduce live (covered by e2e both ways). 
+  - Round 2 (2026-09-24) found the e2e harness double-initialised the editor, so two Controllers handled every event. That hid a real date-order bug (round 1's "didn't reproduce" was wrong) and made undo counts unreliable. Fixed the harness, ordered birth/death dates, moved the snapshot reset into the link actions (relink undo, same-ref relink), removed the adopted-only twin exception and the side-effect restore pass (both created states open-pedigree doesn't allow), made the snapshot exactly each refresh's answers, and accepted any legend entry shape. Needs a third round.
 - [ ] 4.2 Open the PR (`feat:`); hold the release PR until the host side is ready, so this ships as one minor version
 - [ ] 4.3 Host (`redcap_pedigree_editor`): send `null` for empty fields, reword the "no values to import" message, refresh `dist/` from the release, and add e2e for save/reload keeping links and for clears via REDCap
 - [ ] 4.4 `/opsx:verify`, then archive

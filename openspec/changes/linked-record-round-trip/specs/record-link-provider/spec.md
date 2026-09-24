@@ -26,15 +26,19 @@ When a pedigree is exported as GA4GH FHIR, each node's linked record ref SHALL b
 - **THEN** its `Patient` resource SHALL carry no linked-record extension
 
 ### Requirement: The editor remembers what the linked record last sent
-After each `onDone`/`onCreated` dispatch, the node SHALL keep a snapshot of the linked record's last non-empty value for each linkId it sent (legend lists as the record's entries). The snapshot SHALL be saved and restored with the pedigree in both `internal` format (a `linkedRecordSnapshot` node property) and GA4GH format (a JSON `valueString` extension on the node's `Patient` resource, beside the linked-record ref and under the same privacy gate). It SHALL be reset when the node's linked record ref changes, and the record-link actions SHALL send the reset together with the new ref, so undoing a relink restores the previous snapshot.
+After each `onDone`/`onCreated` dispatch, the node SHALL keep a snapshot of the linked record's non-empty values from that dispatch (legend lists as the record's entries). The answers are taken as the record's full state, so a linkId the dispatch leaves out drops from the snapshot (without clearing the node). The snapshot SHALL be saved and restored with the pedigree in both `internal` format (a `linkedRecordSnapshot` node property) and GA4GH format (a JSON `valueString` extension on the node's `Patient` resource, beside the linked-record ref and under the same privacy gate). The record-link actions SHALL reset it, in the same event as the new ref, only when the ref actually changes, so undoing a relink restores the previous snapshot and re-picking the same record keeps it.
 
 #### Scenario: Snapshot survives a save and reload
 - **WHEN** a refresh sends `note: "from the record"`, and the pedigree is saved as GA4GH and reloaded
 - **THEN** the node's snapshot SHALL still be `{ note: "from the record" }`
 
-#### Scenario: Relinking forgets what the old record sent
-- **WHEN** a node's linked record ref changes from `record:1/instance:1` to `record:1/instance:2`
-- **THEN** its snapshot SHALL be empty until the next refresh
+#### Scenario: Relinking forgets what the old record sent, and undo brings it back
+- **WHEN** a node's linked record ref changes from `record:1/instance:1` to `record:1/instance:2`, and the user then undoes that
+- **THEN** its snapshot SHALL be empty after the relink, and back to the old record's snapshot after the undo
+
+#### Scenario: Re-picking the same record keeps the snapshot
+- **WHEN** a node linked to `record:1/instance:1` is linked to `record:1/instance:1` again
+- **THEN** its snapshot SHALL be unchanged
 
 ### Requirement: A linked-record refresh applies the record's changes
 An `onDone`/`onCreated` dispatch SHALL compare each answer with the node's snapshot (what the record sent last time), not with the node's current value:
@@ -51,7 +55,7 @@ Clearing SHALL use a defined per-target clear:
 - childless status becomes `null`
 - life status becomes `alive`
 
-A refresh SHALL NOT copy the adopted flag to twins. Twin-group rules (monozygotic gender, monozygosity) SHALL still propagate. A refresh that changes values SHALL be one undo step, plus at most one more if a setter's side effect wiped another record value and it's put back. A refresh that changes no values SHALL add no undo step.
+Twin-group rules SHALL apply as for any edit. When a refresh moves both the birth and death dates, they SHALL be applied in an order both setters accept (death first if the new birth date is after the current death date, otherwise birth first). A refresh that changes values SHALL be one undo step. A refresh that changes no values SHALL add no undo step. Setter side effects and open-pedigree's consistency rules (e.g. a fetus has no birth date) apply as for any edit, and are not reversed by the refresh.
 
 #### Scenario: A value cleared in the record clears on the node
 - **WHEN** the snapshot has `notes: "old"`, the node still shows `"old"`, and a refresh sends `notes: null`
@@ -73,12 +77,16 @@ A refresh SHALL NOT copy the adopted flag to twins. Twin-group rules (monozygoti
 - **WHEN** the snapshot has gender `F` and an integer `0` that the node still holds, and a refresh sends `null` for both
 - **THEN** gender SHALL become `U`, and the integer answer SHALL be removed
 
-#### Scenario: Refresh doesn't copy adopted to twins, but keeps monozygotic twins' gender in step
-- **WHEN** a refresh sets adopted on a twin, or sets gender on a monozygotic twin
-- **THEN** the other twin's adopted flag SHALL be unchanged, and its gender SHALL follow
+#### Scenario: Monozygotic twins stay the same gender
+- **WHEN** a refresh sets gender on a monozygotic twin
+- **THEN** the other twin's gender SHALL follow
+
+#### Scenario: Moving both dates applies both
+- **WHEN** a refresh moves birth and death from 1950–1960 to 1970–2020, and later to 1900–1910
+- **THEN** the node SHALL show exactly the record's dates each time
 
 ### Requirement: Legend lists are reconciled, not merged, on refresh
-For a legend list (the reserved disorders/genes/phenotypes targets, or a custom legend item), a refresh SHALL remove entries the record sent last time and no longer does, add entries it newly sends, and keep entries the record never sent. Reserved legend entries SHALL be matched through the same ID sanitising the legend uses (e.g. `HP:0001250` is stored as `HP_C_0001250`), so re-sending an entry doesn't duplicate it. `patient-provider`'s one-off import SHALL keep merging as today.
+For a legend list (the reserved disorders/genes/phenotypes targets, or a custom legend item), whose entries may arrive as `{id, name}`, `{system, code, display}` or plain codes, a refresh SHALL remove entries the record sent last time and no longer does, add entries it newly sends, and keep entries the record never sent. Reserved legend entries SHALL be matched through the same ID sanitising the legend uses (e.g. `HP:0001250` is stored as `HP_C_0001250`), so re-sending an entry doesn't duplicate it. `patient-provider`'s one-off import SHALL keep merging as today.
 
 #### Scenario: A dropped disorder is removed; a diagram-entered one is kept
 - **WHEN** the snapshot's `disorders` are `D1`, the node also has diagram-entered `D9`, and a refresh sends no disorders

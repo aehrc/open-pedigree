@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeLinkedRecordRefresh, CLEAR_VALUES, clearValueFor, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 
 const SETTER_FOR = {
-  first_name: 'setFirstName', gender: 'setGender', dob: 'setBirthDate', weeks: 'setGestationAge', disorders: 'setDisorders',
+  first_name: 'setFirstName', gender: 'setGender', dob: 'setBirthDate', dod: 'setDeathDate', weeks: 'setGestationAge', disorders: 'setDisorders',
 };
 const sanitise = (id) => String(id).replace(/:/g, '_C_');
 
@@ -82,10 +82,25 @@ describe('computeLinkedRecordRefresh (compares with what the record sent last ti
     expect(r.properties).toEqual({ setGender: 'U', setQuestionnaireAnswer_count: null });
   });
 
-  it('keeps snapshot entries for linkIds the refresh does not mention', () => {
-    const r = refresh([{ linkId: 'first_name', value: 'Alice' }], { snapshot: { notes: 'x', first_name: 'Alice' } });
-    expect(r.snapshot).toEqual({ notes: 'x', first_name: 'Alice' });
+  it('takes the answers as the record\'s full state: an omitted linkId drops from the snapshot, without clearing the node', () => {
+    const r = refresh([{ linkId: 'first_name', value: 'Alice' }], {
+      current: { setQuestionnaireAnswer_notes: 'x' }, snapshot: { notes: 'x', first_name: 'Alice' },
+    });
+    expect(r.snapshot).toEqual({ first_name: 'Alice' });
     expect(r.properties).toEqual({});
+  });
+
+  it('orders a moving birth/death pair so each setter accepts it', () => {
+    const later = refresh([{ linkId: 'dob', value: '1970-01-01' }, { linkId: 'dod', value: '2020-01-01' }], {
+      current: { setBirthDate: new Date('1950-01-01'), setDeathDate: new Date('1960-01-01') },
+      snapshot: { dob: '1950-01-01', dod: '1960-01-01' },
+    });
+    expect(Object.keys(later.properties)).toEqual(['setDeathDate', 'setBirthDate']);
+    const earlier = refresh([{ linkId: 'dob', value: '1900-01-01' }, { linkId: 'dod', value: '1910-01-01' }], {
+      current: { setBirthDate: new Date('1970-01-01'), setDeathDate: new Date('2020-01-01') },
+      snapshot: { dob: '1970-01-01', dod: '2020-01-01' },
+    });
+    expect(Object.keys(earlier.properties)).toEqual(['setBirthDate', 'setDeathDate']);
   });
 
   describe('legend reconciliation', () => {
