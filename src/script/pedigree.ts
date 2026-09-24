@@ -29,6 +29,8 @@ import {GeneTermType} from 'pedigree/terminology/geneTerm';
 import BioportalTerminology from './terminology/BioportalTerminology';
 import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider';
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
+import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
+import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
@@ -343,7 +345,24 @@ export default class PedigreeEditor {
    */
   _parseQuestionnaireConfig(questionnaire: any): any {
     var config = parseQuestionnaire(questionnaire);
-    var actionItem = function(linkId: string, label: string, predicate: string): any {
+    var provider: Partial<Pick<AbstractRecordLinkProvider, 'getActionLabel'>> = this.getRecordLinkProvider();
+    // A provider may relabel its actions (AbstractRecordLinkProvider.getActionLabel); anything
+    // other than a non-blank string keeps the generic default. Checked by presence, since a host
+    // can pass a duck-typed provider that doesn't extend AbstractRecordLinkProvider. A throw is
+    // contained here: this runs in the constructor and in the questionnaireUrl reload, and a
+    // cosmetic label must never stop the editor loading or discard a fetched Questionnaire.
+    var labelFor = function(action: RecordLinkAction, fallback: string): string {
+      var custom: unknown;
+      try {
+        custom = typeof provider.getActionLabel === 'function' ? provider.getActionLabel(action) : undefined;
+      } catch (e) {
+        console.warn('recordLinkProvider.getActionLabel("' + action + '") threw - using the default label', e);
+        custom = undefined;
+      }
+      return (typeof custom === 'string' && custom.trim() !== '') ? custom : fallback;
+    };
+    var actionItem = function(linkId: RecordLinkAction, defaultLabel: string, predicate: string): any {
+      var label = labelFor(linkId, defaultLabel);
       return {
         linkId: linkId,
         label: label,
