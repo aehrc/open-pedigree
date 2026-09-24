@@ -12,5 +12,5 @@
 
 ## 3. Release
 
-- [ ] 3.1 PR (`feat:`), merge, release-please minor release
-- [ ] 3.2 Refresh `redcap_pedigree_editor`'s bundled `open-pedigree/dist/` from the release and return "Edit in REDCap" from its provider
+- [x] 3.1 PR (`feat:`), merge, release-please minor release (aehrc/open-pedigree#27, released in 1.2.0)
+- [x] 3.2 Return "Edit in REDCap" from `redcap_pedigree_editor`'s provider (done in its PR #14). Refreshing its bundled `open-pedigree/dist/` is tracked in that module, batched with the next open-pedigree release
