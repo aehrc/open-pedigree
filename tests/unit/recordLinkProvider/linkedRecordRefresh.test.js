@@ -12,8 +12,7 @@ function refresh(answers, { current = {}, snapshot = {} } = {}) {
     answers,
     resolveSetter: (linkId) => SETTER_FOR[linkId] || ('setQuestionnaireAnswer_' + linkId),
     isLegend: (linkId) => linkId === 'disorders',
-    incomingLegendKey: (_linkId, e) => sanitise(typeof e === 'object' ? e.id : e),
-    storedLegendKey: (_linkId, e) => sanitise(e),
+    legendKey: (_linkId, e) => sanitise(typeof e === 'object' ? e.id : e),
     legendSetterEntry: (_linkId, e) => e.id,
     current: (setter) => current[setter],
     snapshot,
@@ -90,17 +89,10 @@ describe('computeLinkedRecordRefresh (compares with what the record sent last ti
     expect(r.properties).toEqual({});
   });
 
-  it('orders a moving birth/death pair so each setter accepts it', () => {
-    const later = refresh([{ linkId: 'dob', value: '1970-01-01' }, { linkId: 'dod', value: '2020-01-01' }], {
-      current: { setBirthDate: new Date('1950-01-01'), setDeathDate: new Date('1960-01-01') },
-      snapshot: { dob: '1950-01-01', dod: '1960-01-01' },
-    });
-    expect(Object.keys(later.properties)).toEqual(['setDeathDate', 'setBirthDate']);
-    const earlier = refresh([{ linkId: 'dob', value: '1900-01-01' }, { linkId: 'dod', value: '1910-01-01' }], {
-      current: { setBirthDate: new Date('1970-01-01'), setDeathDate: new Date('2020-01-01') },
-      snapshot: { dob: '1970-01-01', dod: '2020-01-01' },
-    });
-    expect(Object.keys(earlier.properties)).toEqual(['setBirthDate', 'setDeathDate']);
+  it('skips an unparseable date instead of storing Invalid Date, and does not snapshot it', () => {
+    const r = refresh([{ linkId: 'dob', value: '31-12-1980' }], { current: { setBirthDate: '' } });
+    expect(r.properties).toEqual({});
+    expect(r.snapshot).toEqual({});
   });
 
   describe('legend reconciliation', () => {

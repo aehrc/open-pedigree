@@ -40,16 +40,19 @@ const LINKED_RECORD_QUESTIONNAIRE = {
 
 const VISIBLE_MENU = '.menu-box:visible';
 
-async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabels } = {}) {
+async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabels, terminologyBaseUrl } = {}) {
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
-  await page.evaluate(({ q, hasProvider, labels }) => {
+  await page.evaluate(({ q, hasProvider, labels, termUrl }) => {
     // See questionnaire-fields.spec.js for why #work-area (not just #canvas) needs removing.
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
 
     const options = { questionnaireLocal: q };
+    if (termUrl) {
+      options.questionnaireTerminologyBaseUrl = termUrl;
+    }
     if (hasProvider) {
       options.recordLinkProvider = {
         isConfigured: () => true,
@@ -85,7 +88,7 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
     const newEditor = window.OpenPedigree.initialiseEditor(options);
     window.editor = newEditor;
     newEditor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
-  }, { q: questionnaire || LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider, labels: actionLabels || null });
+  }, { q: questionnaire || LINKED_RECORD_QUESTIONNAIRE, hasProvider: !!recordLinkProvider, labels: actionLabels || null, termUrl: terminologyBaseUrl || null });
   await page.waitForTimeout(300);
 }
 
@@ -433,6 +436,17 @@ const ROUND_TRIP_QUESTIONNAIRE = {
           extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToLegendCondition' }],
         },
         {
+          linkId: 'conds', type: 'choice', text: 'Other conditions', repeats: true,
+          answerValueSet: 'http://example.org/ValueSet/conditions',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToLegendCondition' }],
+        },
+        {
+          linkId: 'life', type: 'choice', text: 'Life status',
+          definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+          answerOption: [{ valueCoding: { code: 'alive', display: 'Alive' } }, { valueCoding: { code: 'deceased', display: 'Deceased' } }],
+        },
+        {
           linkId: 'hpo_positive', type: 'choice', text: 'Phenotypes', repeats: true,
           answerValueSet: 'http://purl.obolibrary.org/obo/hp.owl',
           extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToLegendObservation' }],
@@ -470,6 +484,8 @@ async function readRoundTripNode(page, personId) {
       dob: dob ? dob.toDateString() : '',
       dod: dod ? dod.toDateString() : '',
       phenotypes: n.getPhenotypes().slice(0),
+      life: n.getLifeStatus(),
+      conds: (n.getQuestionnaireAnswer('conds') || []).map((c) => c.code),
       adopted: n.getAdopted(),
       count: n.getQuestionnaireAnswer('count'),
       note: n.getQuestionnaireAnswer('note'),
@@ -634,11 +650,28 @@ test('moving both dates later, or both earlier, applies both', async ({ page }) 
   expect(node.dob).toBe(new Date('1970-01-01').toDateString());
   expect(node.dod).toBe(new Date('2020-01-01').toDateString());
 
+  // Undo puts both back, in an order the setters accept.
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  node = await readRoundTripNode(page, personId);
+  expect(node.dob).toBe(new Date('1950-01-01').toDateString());
+  expect(node.dod).toBe(new Date('1960-01-01').toDateString());
+
   // And both earlier, past the old birth date.
   await refreshWith(page, personId, [{ linkId: 'dob', value: '1900-01-01' }, { linkId: 'dod', value: '1910-01-01' }]);
   node = await readRoundTripNode(page, personId);
   expect(node.dob).toBe(new Date('1900-01-01').toDateString());
   expect(node.dod).toBe(new Date('1910-01-01').toDateString());
+});
+
+test('a new birth date on the same day as the current death date is applied', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  await refreshWith(page, personId, [{ linkId: 'dob', value: '1950-01-01' }, { linkId: 'dod', value: '1960-01-01' }]);
+  await refreshWith(page, personId, [{ linkId: 'dob', value: '1960-01-01' }, { linkId: 'dod', value: '1970-01-01' }]);
+  const node = await readRoundTripNode(page, personId);
+  expect(node.dob).toBe(new Date('1960-01-01').toDateString());
+  expect(node.dod).toBe(new Date('1970-01-01').toDateString());
 });
 
 test('a refresh still keeps monozygotic twins the same gender (a group rule)', async ({ page }) => {
@@ -703,5 +736,65 @@ test('legend entries sent as {system, code, display} work for reserved legends',
   await refreshWith(page, personId, [{ linkId: 'hpo_positive', value: null }]);
   expect((await readRoundTripNode(page, personId)).phenotypes).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test('custom legend items accept {id, name} entries', async ({ page }) => {
+  // A custom legend item needs a terminology to have a legend at all (it's only looked up on
+  // search, so this URL is never fetched here).
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE, terminologyBaseUrl: 'http://example.org/fhir' });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  await refreshWith(page, personId, [{ linkId: 'conds', value: [{ id: 'X1', name: 'Example one' }, { id: 'X2', name: 'Example two' }] }]);
+  expect((await readRoundTripNode(page, personId)).conds).toEqual(['X1', 'X2']);
+  await refreshWith(page, personId, [{ linkId: 'conds', value: [{ id: 'X2', name: 'Example two' }] }]);
+  expect((await readRoundTripNode(page, personId)).conds).toEqual(['X2']);
+  expect(errors).toEqual([]);
+});
+
+test('an edit window\'s answers are not applied if the node was relinked meanwhile', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+
+  await page.evaluate((id) => {
+    window.editor._dispatchLinkedRecordRefresh(parseInt(id, 10), [{ linkId: 'note', value: 'from record 1' }], 'record:1/instance:2');
+  }, personId);
+  expect((await readRoundTripNode(page, personId)).note).toBeUndefined();
+});
+
+test('undoing a refresh that set life status and a death date restores both', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+
+  await refreshWith(page, personId, [{ linkId: 'life', value: 'deceased' }, { linkId: 'dod', value: '2000-01-01' }]);
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'deceased', dod: new Date('2000-01-01').toDateString() });
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'alive', dod: '' });
+});
+
+test('a refresh whose only value is rejected adds no undo step', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  await page.evaluate(() => {
+    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 2 3 1 1\nfam1 2 0 0 1 1\nfam1 3 0 0 2 1', 'ped', {}, true, true);
+  });
+  await page.waitForTimeout(300);
+  const fatherId = await page.evaluate(() => {
+    const graph = window.editor.getGraph();
+    for (let id = 0; id <= graph.getMaxNodeId(); id++) {
+      if (graph.isPerson(id) && graph.getGender(id) === 'M' && graph.getParentRelationship(id) === null) {
+        return String(id);
+      }
+    }
+    return null;
+  });
+  await setNodeProperty(page, fatherId, { setLinkedRecordRef: 'record:1/instance:1' });
+  const undoSize = () => page.evaluate(() => window.editor.getActionStack()._size());
+  const before = await undoSize();
+  await refreshWith(page, fatherId, [{ linkId: 'gender', value: 'F' }]);
+  expect(await undoSize()).toBe(before);
 });
 

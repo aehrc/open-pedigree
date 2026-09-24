@@ -27,10 +27,9 @@ export interface LinkedRecordRefreshInput {
   resolveSetter: (linkId: string) => string;
   // Whether linkId is a legend list (reserved disorders/genes/phenotypes, or a custom legend item).
   isLegend: (linkId: string) => boolean;
-  // The node-side key of an incoming legend entry (e.g. its sanitised ID), and of an entry as
-  // the node stores it or as legendSetterEntry() produces it - so the two are comparable.
-  incomingLegendKey: (linkId: string, entry: any) => string;
-  storedLegendKey: (linkId: string, entry: any) => string;
+  // The node-side key of a legend entry - incoming, as the node stores it, or as
+  // legendSetterEntry() produces it (e.g. its sanitised ID) - so all three are comparable.
+  legendKey: (linkId: string, entry: any) => string;
   // The value to hand the setter for a newly added incoming legend entry.
   legendSetterEntry: (linkId: string, entry: any) => any;
   // setter name -> the node's current value, via the matching getter.
@@ -125,8 +124,8 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
     if (input.isLegend(linkId)) {
       const incoming: any[] = Array.isArray(answer.value) ? answer.value : [];
       const previous: any[] = hadLast && Array.isArray(last[linkId]) ? last[linkId] : [];
-      const incomingKeys = incoming.map((e) => input.incomingLegendKey(linkId, e));
-      const previousKeys = previous.map((e) => input.incomingLegendKey(linkId, e));
+      const incomingKeys = incoming.map((e) => input.legendKey(linkId, e));
+      const previousKeys = previous.map((e) => input.legendKey(linkId, e));
       if (incoming.length > 0) {
         snapshot[linkId] = incoming;
       } else {
@@ -137,16 +136,16 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       }
       const currentEntries: any[] = (input.current(setter) || []).slice(0);
       const next = currentEntries.filter((e) => {
-        const key = input.storedLegendKey(linkId, e);
+        const key = input.legendKey(linkId, e);
         return previousKeys.indexOf(key) === -1 || incomingKeys.indexOf(key) !== -1;
       });
       incoming.forEach((e, i) => {
-        if (!next.some((n) => input.storedLegendKey(linkId, n) === incomingKeys[i])) {
+        if (!next.some((n) => input.legendKey(linkId, n) === incomingKeys[i])) {
           next.push(input.legendSetterEntry(linkId, e));
         }
       });
-      const nextKeys = next.map((e) => input.storedLegendKey(linkId, e));
-      const currentKeys = currentEntries.map((e) => input.storedLegendKey(linkId, e));
+      const nextKeys = next.map((e) => input.legendKey(linkId, e));
+      const currentKeys = currentEntries.map((e) => input.legendKey(linkId, e));
       if (!sameJson(nextKeys, currentKeys)) {
         sets[setter] = next;
       }
@@ -166,6 +165,11 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       continue;
     }
 
+    if (DATE_SETTERS.indexOf(setter) !== -1 && isNaN(new Date(answer.value).getTime())) {
+      // An unparseable date (e.g. "31-12-1980" or "unknown") would be stored as Invalid Date and
+      // could never be cleared again - leave the node alone and don't snapshot it.
+      continue;
+    }
     snapshot[linkId] = answer.value;
     if (!hadLast || !sameJson(last[linkId], answer.value)) {
       sets[setter] = answer.value;
@@ -176,18 +180,9 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
   Object.keys(clears).forEach((setter) => {
     properties[setter] = clears[setter];
   });
-  // setBirthDate rejects a birth after the current death date, and setDeathDate a death before
-  // the current birth date - so when both move, apply the death date first if the new birth
-  // date is after the current death date, otherwise the birth date first.
+  // Birth/death ordering is the controller's job (Controller._orderDatePair), so it also holds
+  // for undo replays and ordinary edits.
   const order = Object.keys(sets);
-  if (sets.hasOwnProperty('setBirthDate') && sets.hasOwnProperty('setDeathDate')) {
-    const currentDeath = normalise('setDeathDate', input.current('setDeathDate'));
-    const newBirth = normalise('setBirthDate', sets.setBirthDate);
-    const deathFirst = currentDeath !== '' && newBirth !== '' && new Date(newBirth).getTime() > new Date(currentDeath).getTime();
-    const rest = order.filter((setter) => setter !== 'setBirthDate' && setter !== 'setDeathDate');
-    order.length = 0;
-    order.push(...(deathFirst ? ['setDeathDate', 'setBirthDate'] : ['setBirthDate', 'setDeathDate']), ...rest);
-  }
   order.forEach((setter) => {
     properties[setter] = sets[setter];
   });

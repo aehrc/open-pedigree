@@ -55,7 +55,7 @@ Clearing SHALL use a defined per-target clear:
 - childless status becomes `null`
 - life status becomes `alive`
 
-Twin-group rules SHALL apply as for any edit. When a refresh moves both the birth and death dates, they SHALL be applied in an order both setters accept (death first if the new birth date is after the current death date, otherwise birth first). A refresh that changes values SHALL be one undo step. A refresh that changes no values SHALL add no undo step. Setter side effects and open-pedigree's consistency rules (e.g. a fetus has no birth date) apply as for any edit, and are not reversed by the refresh.
+Twin-group rules SHALL apply as for any edit. When any event (a refresh, an undo, an edit) sets both the birth and death dates, they SHALL be applied in an order both setters accept (death first if the new birth date is on or after the current death date, otherwise birth first). Undo SHALL restore every value the event changed, including ones a setter changed as a side effect. A refresh SHALL NOT be applied if the node's linked record ref has changed since the edit began. A refresh that changes values SHALL be one undo step. A refresh that changes no values SHALL add no undo step. Setter side effects and open-pedigree's consistency rules (e.g. a fetus has no birth date) apply as for any edit, and are not reversed by the refresh.
 
 #### Scenario: A value cleared in the record clears on the node
 - **WHEN** the snapshot has `notes: "old"`, the node still shows `"old"`, and a refresh sends `notes: null`
@@ -82,8 +82,8 @@ Twin-group rules SHALL apply as for any edit. When a refresh moves both the birt
 - **THEN** the other twin's gender SHALL follow
 
 #### Scenario: Moving both dates applies both
-- **WHEN** a refresh moves birth and death from 1950–1960 to 1970–2020, and later to 1900–1910
-- **THEN** the node SHALL show exactly the record's dates each time
+- **WHEN** a refresh moves birth and death from 1950–1960 to 1970–2020 (then undone), or to 1960–1970 (a birth on the old death day), or to 1900–1910
+- **THEN** the node SHALL show exactly the record's dates each time, and undo SHALL restore the previous pair
 
 ### Requirement: Legend lists are reconciled, not merged, on refresh
 For a legend list (the reserved disorders/genes/phenotypes targets, or a custom legend item), whose entries may arrive as `{id, name}`, `{system, code, display}` or plain codes, a refresh SHALL remove entries the record sent last time and no longer does, add entries it newly sends, and keep entries the record never sent. Reserved legend entries SHALL be matched through the same ID sanitising the legend uses (e.g. `HP:0001250` is stored as `HP_C_0001250`), so re-sending an entry doesn't duplicate it. `patient-provider`'s one-off import SHALL keep merging as today.

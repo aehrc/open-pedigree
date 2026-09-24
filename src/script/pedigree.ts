@@ -36,6 +36,16 @@ import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LIN
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 
+// Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
+// setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
+const SETTER_TO_GETTER: Record<string, string> = {};
+Object.keys(RESERVED_LEGEND_TARGETS).forEach(function(linkId: string) {
+  SETTER_TO_GETTER[RESERVED_LEGEND_TARGETS[linkId].setter] = RESERVED_LEGEND_TARGETS[linkId].getter;
+});
+Object.keys(MAPS_TO_FIELD_TARGETS).forEach(function(field: string) {
+  SETTER_TO_GETTER[MAPS_TO_FIELD_TARGETS[field].setter] = MAPS_TO_FIELD_TARGETS[field].getter;
+});
+
 export default class PedigreeEditor {
   DEBUG_MODE: any;
   _omimServiceUrl: string;
@@ -569,6 +579,10 @@ export default class PedigreeEditor {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getRecordLinkProvider().openPicker(nodeId,
         function(recordRef: string, _details: any) {
+          // The node may have been deleted while the picker was open.
+          if (!(window as any).editor.getView().getNode(nodeId)) {
+            return;
+          }
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
             detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
           }));
@@ -579,10 +593,14 @@ export default class PedigreeEditor {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
         function(recordRef: string, answers: {linkId: string, value: any}[]) {
+          // The node may have been deleted while the create dialog was open.
+          if (!(window as any).editor.getView().getNode(nodeId)) {
+            return;
+          }
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
             detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
           }));
-          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers);
+          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers, recordRef);
         }
       );
     },
@@ -595,7 +613,9 @@ export default class PedigreeEditor {
       }
       (window as any).editor.getRecordLinkProvider().openEditor(nodeId,
         function(answers: {linkId: string, value: any}[]) {
-          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers);
+          // recordRef as it was when editing began: if the node has since been relinked (or ids
+          // shifted), these answers belong to a different record and aren't applied.
+          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers, recordRef);
         }
       );
     }
@@ -642,25 +662,21 @@ export default class PedigreeEditor {
    * _dispatchQuestionnaireAnswers (patient-provider's one-off import, which merges), only real
    * changes are sent, as one flagged event, and a refresh with no changes adds no undo step.
    */
-  _dispatchLinkedRecordRefresh(nodeId: any, answers: {linkId: string, value: any}[]): void {
+  _dispatchLinkedRecordRefresh(nodeId: any, answers: {linkId: string, value: any}[], expectedRef?: string): void {
     var editor = (window as any).editor;
     var node = editor.getView().getNode(nodeId);
     if (!node) {
       return;
     }
-    // Getter names don't always mirror setters (setHPO/getPhenotypes).
-    var getterFor: any = {};
-    Object.keys(RESERVED_LEGEND_TARGETS).forEach(function(linkId: string) {
-      getterFor[RESERVED_LEGEND_TARGETS[linkId].setter] = RESERVED_LEGEND_TARGETS[linkId].getter;
-    });
-    Object.keys(MAPS_TO_FIELD_TARGETS).forEach(function(field: string) {
-      getterFor[MAPS_TO_FIELD_TARGETS[field].setter] = MAPS_TO_FIELD_TARGETS[field].getter;
-    });
+    if (expectedRef !== undefined && node.getLinkedRecordRef() !== expectedRef) {
+      console.warn('Linked-record refresh for ' + expectedRef + ' skipped: node ' + nodeId + ' is now linked to "' + node.getLinkedRecordRef() + '"');
+      return;
+    }
     var resolveSetter = function(linkId: string): string {
       return editor._resolveQuestionnaireSetter(linkId);
     };
     var current = function(setter: string): any {
-      var getter = getterFor[setter] || setter.replace(/^set/, 'get');
+      var getter = SETTER_TO_GETTER[setter] || setter.replace(/^set/, 'get');
       return typeof node[getter] === 'function' ? node[getter]() : undefined;
     };
     var itemFor = function(linkId: string): any {
@@ -697,10 +713,7 @@ export default class PedigreeEditor {
         return isReserved(linkId)
           || !!(item && item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation'));
       },
-      incomingLegendKey: function(linkId: string, entry: any): string {
-        return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
-      },
-      storedLegendKey: function(linkId: string, entry: any): string {
+      legendKey: function(linkId: string, entry: any): string {
         return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
       },
       legendSetterEntry: function(linkId: string, entry: any): any {
@@ -708,7 +721,11 @@ export default class PedigreeEditor {
           return entryId(entry);
         }
         // Custom legend items store {system, code, display}.
-        return (entry && typeof entry === 'object') ? entry : { code: String(entry), display: String(entry) };
+        if (entry && typeof entry === 'object') {
+          var code = entryId(entry);
+          return { system: entry.system, code: code, display: entry.display || entry.name || code };
+        }
+        return { code: String(entry), display: String(entry) };
       },
       current: current,
       snapshot: previousSnapshot
