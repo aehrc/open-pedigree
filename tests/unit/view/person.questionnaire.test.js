@@ -211,3 +211,41 @@ describe('Person construction with no Questionnaire configured', () => {
     expect(person.getProperties().linkedRecordRef).toBeUndefined();
   });
 });
+
+describe('Person linked-record supplied set (linked-record-round-trip)', () => {
+  beforeEach(() => {
+    globalThis.editor = makeMockEditor(combinedConfig);
+  });
+
+  it('starts empty and round-trips through getProperties/assignProperties', () => {
+    const p = new Person(0, 0, 1, { gender: 'M' });
+    expect(p.getLinkedRecordSupplied()).toEqual({});
+    expect(p.getProperties().linkedRecordSupplied).toBeUndefined();
+
+    p.setLinkedRecordRef('record:1/instance:1');
+    p.setLinkedRecordSupplied({ first_name: true, disorders: ['D1'] });
+    const saved = p.getProperties();
+    expect(saved.linkedRecordSupplied).toEqual({ first_name: true, disorders: ['D1'] });
+
+    const reloaded = new Person(0, 0, 2, { gender: 'M' });
+    reloaded.assignProperties(saved);
+    expect(reloaded.getLinkedRecordRef()).toBe('record:1/instance:1');
+    expect(reloaded.getLinkedRecordSupplied()).toEqual({ first_name: true, disorders: ['D1'] });
+  });
+
+  it('forgets the supplied set when the node is relinked or unlinked, but not when set to the same ref', () => {
+    const p = new Person(0, 0, 1, { gender: 'M' });
+    p.setLinkedRecordRef('record:1/instance:1');
+    p.setLinkedRecordSupplied({ first_name: true });
+
+    p.setLinkedRecordRef('record:1/instance:1');
+    expect(p.getLinkedRecordSupplied()).toEqual({ first_name: true });
+
+    p.setLinkedRecordRef('record:1/instance:2');
+    expect(p.getLinkedRecordSupplied()).toEqual({});
+
+    p.setLinkedRecordSupplied({ first_name: true });
+    p.setLinkedRecordRef('');
+    expect(p.getLinkedRecordSupplied()).toEqual({});
+  });
+});

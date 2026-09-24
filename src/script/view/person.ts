@@ -66,6 +66,7 @@ export default class Person extends AbstractPerson {
   _lostContact: any;
   _linkedPatientRef: any;
   _linkedRecordRef: any;
+  _linkedRecordSupplied: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -225,6 +226,7 @@ export default class Person extends AbstractPerson {
     this._lostContact = false;
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
+    this._linkedRecordSupplied = {};
     this._questionnaireAnswers = {};
   }
 
@@ -251,7 +253,26 @@ export default class Person extends AbstractPerson {
   }
 
   setLinkedRecordRef(ref: string): void {
+    // What the previous record supplied says nothing about a different record.
+    if ((ref || '') !== (this._linkedRecordRef || '')) {
+      this._linkedRecordSupplied = {};
+    }
     this._linkedRecordRef = ref;
+  }
+
+  /**
+   * Which values the linked record supplied at its last refresh: linkId -> true, or for a
+   * reserved legend target linkId -> the supplied entry IDs. A refresh only clears what's in
+   * here, so values entered in the diagram are never wiped (see linked-record-round-trip).
+   *
+   * @method getLinkedRecordSupplied
+   */
+  getLinkedRecordSupplied(): any {
+    return this._linkedRecordSupplied || {};
+  }
+
+  setLinkedRecordSupplied(supplied: any): void {
+    this._linkedRecordSupplied = supplied || {};
   }
 
   /**
@@ -1134,6 +1155,9 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedRecordRef() != '') {
       info['linkedRecordRef'] = this.getLinkedRecordRef();
     }
+    if (Object.keys(this.getLinkedRecordSupplied()).length > 0) {
+      info['linkedRecordSupplied'] = this.getLinkedRecordSupplied();
+    }
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
@@ -1207,6 +1231,10 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('linkedRecordRef') && this.getLinkedRecordRef() != info.linkedRecordRef) {
         this.setLinkedRecordRef(info.linkedRecordRef);
+      }
+      // After the ref: setLinkedRecordRef() resets the supplied set when the ref changes.
+      if (info.hasOwnProperty('linkedRecordSupplied')) {
+        this.setLinkedRecordSupplied(info.linkedRecordSupplied);
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;

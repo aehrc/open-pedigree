@@ -90,6 +90,10 @@ export default class Controller {
 
     var node    = editor.getView().getNode(nodeID);
     var changed = false;
+    // A linked-record refresh (Pedigree._dispatchLinkedRecordRefresh) has already worked out the
+    // real changes: compare strictly (0/''/false aren't "the same"), and don't copy values to
+    // twins - a linked record describes one person.
+    var isLinkedRecordRefresh = !!event.detail.linkedRecordRefresh;
 
     var twinUpdate: any = undefined;
     var needUpdateAncestors = false;
@@ -108,7 +112,7 @@ export default class Controller {
 
         var propertyGetFunction =  propertySetFunction.replace('set','get');
         var oldValue = node[propertyGetFunction]();
-        if (oldValue == propValue) {
+        if (isLinkedRecordRefresh ? oldValue === propValue : oldValue == propValue) {
           continue;
         }
 
@@ -195,7 +199,7 @@ export default class Controller {
       }
     }
 
-    if (twinUpdate) {
+    if (twinUpdate && !isLinkedRecordRefresh) {
       var allTwins = editor.getGraph().getAllTwinsSortedByOrder(nodeID);
       for (var propertySetFunction in twinUpdate) {
         if (twinUpdate.hasOwnProperty(propertySetFunction)) {

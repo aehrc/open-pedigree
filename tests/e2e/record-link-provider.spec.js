@@ -259,7 +259,10 @@ test('createNewRecord sets the node\'s linkedRecordRef from onCreated\'s recordR
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('set at creation');
 });
 
-test('editRecord dispatching a reserved-legend-target answer (disorders) merges rather than overwrites, matching importClinicalData', async ({ page }) => {
+// A first refresh has supplied nothing yet, so the node's existing disorder counts as
+// diagram-entered and is kept alongside the record's (linked-record-round-trip) - not a merge;
+// see the legend reconciliation test below for removal and replacement.
+test('editRecord keeps diagram-entered disorders and adds the record\'s on a first refresh', async ({ page }) => {
   await loadEditor(page, { recordLinkProvider: true });
   const personId = await openNodeMenuForProband(page);
 
@@ -372,4 +375,194 @@ test('a getActionLabel that throws keeps the default labels and does not stop th
 
   await expect(page.locator(`${VISIBLE_MENU} .field-linkRecord button`)).toHaveText('Link to existing record');
   await expect(page.locator(`${VISIBLE_MENU} .field-createNewRecord button`)).toHaveText('Create new linked record');
+});
+
+// ---- linked-record-round-trip ----------------------------------------------------------------
+// A Questionnaire with mapped fields (gender, birth date, adopted), a plain integer and a string
+// item, and the disorders legend - enough to exercise every refresh rule end to end.
+const FIELD_MAPPING_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
+const ROUND_TRIP_QUESTIONNAIRE = {
+  resourceType: 'Questionnaire',
+  url: 'http://example.org/Questionnaire/e2e-linked-record-round-trip',
+  version: '1.0',
+  item: [
+    {
+      linkId: 'person', type: 'group', text: 'Person',
+      item: [
+        {
+          linkId: 'gender', type: 'choice', text: 'Gender',
+          definition: 'http://hl7.org/fhir/StructureDefinition/Patient#Patient.gender',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+          answerOption: [{ valueCoding: { code: 'M', display: 'Male' } }, { valueCoding: { code: 'F', display: 'Female' } }, { valueCoding: { code: 'U', display: 'Unknown' } }],
+        },
+        {
+          linkId: 'dob', type: 'date', text: 'Date of birth',
+          definition: 'http://hl7.org/fhir/StructureDefinition/Patient#Patient.birthDate',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+        },
+        {
+          linkId: 'adopted', type: 'boolean', text: 'Adopted',
+          definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.isAdopted',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+        },
+        { linkId: 'count', type: 'integer', text: 'Count' },
+        { linkId: 'note', type: 'string', text: 'Note' },
+        {
+          linkId: 'disorders', type: 'choice', text: 'Disorders', repeats: true,
+          answerValueSet: 'http://purl.bioontology.org/ontology/OMIM',
+          extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToLegendCondition' }],
+        },
+      ],
+    },
+  ],
+};
+
+async function setNodeProperty(page, personId, properties) {
+  await page.evaluate(({ id, props }) => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: parseInt(id, 10), properties: props } }));
+  }, { id: personId, props: properties });
+}
+
+// Runs the linked-record refresh exactly as a provider does: the Edit action's onDone.
+async function refreshWith(page, personId, answers) {
+  await page.evaluate(({ id, a }) => {
+    window.__pendingEditAnswers = a;
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(parseInt(id, 10)), 100, 100);
+  }, { id: personId, a: answers });
+  await switchToLinkedRecordTab(page);
+  await clickInVisibleMenu(page, '.field-editRecord button');
+  await page.waitForTimeout(200);
+}
+
+async function readRoundTripNode(page, personId) {
+  return page.evaluate((id) => {
+    const n = window.editor.getView().getNode(parseInt(id, 10));
+    const dob = n.getBirthDate();
+    return {
+      ref: n.getLinkedRecordRef(),
+      gender: n.getGender(),
+      dob: dob ? dob.toDateString() : '',
+      adopted: n.getAdopted(),
+      count: n.getQuestionnaireAnswer('count'),
+      note: n.getQuestionnaireAnswer('note'),
+      disorders: n.getDisorders().slice(0).sort(),
+      supplied: n.getLinkedRecordSupplied(),
+    };
+  }, personId);
+}
+
+test('a linked node keeps its link and supplied set through a GA4GH export and re-import', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'from the record' }]);
+
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15000 }),
+    page.evaluate(() => {
+      const ga4ghRadio = document.querySelector('input[type=radio][name="export-type"][value="GA4GH"]');
+      ga4ghRadio.checked = true;
+      ga4ghRadio.click();
+      document.getElementById('export_button').click();
+    }),
+  ]);
+  const fs = require('fs');
+  const exported = fs.readFileSync(await download.path(), 'utf8');
+
+  await page.evaluate((json) => {
+    window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, true, true);
+  }, exported);
+  await page.waitForTimeout(300);
+
+  const reloadedId = await openNodeMenuForProband(page);
+  const node = await readRoundTripNode(page, reloadedId);
+  expect(node.ref).toBe('record:1/instance:1');
+  expect(node.note).toBe('from the record');
+  expect(node.supplied).toEqual({ note: true });
+  await switchToLinkedRecordTab(page);
+  await expect(page.locator(`${VISIBLE_MENU} .field-editRecord`)).not.toHaveClass(/hidden/);
+});
+
+test('a refresh clears what the record supplied, leaves diagram-entered values, and handles gender and 0', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+
+  await refreshWith(page, personId, [
+    { linkId: 'gender', value: 'F' }, { linkId: 'count', value: 0 }, { linkId: 'note', value: 'hello' },
+  ]);
+  await setNodeProperty(page, personId, { setBirthDate: '1980-01-01' }); // entered in the diagram
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ gender: 'F', count: 0, note: 'hello' });
+
+  await refreshWith(page, personId, [
+    { linkId: 'gender', value: null }, { linkId: 'count', value: null },
+    { linkId: 'note', value: null }, { linkId: 'dob', value: null },
+  ]);
+  const node = await readRoundTripNode(page, personId);
+  expect(node.gender).toBe('U');
+  expect(node.count).toBeUndefined();
+  expect(node.note).toBeUndefined();
+  expect(node.dob).toBe(new Date('1980-01-01').toDateString());
+  expect(node.supplied).toEqual({});
+});
+
+test('a refresh that changes nothing adds no undo step, and one that changes things adds exactly one', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  const undoSize = () => page.evaluate(() => window.editor.getActionStack()._size());
+
+  const before = await undoSize();
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'hello' }, { linkId: 'count', value: 3 }]);
+  expect(await undoSize()).toBe(before + 1);
+
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'hello' }, { linkId: 'count', value: 3 }]);
+  expect(await undoSize()).toBe(before + 1);
+});
+
+test('a refresh does not copy the adopted flag to the node\'s twin', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  // Twins need a parent relationship, which loadEditor's single-person pedigree doesn't have.
+  await page.evaluate(() => {
+    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 2 3 1 1\nfam1 2 0 0 1 1\nfam1 3 0 0 2 1', 'ped', {}, true, true);
+  });
+  await page.waitForTimeout(300);
+  const personId = await page.evaluate(() => {
+    const graph = window.editor.getGraph();
+    for (let id = 0; id <= graph.getMaxNodeId(); id++) {
+      if (graph.isPerson(id) && graph.getParentRelationship(id) !== null) {
+        return String(id);
+      }
+    }
+    return null;
+  });
+  await page.evaluate((id) => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:modify', { detail: { nodeID: parseInt(id, 10), modifications: { addTwin: 2 } } }));
+  }, personId);
+  await page.waitForTimeout(300);
+  const twinId = await page.evaluate((id) => window.editor.getGraph().getAllTwinsSortedByOrder(parseInt(id, 10)).find((t) => t !== parseInt(id, 10)), personId);
+  expect(twinId).toBeDefined();
+
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  await refreshWith(page, personId, [{ linkId: 'adopted', value: true }]);
+
+  expect(await page.evaluate((id) => window.editor.getView().getNode(parseInt(id, 10)).getAdopted(), personId)).toBe(true);
+  expect(await page.evaluate((id) => window.editor.getView().getNode(id).getAdopted(), twinId)).toBe(false);
+});
+
+test('legend refresh removes and replaces supplied disorders but keeps diagram-entered ones', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+
+  await refreshWith(page, personId, [{ linkId: 'disorders', value: [{ id: 'D1', name: 'One' }] }]);
+  await setNodeProperty(page, personId, { setDisorders: ['D1', 'D9'] }); // D9 entered in the diagram
+  expect((await readRoundTripNode(page, personId)).disorders).toEqual(['D1', 'D9']);
+
+  await refreshWith(page, personId, [{ linkId: 'disorders', value: [{ id: 'D2', name: 'Two' }] }]);
+  expect((await readRoundTripNode(page, personId)).disorders).toEqual(['D2', 'D9']);
+
+  await refreshWith(page, personId, [{ linkId: 'disorders', value: null }]);
+  expect((await readRoundTripNode(page, personId)).disorders).toEqual(['D9']);
 });
