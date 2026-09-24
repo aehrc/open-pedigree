@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.1.0...open-pedigree-v1.2.0) (2026-09-24)
+
+
+### Features
+
+* let a record-link provider relabel its node-menu actions ([#27](https://github.com/aehrc/open-pedigree/issues/27)) ([208670f](https://github.com/aehrc/open-pedigree/commit/208670fe41e593cbe93093a4f1cc020290010130))
+
 ## [1.1.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.0.1...open-pedigree-v1.1.0) (2026-09-22)
 
 
