@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.2.0...open-pedigree-v1.3.0) (2026-09-24)
+
+
+### Features
+
+* keep linked records through GA4GH saves, and make refreshes apply the record's changes ([#30](https://github.com/aehrc/open-pedigree/issues/30)) ([7625004](https://github.com/aehrc/open-pedigree/commit/7625004b4c6524b5955cb5b6bd89bfe99e38bd91))
+
 ## [1.2.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.1.0...open-pedigree-v1.2.0) (2026-09-24)
 
 
