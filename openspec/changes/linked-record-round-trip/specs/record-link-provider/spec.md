@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: openEditor and createNew dispatch answers through the existing setter-resolution path
-`onDone` (from `openEditor`) SHALL receive an array of `{linkId: string, value: any}` entries, and `onCreated` (from `createNew`) SHALL receive `(recordRef: string, answers: {linkId: string, value: any}[])`. Each entry SHALL be resolved to its target through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`), but applied with the refresh semantics in "A linked-record refresh mirrors the record's values". `onCreated`'s `recordRef` argument SHALL be stored on the node the same way `openPicker`'s `onLinked` stores its `recordRef`. A newly-created record has its own ref the instant it exists, and without it the node could never satisfy the `canEditLinkedRecord` predicate (this capability's "Capability flags gate node-menu actions" requirement) afterward.
+`onDone` (from `openEditor`) SHALL receive an array of `{linkId: string, value: any}` entries, and `onCreated` (from `createNew`) SHALL receive `(recordRef: string, answers: {linkId: string, value: any}[])`. Each entry SHALL be resolved to its target through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`), but applied with the refresh semantics in "A linked-record refresh applies the record's changes". `onCreated`'s `recordRef` argument SHALL be stored on the node the same way `openPicker`'s `onLinked` stores its `recordRef`. A newly-created record has its own ref the instant it exists, and without it the node could never satisfy the `canEditLinkedRecord` predicate (this capability's "Capability flags gate node-menu actions" requirement) afterward.
 
 #### Scenario: openEditor's onDone updates node properties
 - **WHEN** a provider calls `onDone([{ linkId: "gender", value: "F" }])` for an item mapped via `mapsToField` to `gender`
@@ -25,65 +25,69 @@ When a pedigree is exported as GA4GH FHIR, each node's linked record ref SHALL b
 - **WHEN** a node with no linked record is exported as GA4GH
 - **THEN** its `Patient` resource SHALL carry no linked-record extension
 
-### Requirement: The editor remembers which values the linked record supplied
-After each `onDone`/`onCreated` dispatch, the node SHALL record which linkIds received a non-empty value from the linked record, and for reserved legend targets which entry IDs. This supplied set SHALL be saved and restored with the pedigree in both `internal` and GA4GH formats (GA4GH: as extensions on the corresponding QuestionnaireResponse items and answers). It SHALL be cleared when the node's linked record ref changes (relinked or unlinked).
+### Requirement: The editor remembers what the linked record last sent
+After each `onDone`/`onCreated` dispatch, the node SHALL keep a snapshot of the linked record's last non-empty value for each linkId it sent (legend lists as the record's entries). The snapshot SHALL be saved and restored with the pedigree in both `internal` format (a `linkedRecordSnapshot` node property) and GA4GH format (a JSON `valueString` extension on the node's `Patient` resource, beside the linked-record ref and under the same privacy gate). It SHALL be reset when the node's linked record ref changes, and the record-link actions SHALL send the reset together with the new ref, so undoing a relink restores the previous snapshot.
 
-#### Scenario: Supplied set survives a save and reload
-- **WHEN** a refresh supplies `first_name` and the legend entry `D1`, and the pedigree is saved as GA4GH and reloaded
-- **THEN** the node's supplied set SHALL still contain `first_name` and legend entry `D1`
+#### Scenario: Snapshot survives a save and reload
+- **WHEN** a refresh sends `note: "from the record"`, and the pedigree is saved as GA4GH and reloaded
+- **THEN** the node's snapshot SHALL still be `{ note: "from the record" }`
 
-#### Scenario: Relinking forgets what the old record supplied
+#### Scenario: Relinking forgets what the old record sent
 - **WHEN** a node's linked record ref changes from `record:1/instance:1` to `record:1/instance:2`
-- **THEN** its supplied set SHALL be empty until the next refresh
+- **THEN** its snapshot SHALL be empty until the next refresh
 
-### Requirement: A linked-record refresh mirrors the record's values
-An `onDone`/`onCreated` dispatch SHALL treat its answers as the linked record's current state:
-- A non-empty value SHALL be set.
-- A `null` value for a linkId in the node's supplied set SHALL clear that target.
-- A `null` value for a linkId not in the supplied set SHALL leave the node's value unchanged, so values entered in the diagram are never wiped by a record that never supplied them.
+### Requirement: A linked-record refresh applies the record's changes
+An `onDone`/`onCreated` dispatch SHALL compare each answer with the node's snapshot (what the record sent last time), not with the node's current value:
+- An answer equal to the snapshot SHALL change nothing, even if the node reads back differently (open-pedigree may normalise or reject values).
+- A changed non-empty answer SHALL be set.
+- A `null` (empty) answer SHALL clear the target only if the node still holds the snapshot's value. If it holds anything else (a diagram edit, or a value open-pedigree rejected), it SHALL be left alone. A value the record never sent is never cleared.
 
-Clearing SHALL use a defined per-target clear rather than the generic setter with `''`:
+Clearing SHALL use a defined per-target clear:
 - generic answers are removed
-- names, comments and dates become empty
+- names, comments, dates and carrier status become empty
 - gender becomes `U`
-- carrier status becomes empty
 - boolean targets return to their model default
 - gestation age is unset
-- life status becomes `alive`, clearing any death date
+- childless status becomes `null`
+- life status becomes `alive`
 
-Comparisons SHALL be strict, a refresh SHALL NOT propagate values to twins, and one refresh that changes anything SHALL be exactly one undo step. A refresh that changes nothing SHALL add no undo step.
+A refresh SHALL NOT copy the adopted flag to twins. Twin-group rules (monozygotic gender, monozygosity) SHALL still propagate. A refresh that changes values SHALL be one undo step, plus at most one more if a setter's side effect wiped another record value and it's put back. A refresh that changes no values SHALL add no undo step.
 
 #### Scenario: A value cleared in the record clears on the node
-- **WHEN** the node's supplied set contains `notes`, and a refresh sends `{ linkId: "notes", value: null }`
+- **WHEN** the snapshot has `notes: "old"`, the node still shows `"old"`, and a refresh sends `notes: null`
 - **THEN** the node's `notes` answer SHALL be removed
 
-#### Scenario: A diagram-entered value survives a sparse record
-- **WHEN** a node has a birth date entered in the diagram, its supplied set doesn't contain the birth-date item, and a refresh sends `null` for it
+#### Scenario: A diagram-entered value survives
+- **WHEN** a node has a birth date entered in the diagram, which the record never sent, and a refresh sends `null` for it
 - **THEN** the node's birth date SHALL be unchanged
 
+#### Scenario: A rejected value, later emptied, doesn't wipe the diagram's value
+- **WHEN** a male partnered with a female is refreshed with gender `F` (rejected by partnership rules), and later with gender `null`
+- **THEN** the node's gender SHALL stay `M`
+
+#### Scenario: An unchanged value that open-pedigree stores differently settles
+- **WHEN** a live-born person is refreshed repeatedly with the same gestation age
+- **THEN** only the first refresh SHALL add an undo step
+
 #### Scenario: Clearing gender and zero values works
-- **WHEN** the supplied set contains the gender item and an integer item currently `0`, and a refresh sends `null` for both
+- **WHEN** the snapshot has gender `F` and an integer `0` that the node still holds, and a refresh sends `null` for both
 - **THEN** gender SHALL become `U`, and the integer answer SHALL be removed
 
-#### Scenario: No-op refresh leaves undo untouched
-- **WHEN** a refresh sends exactly the node's current values
-- **THEN** no undo step SHALL be added
-
-#### Scenario: Refresh doesn't touch twins
-- **WHEN** a refresh changes the adopted flag on a node that is a twin
-- **THEN** the twin's adopted flag SHALL be unchanged
+#### Scenario: Refresh doesn't copy adopted to twins, but keeps monozygotic twins' gender in step
+- **WHEN** a refresh sets adopted on a twin, or sets gender on a monozygotic twin
+- **THEN** the other twin's adopted flag SHALL be unchanged, and its gender SHALL follow
 
 ### Requirement: Legend lists are reconciled, not merged, on refresh
-For a reserved legend target, a refresh SHALL remove previously-supplied entries the record no longer contains, add entries it newly contains, and keep entries that were never supplied by the record (entered in the diagram). `patient-provider`'s one-off import SHALL keep merging as today.
+For a legend list (the reserved disorders/genes/phenotypes targets, or a custom legend item), a refresh SHALL remove entries the record sent last time and no longer does, add entries it newly sends, and keep entries the record never sent. Reserved legend entries SHALL be matched through the same ID sanitising the legend uses (e.g. `HP:0001250` is stored as `HP_C_0001250`), so re-sending an entry doesn't duplicate it. `patient-provider`'s one-off import SHALL keep merging as today.
 
-#### Scenario: A disorder removed in the record is removed from the node
-- **WHEN** the supplied set's `disorders` entries are `D1`, and a refresh sends `disorders` with no `D1` entry (or `null`)
-- **THEN** `D1` SHALL be removed from the node's disorders
-
-#### Scenario: A diagram-entered disorder is kept
-- **WHEN** the node also has disorder `D9`, entered in the diagram and never supplied by the record
-- **THEN** `D9` SHALL remain after the refresh
+#### Scenario: A dropped disorder is removed; a diagram-entered one is kept
+- **WHEN** the snapshot's `disorders` are `D1`, the node also has diagram-entered `D9`, and a refresh sends no disorders
+- **THEN** the node's disorders SHALL be `D9`
 
 #### Scenario: A changed disorder replaces the old one
-- **WHEN** the supplied `disorders` entries are `D1`, and a refresh sends `[{id: "D2", name: "…"}]`
+- **WHEN** the snapshot's `disorders` are `D1`, and a refresh sends `[{id: "D2", name: "…"}]`
 - **THEN** the node's disorders SHALL contain `D2` and not `D1` (plus any diagram-entered entries)
+
+#### Scenario: Sanitised phenotype IDs don't duplicate and can be removed
+- **WHEN** a refresh sends phenotype `HP:0001250` twice, and later sends none
+- **THEN** the node SHALL have one `HP_C_0001250` after the first two refreshes (the second adding no undo step), and none after the third

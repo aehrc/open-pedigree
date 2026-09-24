@@ -31,7 +31,7 @@ import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider'
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
-import { computeLinkedRecordRefresh } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
@@ -570,7 +570,8 @@ export default class PedigreeEditor {
       (window as any).editor.getRecordLinkProvider().openPicker(nodeId,
         function(recordRef: string, _details: any) {
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef } }
+            // The snapshot reset travels with the new ref, so undo restores both.
+            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef, setLinkedRecordSnapshot: {} } }
           }));
         }
       );
@@ -580,7 +581,8 @@ export default class PedigreeEditor {
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
         function(recordRef: string, answers: {linkId: string, value: any}[]) {
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef } }
+            // The snapshot reset travels with the new ref, so undo restores both.
+            detail: { nodeID: nodeId, properties: { setLinkedRecordRef: recordRef, setLinkedRecordSnapshot: {} } }
           }));
           (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers);
         }
@@ -634,13 +636,12 @@ export default class PedigreeEditor {
   }
 
   /**
-   * Applies a linked record's answers (record-link-provider `onDone`/`onCreated`) so the node
-   * mirrors the record: sets what it has, clears what it previously supplied and no longer has,
-   * reconciles legend lists, and never touches a value the record didn't supply (entered in the
-   * diagram) - see linked-record-round-trip, and linkedRecordRefresh.ts for the rules. Unlike
-   * _dispatchQuestionnaireAnswers (patient-provider's one-off import, which merges), this sends
-   * only real changes, as one flagged event: the controller then compares strictly and skips twin
-   * propagation, and a refresh that changes no values adds no undo step.
+   * Applies a linked record's answers (record-link-provider `onDone`/`onCreated`): the record's
+   * changes since its last refresh are applied - set, cleared (only where the node still holds
+   * the record's value) or, for legend lists, reconciled - and nothing entered in the diagram is
+   * wiped. See linked-record-round-trip, and linkedRecordRefresh.ts for the rules. Unlike
+   * _dispatchQuestionnaireAnswers (patient-provider's one-off import, which merges), only real
+   * changes are sent, as one flagged event, and a refresh with no changes adds no undo step.
    */
   _dispatchLinkedRecordRefresh(nodeId: any, answers: {linkId: string, value: any}[]): void {
     var editor = (window as any).editor;
@@ -659,28 +660,69 @@ export default class PedigreeEditor {
     var resolveSetter = function(linkId: string): string {
       return editor._resolveQuestionnaireSetter(linkId);
     };
+    var current = function(setter: string): any {
+      var getter = getterFor[setter] || setter.replace(/^set/, 'get');
+      return typeof node[getter] === 'function' ? node[getter]() : undefined;
+    };
+    var itemFor = function(linkId: string): any {
+      var config = editor._questionnaireConfig;
+      return config && config.items.find(function(i: any) { return i.linkId === linkId; });
+    };
+    var isReserved = function(linkId: string): boolean {
+      return RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId);
+    };
+    // Reserved legends store sanitised IDs (terminology.sanitizeID, e.g. "HP:1" -> "HP_C_1"),
+    // so compare through the same function; custom legend items store {system, code, display}.
+    var sanitise = function(linkId: string, id: any): string {
+      var terminology = editor.getQuestionnaireTerminology(linkId);
+      var raw = id === undefined || id === null ? '' : String(id);
+      return terminology && typeof terminology.sanitizeID === 'function' ? terminology.sanitizeID(raw) : raw;
+    };
     // An answer for a linkId the effective Questionnaire doesn't declare has no setter on the node.
     var usable = (answers || []).filter(function(answer: any) {
       return answer && typeof node[resolveSetter(answer.linkId)] === 'function';
     });
-    var previousSupplied = node.getLinkedRecordSupplied();
+    var previousSnapshot = node.getLinkedRecordSnapshot();
     var result = computeLinkedRecordRefresh({
       answers: usable,
       resolveSetter: resolveSetter,
-      isLegendTarget: function(linkId: string): boolean { return RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId); },
-      current: function(setter: string): any {
-        var getter = getterFor[setter] || setter.replace(/^set/, 'get');
-        return typeof node[getter] === 'function' ? node[getter]() : undefined;
+      isLegend: function(linkId: string): boolean {
+        var item = itemFor(linkId);
+        return isReserved(linkId)
+          || !!(item && item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation'));
       },
-      supplied: previousSupplied
+      incomingLegendKey: function(linkId: string, entry: any): string {
+        return isReserved(linkId) ? sanitise(linkId, entry && typeof entry === 'object' ? entry.id : entry) : String(entry && entry.code);
+      },
+      storedLegendKey: function(linkId: string, entry: any): string {
+        return isReserved(linkId) ? sanitise(linkId, entry) : String(entry && entry.code);
+      },
+      legendSetterEntry: function(linkId: string, entry: any): any {
+        return isReserved(linkId) ? (entry && typeof entry === 'object' ? entry.id : entry) : entry;
+      },
+      current: current,
+      snapshot: previousSnapshot
     });
-    var suppliedChanged = JSON.stringify(result.supplied) !== JSON.stringify(previousSupplied);
-    if (!result.valuesChanged && !suppliedChanged) {
+    var snapshotChanged = JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot);
+    if (!result.valuesChanged && !snapshotChanged) {
       return;
     }
+
+    // Record fields (other than the ones being changed) whose node value matches the record now,
+    // so a setter side effect that wipes one (e.g. clearing life status also clears the death
+    // date) can be put back afterwards.
+    var holding: string[] = [];
+    Object.keys(result.snapshot).forEach(function(linkId: string) {
+      var setter = resolveSetter(linkId);
+      if (!result.properties.hasOwnProperty(setter) && !isReserved(linkId)
+          && typeof node[setter] === 'function' && sameValue(setter, current(setter), result.snapshot[linkId])) {
+        holding.push(linkId);
+      }
+    });
+
     var properties: any = result.properties;
-    if (suppliedChanged) {
-      properties.setLinkedRecordSupplied = result.supplied;
+    if (snapshotChanged) {
+      properties.setLinkedRecordSnapshot = result.snapshot;
     }
     document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
       detail: {
@@ -691,6 +733,19 @@ export default class PedigreeEditor {
         noUndoRedo: !result.valuesChanged
       }
     }));
+
+    var restore: any = {};
+    holding.forEach(function(linkId: string) {
+      var setter = resolveSetter(linkId);
+      if (!sameValue(setter, current(setter), result.snapshot[linkId])) {
+        restore[setter] = result.snapshot[linkId];
+      }
+    });
+    if (Object.keys(restore).length > 0) {
+      document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+        detail: { nodeID: nodeId, properties: restore, linkedRecordRefresh: true }
+      }));
+    }
   }
 
   getQuestionnaireConfig(): any {

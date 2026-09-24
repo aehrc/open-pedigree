@@ -430,7 +430,7 @@ describe('DEFAULT_QUESTIONNAIRE end-to-end GA4GH export/import round trip', () =
 
 describe('linked record round trip (linked-record-round-trip)', () => {
   const LINK_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
-  const SUPPLIED_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/questionnaire-response-linked-record-supplied';
+  const SNAPSHOT_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
 
   function johnGraph() {
     return PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
@@ -469,51 +469,31 @@ describe('linked record round trip (linked-record-round-trip)', () => {
     expect(patients.some(p => (p.extension || []).some(ext => ext.url === LINK_URL))).toBe(false);
   });
 
-  it('marks and restores supplied plain items, and leaves unmarked items out of the supplied set', () => {
+  it('exports the record snapshot as a Patient extension beside the link and restores it on import', () => {
     const baseGraph = johnGraph();
     baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
-    baseGraph.properties[0].questionnaireAnswers = { notes: 'from REDCap' };
-    baseGraph.properties[0].carrierStatus = 'carrier';
-    baseGraph.properties[0].linkedRecordSupplied = { notes: true };
+    baseGraph.properties[0].linkedRecordSnapshot = { notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] };
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
 
-    const qr = JSON.parse(exported).entry.map(e => e.resource).find(r => r.resourceType === 'QuestionnaireResponse');
-    expect(qr.item.find(i => i.linkId === 'notes').extension).toEqual([{ url: SUPPLIED_URL, valueBoolean: true }]);
-    expect(qr.item.find(i => i.linkId === 'carrier').extension).toBeUndefined();
-
+    const ext = johnPatient(exported).extension.find(e => e.url === SNAPSHOT_URL);
+    expect(JSON.parse(ext.valueString)).toEqual({ notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] });
     const john = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find(p => p.fName === 'John');
-    expect(john.linkedRecordSupplied).toEqual({ notes: true });
+    expect(john.linkedRecordSnapshot).toEqual({ notes: 'from REDCap', disorders: [{ id: 'HP:1', name: 'x' }] });
   });
 
-  it('loads a document without markers (saved before this change) with no supplied set', () => {
+  it('loads a document without a snapshot (saved before this change) with none', () => {
     const baseGraph = johnGraph();
-    baseGraph.properties[0].questionnaireAnswers = { notes: 'old save' };
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
     const john = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find(p => p.fName === 'John');
-    expect(john.linkedRecordSupplied).toBeUndefined();
+    expect(john.linkedRecordSnapshot).toBeUndefined();
   });
 
-  it('marks supplied legend entries per answer with the node entry ID, and restores exactly those IDs', () => {
-    const legendConfig = {
-      canonicalUrl: 'http://example.org/Questionnaire/legend|1.0',
-      items: [{ linkId: 'disorders', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } }],
-    };
-    vi.stubGlobal('editor', {
-      // A coding whose code differs from the node's raw ID - the marker must carry the raw ID.
-      getFhirTerminologyHelper: () => ({ getCodeableConceptFromDisorder: (id) => ({ coding: [{ system: 'http://example.org', code: 'code-' + id, display: 'Disorder ' + id }] }) }),
-      getQuestionnaireConfig: () => legendConfig,
-    });
-
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', {
-      disorders: ['D1', 'D9'],
-      linkedRecordSupplied: { disorders: ['D1'] },
-    });
-    const answers = qr.item.find(i => i.linkId === 'disorders').answer;
-    expect(answers[0].extension).toEqual([{ url: SUPPLIED_URL, valueString: 'D1' }]);
-    expect(answers[1].extension).toBeUndefined();
-
-    const nodeData = { properties: {} };
-    GA4GHFHIRConverter.extractDataFromQuestionnaireResponse(qr, { 'Patient/1': nodeData });
-    expect(nodeData.properties.linkedRecordSupplied).toEqual({ disorders: ['D1'] });
+  it('keeps the snapshot out of de-identified exports', () => {
+    const baseGraph = johnGraph();
+    baseGraph.properties[0].linkedRecordRef = 'record:1/instance:1';
+    baseGraph.properties[0].linkedRecordSnapshot = { notes: 'secret' };
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'minimal', null, null);
+    expect(exported).not.toContain('secret');
   });
 });

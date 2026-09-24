@@ -8,12 +8,14 @@
 ## What Changes
 
 - **GA4GH persistence of the link:** the node's `linkedRecordRef` is exported as a `Patient` extension and restored on import.
-- **Supplied-value tracking:** the editor remembers which answers (and which legend entries) the linked record supplied at its last refresh. This is saved with the pedigree in both `internal` and GA4GH formats (GA4GH as QuestionnaireResponse item/answer extensions), and reset when the node is linked to a different record or unlinked.
-- **Refresh dispatch for `openEditor`/`createNew` answers:**
-  - `null` means "empty in the linked record". A value the record previously supplied is cleared through a defined per-target clear; a value it never supplied (entered in the diagram) is left alone.
-  - Legend targets remove previously-supplied entries the record no longer has, and add new ones. Entries added in the diagram are kept.
-  - Comparisons are strict. Nothing changes and no undo entry is added when the refresh matches the node. A refresh that changes something is one undo step.
-  - Twin propagation is not triggered by a refresh.
+- **A snapshot of what the record last sent:** kept per node, saved with the pedigree in both `internal` and GA4GH formats (GA4GH as a JSON extension on the `Patient`, beside the link), and reset when the node is relinked or unlinked. The record-link actions send the reset with the new ref, so undo restores it.
+- **Refresh dispatch for `openEditor`/`createNew` answers: apply the record's *changes*.** Each answer is compared with the snapshot, not with the node, because open-pedigree's setters normalise, reject and recompute values, so comparing against the node never settles:
+  - Unchanged: nothing happens.
+  - Changed: it's set.
+  - Emptied: it's cleared through a per-target clear, but only while the node still holds the record's last value. A diagram edit, or a value open-pedigree rejected, is left alone.
+  - Legend lists are reconciled (dropped entries removed, new ones added, diagram-entered ones kept), matching IDs through the legend's own sanitising.
+  - A refresh with no changes adds no undo step. The adopted flag isn't copied to twins, but twin-group rules still apply.
+- **Bug fix found on the way:** `Person.removePhenotype` and `removeGene` called Prototype.js's `Array#without`, which no longer exists, so removing any phenotype or candidate gene threw, in the normal UI too. They now use `filter`, like `removeDisorder`.
 - `patient-provider`'s one-off import (`importClinicalData`) keeps today's merge behaviour.
 
 ## Capabilities
@@ -22,10 +24,10 @@
 - (none)
 
 ### Modified Capabilities
-- `record-link-provider`: link persistence across GA4GH save and load; supplied-value tracking; refresh semantics for `onDone`/`onCreated` (clearing, legend replacement, strict comparison, single undo step).
+- `record-link-provider`: link persistence across GA4GH save and load; a snapshot of what the record last sent; refresh semantics for `onDone`/`onCreated` (apply the record's changes: set, clear-if-still-the-record's, legend reconciliation; quiet undo).
 
 ## Impact
 
-- `src/script/GA4GHFHIRConverter.ts` (export and import of the link and supplied markers), `src/script/view/person.ts` (link and supplied-set properties, reset on relink), `src/script/pedigree.ts` (`editRecord`/`createNewRecord` dispatch in refresh mode), `src/script/controller.ts` (a refresh path with strict compare and no twin propagation, if needed).
-- Tests: unit tests for the converter round trip and refresh dispatch; e2e for save, reload and the link surviving, and for refresh clearing supplied values while keeping diagram-entered ones.
+- `src/script/GA4GHFHIRConverter.ts` (export and import of the link and snapshot Patient extensions), `src/script/view/person.ts` (link and snapshot properties, reset on relink; `removePhenotype`/`removeGene` fix), `src/script/pedigree.ts` (`editRecord`/`createNewRecord` dispatch in refresh mode), `src/script/controller.ts` (a refresh path with strict compare and no twin propagation, if needed).
+- Tests: unit tests for the converter round trip and refresh dispatch; e2e for save, reload and the link surviving, and for refresh behaviour against a real editor (clearing, diagram values kept, rejected values, sanitised legend IDs, dates, twins, undo).
 - Host follow-up (`redcap_pedigree_editor`): send `null` for empty fields, pick up the release, and refresh its bundled `dist/`. Released as one minor version.

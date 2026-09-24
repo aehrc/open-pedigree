@@ -94,6 +94,10 @@ export default class Controller {
     // real changes: compare strictly (0/''/false aren't "the same"), and don't copy values to
     // twins - a linked record describes one person.
     var isLinkedRecordRefresh = !!event.detail.linkedRecordRefresh;
+    if (isLinkedRecordRefresh) {
+      // Carried in the memo so undoing a refresh is also treated as one.
+      (undoEvent.memo as any).linkedRecordRefresh = true;
+    }
 
     var twinUpdate: any = undefined;
     var needUpdateAncestors = false;
@@ -175,10 +179,14 @@ export default class Controller {
 
         if (propertySetFunction == 'setAdopted') {
           needUpdateAncestors = true;
-          if (!twinUpdate) {
-            twinUpdate = {};
+          // A linked record describes one person: its adopted flag isn't copied to twins.
+          // (Monozygotic gender and monozygosity are group rules and still propagate.)
+          if (!isLinkedRecordRefresh) {
+            if (!twinUpdate) {
+              twinUpdate = {};
+            }
+            twinUpdate[propertySetFunction] = propValue;
           }
-          twinUpdate[propertySetFunction] = propValue;
         }
 
         if (propertySetFunction == 'setMonozygotic') {
@@ -199,7 +207,7 @@ export default class Controller {
       }
     }
 
-    if (twinUpdate && !isLinkedRecordRefresh) {
+    if (twinUpdate) {
       var allTwins = editor.getGraph().getAllTwinsSortedByOrder(nodeID);
       for (var propertySetFunction in twinUpdate) {
         if (twinUpdate.hasOwnProperty(propertySetFunction)) {

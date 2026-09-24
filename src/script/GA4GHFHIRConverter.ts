@@ -4,10 +4,9 @@ import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questio
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
-// Marks what the linked record supplied at its last refresh (linked-record-round-trip): on a
-// QuestionnaireResponse item as valueBoolean, or - for reserved legend items, whose entries are
-// per-answer - on each supplied answer as valueString = the node's own entry ID.
-export const LINKED_RECORD_SUPPLIED_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/questionnaire-response-linked-record-supplied';
+// What the linked record sent at its last refresh (linked-record-round-trip), on the same
+// Patient resource, as JSON: application bookkeeping for the next refresh, not clinical data.
+export const LINKED_RECORD_SNAPSHOT_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
 
 
 
@@ -700,6 +699,13 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   for (const ext of (patientResource.extension || [])) {
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;
+    }
+    if (ext.url === LINKED_RECORD_SNAPSHOT_EXTENSION_URL && ext.valueString) {
+      try {
+        (properties as any).linkedRecordSnapshot = JSON.parse(ext.valueString);
+      } catch (e) {
+        console.warn('Ignoring an unreadable linked-record snapshot extension', e);
+      }
     }
   }
   properties.gender = 'U';
@@ -1460,6 +1466,12 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
         'url': LINKED_RECORD_REF_EXTENSION_URL,
         'valueString': nodeProperties.linkedRecordRef
       });
+      if (nodeProperties.linkedRecordSnapshot && Object.keys(nodeProperties.linkedRecordSnapshot).length > 0) {
+        patientResource.extension.push({
+          'url': LINKED_RECORD_SNAPSHOT_EXTENSION_URL,
+          'valueString': JSON.stringify(nodeProperties.linkedRecordSnapshot)
+        });
+      }
     }
   }
   return patientResource;
@@ -1791,19 +1803,16 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     return null;
   }
   const storedAnswers = nodeProperties['questionnaireAnswers'] || {};
-  const supplied = nodeProperties['linkedRecordSupplied'] || {};
   const items = [];
   for (const item of questionnaireConfig.items) {
     if (item.fieldType === 'heading') {
       continue;
     }
     let value;
-    let legendRawIds = null;
     if (item.mapping && item.mapping.kind === 'field') {
       value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
     } else if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') && RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
-      legendRawIds = nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey] || [];
-      value = this._reservedLegendIdsToAnswers(item.linkId, legendRawIds);
+      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey]);
     } else {
       value = storedAnswers[item.linkId];
     }
@@ -1811,20 +1820,10 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
       continue;
     }
     const values = Array.isArray(value) ? value : [value];
-    const answers = values.map((v) => this.answerToFhirValue(item.itemType, v));
-    const qrItem: any = { 'linkId': item.linkId, 'answer': answers };
-    if (legendRawIds) {
-      // _reservedLegendIdsToAnswers maps legendRawIds in order, so answers[i] is legendRawIds[i].
-      const suppliedIds = Array.isArray(supplied[item.linkId]) ? supplied[item.linkId] : [];
-      answers.forEach((answer, i) => {
-        if (suppliedIds.indexOf(legendRawIds[i]) !== -1) {
-          answer.extension = [{ 'url': LINKED_RECORD_SUPPLIED_EXTENSION_URL, 'valueString': legendRawIds[i] }];
-        }
-      });
-    } else if (supplied[item.linkId] === true) {
-      qrItem.extension = [{ 'url': LINKED_RECORD_SUPPLIED_EXTENSION_URL, 'valueBoolean': true }];
-    }
-    items.push(qrItem);
+    items.push({
+      'linkId': item.linkId,
+      'answer': values.map((v) => this.answerToFhirValue(item.itemType, v))
+    });
   }
   if (items.length === 0) {
     return null;
@@ -1975,7 +1974,6 @@ GA4GHFHIRConverter.extractDataFromQuestionnaireResponse = function (qrResource, 
     if (!item || !qrItem.answer || qrItem.answer.length === 0) {
       continue;
     }
-    this._readLinkedRecordSupplied(qrItem, nodeData.properties);
     const values = qrItem.answer.map((a) => this.fhirValueToAnswer(item.itemType, a));
     const value = item.repeats ? values : values[0];
 
@@ -1986,28 +1984,6 @@ GA4GHFHIRConverter.extractDataFromQuestionnaireResponse = function (qrResource, 
     }
     nodeData.properties.questionnaireAnswers[qrItem.linkId] = value;
   }
-};
-
-// Rebuilds a node's linkedRecordSupplied set from a QuestionnaireResponse item's markers (see
-// LINKED_RECORD_SUPPLIED_EXTENSION_URL): an item-level marker means the whole item was supplied;
-// answer-level markers carry the supplied legend entry IDs.
-(GA4GHFHIRConverter as any)._readLinkedRecordSupplied = function (qrItem, properties) {
-  const isMarker = (ext) => ext && ext.url === LINKED_RECORD_SUPPLIED_EXTENSION_URL;
-  const suppliedIds = [];
-  for (const answer of qrItem.answer) {
-    const marker = (answer.extension || []).find(isMarker);
-    if (marker && marker.valueString) {
-      suppliedIds.push(marker.valueString);
-    }
-  }
-  const itemMarked = (qrItem.extension || []).some((ext) => isMarker(ext) && ext.valueBoolean === true);
-  if (!itemMarked && suppliedIds.length === 0) {
-    return;
-  }
-  if (!properties.linkedRecordSupplied) {
-    properties.linkedRecordSupplied = {};
-  }
-  properties.linkedRecordSupplied[qrItem.linkId] = suppliedIds.length > 0 ? suppliedIds : true;
 };
 
 export default GA4GHFHIRConverter;

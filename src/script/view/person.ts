@@ -66,7 +66,7 @@ export default class Person extends AbstractPerson {
   _lostContact: any;
   _linkedPatientRef: any;
   _linkedRecordRef: any;
-  _linkedRecordSupplied: any;
+  _linkedRecordSnapshot: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -226,7 +226,7 @@ export default class Person extends AbstractPerson {
     this._lostContact = false;
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
-    this._linkedRecordSupplied = {};
+    this._linkedRecordSnapshot = {};
     this._questionnaireAnswers = {};
   }
 
@@ -253,26 +253,27 @@ export default class Person extends AbstractPerson {
   }
 
   setLinkedRecordRef(ref: string): void {
-    // What the previous record supplied says nothing about a different record.
+    // A snapshot of what the previous record sent says nothing about a different record. The
+    // record-link actions also send setLinkedRecordSnapshot({}) alongside a new ref, so undoing
+    // a relink restores the old snapshot too.
     if ((ref || '') !== (this._linkedRecordRef || '')) {
-      this._linkedRecordSupplied = {};
+      this._linkedRecordSnapshot = {};
     }
     this._linkedRecordRef = ref;
   }
 
   /**
-   * Which values the linked record supplied at its last refresh: linkId -> true, or for a
-   * reserved legend target linkId -> the supplied entry IDs. A refresh only clears what's in
-   * here, so values entered in the diagram are never wiped (see linked-record-round-trip).
+   * What the linked record sent at its last refresh: linkId -> its last non-empty value. A
+   * refresh applies only the record's changes relative to this (linked-record-round-trip).
    *
-   * @method getLinkedRecordSupplied
+   * @method getLinkedRecordSnapshot
    */
-  getLinkedRecordSupplied(): any {
-    return this._linkedRecordSupplied || {};
+  getLinkedRecordSnapshot(): any {
+    return this._linkedRecordSnapshot || {};
   }
 
-  setLinkedRecordSupplied(supplied: any): void {
-    this._linkedRecordSupplied = supplied || {};
+  setLinkedRecordSnapshot(snapshot: any): void {
+    this._linkedRecordSnapshot = snapshot || {};
   }
 
   /**
@@ -844,7 +845,7 @@ export default class Person extends AbstractPerson {
   removePhenotype(phenotypeID: any): void {
     if (this.hasPhenotype(phenotypeID)) {
       editor.getPhenotypeLegend().removeCase(phenotypeID, this.getID());
-      this._phenotypes = this.getPhenotypes().without(phenotypeID);
+      this._phenotypes = this.getPhenotypes().filter((p: any) => p !== phenotypeID);
     } else {
       alert('This person doesn\'t have the specified Phenotype term');
     }
@@ -909,7 +910,7 @@ export default class Person extends AbstractPerson {
   removeGene(geneID: any): void {
     if (this.hasGene(geneID)) {
       editor.getGeneLegend().removeCase(geneID, this.getID());
-      this._candidateGenes = this.getGenes().without(geneID);
+      this._candidateGenes = this.getGenes().filter((g: any) => g !== geneID);
     } else {
       console.log('This person doesn\'t have the specified gene');
     }
@@ -1155,8 +1156,8 @@ export default class Person extends AbstractPerson {
     if (this.getLinkedRecordRef() != '') {
       info['linkedRecordRef'] = this.getLinkedRecordRef();
     }
-    if (Object.keys(this.getLinkedRecordSupplied()).length > 0) {
-      info['linkedRecordSupplied'] = this.getLinkedRecordSupplied();
+    if (Object.keys(this.getLinkedRecordSnapshot()).length > 0) {
+      info['linkedRecordSnapshot'] = this.getLinkedRecordSnapshot();
     }
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
@@ -1232,9 +1233,9 @@ export default class Person extends AbstractPerson {
       if (info.hasOwnProperty('linkedRecordRef') && this.getLinkedRecordRef() != info.linkedRecordRef) {
         this.setLinkedRecordRef(info.linkedRecordRef);
       }
-      // After the ref: setLinkedRecordRef() resets the supplied set when the ref changes.
-      if (info.hasOwnProperty('linkedRecordSupplied')) {
-        this.setLinkedRecordSupplied(info.linkedRecordSupplied);
+      // After the ref: setLinkedRecordRef() resets the snapshot when the ref changes.
+      if (info.hasOwnProperty('linkedRecordSnapshot')) {
+        this.setLinkedRecordSnapshot(info.linkedRecordSnapshot);
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;
