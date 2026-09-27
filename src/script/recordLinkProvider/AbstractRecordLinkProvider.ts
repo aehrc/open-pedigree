@@ -12,7 +12,9 @@ export default abstract class AbstractRecordLinkProvider {
     abstract canLink(nodeId: number): boolean;
     abstract canCreateNew(nodeId: number): boolean;
 
-    abstract openPicker(nodeId: number, onLinked: (recordRef: string, details?: Record<string, any>) => void): void;
+    // onLinked's optional answers are the linked record's values, applied as for onCreated's -
+    // without them only the ref is stored, and values arrive with the first openEditor refresh.
+    abstract openPicker(nodeId: number, onLinked: (recordRef: string, details?: Record<string, any>, answers?: {linkId: string, value: any}[]) => void): void;
 
     abstract openEditor(nodeId: number, onDone: (answers: {linkId: string, value: any}[]) => void): void;
 

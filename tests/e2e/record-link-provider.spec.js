@@ -61,7 +61,7 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
         canLink: () => true,
         canCreateNew: () => true,
         openPicker: (_nodeId, onLinked) => {
-          window.__pendingLink && onLinked(window.__pendingLink.ref, window.__pendingLink.details);
+          window.__pendingLink && onLinked(window.__pendingLink.ref, window.__pendingLink.details, window.__pendingLink.answers);
         },
         openEditor: (_nodeId, onDone) => {
           window.__pendingEditAnswers && onDone(window.__pendingEditAnswers);
@@ -237,6 +237,49 @@ test('full flow: linking a node then editing it dispatches answers that update t
 
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('value from REDCap');
   await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toBeDisabled();
+});
+
+// link-record-brings-answers: onLinked's optional answers are applied in the same step, as
+// onCreated's are. (Without them only the ref is set - the full-flow test above.)
+test('linking with answers sets the ref and brings the record\'s values in', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true });
+  const personId = await openNodeMenuForProband(page);
+  await switchToLinkedRecordTab(page);
+
+  await page.evaluate(() => {
+    window.__pendingLink = { ref: 'Record/42', details: {}, answers: [{ linkId: 'ext_field_a', value: 'from the record' }] };
+  });
+  await clickInVisibleMenu(page, '.field-linkRecord button');
+  await page.waitForTimeout(100);
+
+  const node = await page.evaluate((id) => {
+    const n = window.editor.getView().getNode(parseInt(id, 10));
+    return { ref: n.getLinkedRecordRef(), answer: n.getQuestionnaireAnswer('ext_field_a'), snapshot: n.getLinkedRecordSnapshot() };
+  }, personId);
+  expect(node).toEqual({ ref: 'Record/42', answer: 'from the record', snapshot: { ext_field_a: 'from the record' } });
+  await expect(page.locator(`${VISIBLE_MENU} .field-ext_field_a input[type=text]`)).toHaveValue('from the record');
+});
+
+test('relinking to another record with answers replaces the old record\'s value and snapshot', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true });
+  const personId = await openNodeMenuForProband(page);
+  await switchToLinkedRecordTab(page);
+
+  const link = async (ref, value) => {
+    await page.evaluate(({ r, v }) => {
+      window.__pendingLink = { ref: r, details: {}, answers: [{ linkId: 'ext_field_a', value: v }] };
+    }, { r: ref, v: value });
+    await clickInVisibleMenu(page, '.field-linkRecord button');
+    await page.waitForTimeout(100);
+  };
+  await link('Record/1', 'one');
+  await link('Record/2', 'two');
+
+  const node = await page.evaluate((id) => {
+    const n = window.editor.getView().getNode(parseInt(id, 10));
+    return { ref: n.getLinkedRecordRef(), answer: n.getQuestionnaireAnswer('ext_field_a'), snapshot: n.getLinkedRecordSnapshot() };
+  }, personId);
+  expect(node).toEqual({ ref: 'Record/2', answer: 'two', snapshot: { ext_field_a: 'two' } });
 });
 
 test('createNewRecord sets the node\'s linkedRecordRef from onCreated\'s recordRef, making Edit reachable afterward', async ({ page }) => {
@@ -541,6 +584,49 @@ test('a refresh clears what the record supplied, leaves diagram-entered values, 
   expect(node.count).toBeUndefined();
   expect(node.note).toBeUndefined();
   expect(node.dob).toBe(new Date('1980-01-01').toDateString());
+  expect(node.snapshot).toEqual({});
+});
+
+// Links a node exactly as a provider's picker does: onLinked with the record's answers.
+async function linkWith(page, personId, ref, answers) {
+  await page.evaluate(({ id, r, a }) => {
+    window.__pendingLink = { ref: r, details: {}, answers: a };
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(parseInt(id, 10)), 100, 100);
+  }, { id: personId, r: ref, a: answers });
+  await switchToLinkedRecordTab(page);
+  await clickInVisibleMenu(page, '.field-linkRecord button');
+  await page.waitForTimeout(200);
+}
+
+test('relinking to a record without a value clears the old record\'s value, but keeps one typed in the diagram', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await linkWith(page, personId, 'record:1/instance:1', [
+    { linkId: 'note', value: 'from record 1' }, { linkId: 'count', value: 3 },
+  ]);
+  // Typed in the diagram: no longer the record's value.
+  await setNodeProperty(page, personId, { setQuestionnaireAnswer_count: 7 });
+
+  await linkWith(page, personId, 'record:1/instance:2', [{ linkId: 'note', value: null }, { linkId: 'count', value: null }]);
+  const node = await readRoundTripNode(page, personId);
+  expect(node.ref).toBe('record:1/instance:2');
+  expect(node.note ?? null).toBeNull();
+  expect(node.count).toBe(7);
+  expect(node.snapshot).toEqual({});
+});
+
+test('one undo removes a link and the values it brought', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  // Something to undo back to: in this harness the link would otherwise be the first state.
+  await setNodeProperty(page, personId, { setGender: 'F' });
+  await linkWith(page, personId, 'record:1/instance:1', [{ linkId: 'note', value: 'from the record' }]);
+  expect((await readRoundTripNode(page, personId)).note).toBe('from the record');
+
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  const node = await readRoundTripNode(page, personId);
+  expect(node.ref || '').toBe('');
+  expect(node.note ?? null).toBeNull();
   expect(node.snapshot).toEqual({});
 });
 

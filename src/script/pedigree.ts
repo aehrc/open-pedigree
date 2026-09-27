@@ -578,14 +578,9 @@ export default class PedigreeEditor {
     linkRecord: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getRecordLinkProvider().openPicker(nodeId,
-        function(recordRef: string, _details: any) {
-          // The node may have been deleted while the picker was open.
-          if (!(window as any).editor.getView().getNode(nodeId)) {
-            return;
-          }
-          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
-          }));
+        function(recordRef: string, _details: any, answers?: {linkId: string, value: any}[]) {
+          // The record's values come too if the provider sent them (link-record-brings-answers).
+          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers);
         }
       );
     },
@@ -593,14 +588,7 @@ export default class PedigreeEditor {
       var nodeId = menu.targetNode.getID();
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
         function(recordRef: string, answers: {linkId: string, value: any}[]) {
-          // The node may have been deleted while the create dialog was open.
-          if (!(window as any).editor.getView().getNode(nodeId)) {
-            return;
-          }
-          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
-          }));
-          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers, recordRef);
+          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers || []);
         }
       );
     },
@@ -663,8 +651,7 @@ export default class PedigreeEditor {
    * changes are sent, as one flagged event, and a refresh with no changes adds no undo step.
    */
   _dispatchLinkedRecordRefresh(nodeId: any, answers: {linkId: string, value: any}[], expectedRef?: string): void {
-    var editor = (window as any).editor;
-    var node = editor.getView().getNode(nodeId);
+    var node = (window as any).editor.getView().getNode(nodeId);
     if (!node) {
       return;
     }
@@ -672,6 +659,61 @@ export default class PedigreeEditor {
       console.warn('Linked-record refresh for ' + expectedRef + ' skipped: node ' + nodeId + ' is now linked to "' + node.getLinkedRecordRef() + '"');
       return;
     }
+    var changes = this._linkedRecordRefreshChanges(node, answers);
+    if (!changes.valuesChanged && !changes.snapshotChanged) {
+      return;
+    }
+    var properties: any = changes.properties;
+    if (changes.snapshotChanged) {
+      properties.setLinkedRecordSnapshot = changes.snapshot;
+    }
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+      detail: {
+        nodeID: nodeId,
+        properties: properties,
+        linkedRecordRefresh: true,
+        // Only the bookkeeping changed - nothing the user could see or want to undo.
+        noUndoRedo: !changes.valuesChanged
+      }
+    }));
+  }
+
+  /**
+   * Links a node to `recordRef` (record-link-provider `onLinked`/`onCreated`). With `answers`, the
+   * record's values are applied in the same event, so one undo removes the link and its values
+   * together. They're applied against the snapshot the node already has - what its previous record
+   * sent, if any - so that record's values are replaced or cleared rather than left behind, while
+   * anything entered in the diagram stays; the snapshot then becomes this record's. Without
+   * `answers`, only the ref is stored (see _linkedRecordRefProperties).
+   */
+  _applyLinkedRecord(nodeId: any, recordRef: string, answers?: {linkId: string, value: any}[]): void {
+    var node = (window as any).editor.getView().getNode(nodeId);
+    // The node may have been deleted while the provider's dialog was open.
+    if (!node) {
+      return;
+    }
+    if (!Array.isArray(answers)) {
+      document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+        detail: { nodeID: nodeId, properties: this._linkedRecordRefProperties(nodeId, recordRef) }
+      }));
+      return;
+    }
+    var changes = this._linkedRecordRefreshChanges(node, answers);
+    var properties: any = changes.properties;
+    properties.setLinkedRecordRef = recordRef;
+    properties.setLinkedRecordSnapshot = changes.snapshot;
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+      detail: { nodeID: nodeId, properties: properties, linkedRecordRefresh: true }
+    }));
+  }
+
+  /**
+   * The setproperty changes a linked record's `answers` make to `node`, compared with the node's
+   * snapshot (see _dispatchLinkedRecordRefresh): `properties` to send, the new `snapshot`, and
+   * whether any values or the snapshot changed.
+   */
+  _linkedRecordRefreshChanges(node: any, answers: {linkId: string, value: any}[]): { properties: any, snapshot: any, valuesChanged: boolean, snapshotChanged: boolean } {
+    var editor = (window as any).editor;
     var resolveSetter = function(linkId: string): string {
       return editor._resolveQuestionnaireSetter(linkId);
     };
@@ -730,24 +772,12 @@ export default class PedigreeEditor {
       current: current,
       snapshot: previousSnapshot
     });
-    var snapshotChanged = JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot);
-    if (!result.valuesChanged && !snapshotChanged) {
-      return;
-    }
-
-    var properties: any = result.properties;
-    if (snapshotChanged) {
-      properties.setLinkedRecordSnapshot = result.snapshot;
-    }
-    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-      detail: {
-        nodeID: nodeId,
-        properties: properties,
-        linkedRecordRefresh: true,
-        // Only the bookkeeping changed - nothing the user could see or want to undo.
-        noUndoRedo: !result.valuesChanged
-      }
-    }));
+    return {
+      properties: result.properties,
+      snapshot: result.snapshot,
+      valuesChanged: result.valuesChanged,
+      snapshotChanged: JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot)
+    };
   }
 
   /**
