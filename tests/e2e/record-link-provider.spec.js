@@ -156,6 +156,75 @@ test('with a recordLinkProvider configured, linked-record items from two differe
   expect(fieldOrder.indexOf('field-editRecord')).toBeLessThan(fieldOrder.indexOf('field-ext_field_a'));
 });
 
+// A host instrument whose section headers become groups, with every field linked (e.g.
+// redcap_pedigree_editor's derived form): regrouping empties the "Basic Info" tab.
+const ALL_LINKED_GROUP_QUESTIONNAIRE = {
+  resourceType: 'Questionnaire',
+  url: 'http://example.org/Questionnaire/e2e-all-linked-group',
+  version: '1.0',
+  item: [
+    {
+      linkId: 'basic_info', type: 'group', text: 'Basic Info',
+      item: [
+        {
+          linkId: 'ext_field_a', type: 'string', text: 'External field A',
+          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+        },
+      ],
+    },
+    {
+      linkId: 'more', type: 'group', text: 'More',
+      item: [{ linkId: 'notes', type: 'string', text: 'Notes' }],
+    },
+  ],
+};
+
+test('a tab whose items are all regrouped onto the Linked Record tab isn\'t shown', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ALL_LINKED_GROUP_QUESTIONNAIRE });
+  await openNodeMenuForProband(page);
+  const tabLabels = () => page.locator(`${VISIBLE_MENU} .tabs dd a`).allTextContents();
+
+  expect(await tabLabels()).toEqual(['More', 'Linked Record']);
+  await expect(page.locator(`${VISIBLE_MENU} #tab_basic_info`)).toHaveCount(0);
+  // Its item is still there, under its heading on the Linked Record tab.
+  await expect(page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-ext_field_a`)).toBeAttached();
+  expect(await page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-heading .field-name`).allTextContents()).toEqual(['Basic Info']);
+});
+
+test('a tab left with only a nested group\'s heading isn\'t shown, and the heading doesn\'t stray onto other tabs', async ({ page }) => {
+  const questionnaire = {
+    resourceType: 'Questionnaire', url: 'http://example.org/Questionnaire/e2e-nested-all-linked', version: '1.0',
+    item: [
+      {
+        linkId: 'clinical', type: 'group', text: 'Clinical',
+        item: [{
+          linkId: 'section_a', type: 'group', text: 'Section A',
+          item: [{
+            linkId: 'ext_field_a', type: 'string', text: 'External field A',
+            extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+          }],
+        }],
+      },
+      { linkId: 'more', type: 'group', text: 'More', item: [{ linkId: 'notes', type: 'string', text: 'Notes' }] },
+    ],
+  };
+  await loadEditor(page, { recordLinkProvider: true, questionnaire });
+  await openNodeMenuForProband(page);
+  expect(await page.locator(`${VISIBLE_MENU} .tabs dd a`).allTextContents()).toEqual(['More', 'Linked Record']);
+  // Every heading is inside a tab's panel - none at the form's root.
+  expect(await page.locator(`${VISIBLE_MENU} form.tabs-content > .field-heading`).count()).toBe(0);
+  expect(await page.locator(`${VISIBLE_MENU} #tab_more .field-heading`).count()).toBe(0);
+  await expect(page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-ext_field_a`)).toBeAttached();
+  expect(await page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-heading .field-name`).allTextContents()).toEqual(['Section A']);
+});
+
+test('without a recordLinkProvider the same tab keeps its (disabled) linked item and is shown', async ({ page }) => {
+  await loadEditor(page, { questionnaire: ALL_LINKED_GROUP_QUESTIONNAIRE });
+  await openNodeMenuForProband(page);
+  expect(await page.locator(`${VISIBLE_MENU} .tabs dd a`).allTextContents()).toEqual(['Basic Info', 'More']);
+  await expect(page.locator(`${VISIBLE_MENU} #tab_basic_info .field-ext_field_a input[type=text]`)).toBeDisabled();
+});
+
 const NESTED_INTERRUPTED_GROUP_QUESTIONNAIRE = {
   resourceType: 'Questionnaire',
   url: 'http://example.org/Questionnaire/e2e-linked-record-nested-interrupted-test',

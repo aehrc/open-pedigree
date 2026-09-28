@@ -494,7 +494,21 @@ export default class PedigreeEditor {
       fields.push(descriptor);
     });
 
-    var tabs = this._questionnaireConfig.tabs.slice();
+    // A tab left with nothing on it - every item regrouped onto the Linked Record tab (e.g. a
+    // host's instrument whose section headers become tabs, with all its fields linked) - isn't
+    // shown. The Linked Record tab always has its action buttons.
+    var tabs = this._questionnaireConfig.tabs.filter(function(tab: any) {
+      return fields.some(function(field: any) {
+        return field.tab && field.tab.key === tab.key && field.type !== 'heading';
+      });
+    });
+    // A left-out tab can still have headings (e.g. a nested group whose fields were all
+    // regrouped - they're sub-headed on the Linked Record tab instead). Drop them too: NodeMenu
+    // would otherwise put a field whose tab doesn't exist at the form's root, on every tab.
+    var shownTabKeys = tabs.map(function(tab: any) { return tab.key; });
+    fields = fields.filter(function(field: any) {
+      return !field.tab || field.tab.key === LINKED_RECORD_TAB.key || shownTabKeys.indexOf(field.tab.key) !== -1;
+    });
     if (recordLinkConfigured) {
       tabs.push(LINKED_RECORD_TAB);
     }
