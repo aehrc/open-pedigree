@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.3.0...open-pedigree-v1.4.0) (2026-09-28)
+
+
+### Features
+
+* let a record-link provider bring the record's answers when linking ([#34](https://github.com/aehrc/open-pedigree/issues/34)) ([e0e0ad5](https://github.com/aehrc/open-pedigree/commit/e0e0ad5a68764f89ea12747d003c40c4c7d6d785))
+
 ## [1.3.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.2.0...open-pedigree-v1.3.0) (2026-09-24)
 
 
