@@ -1150,7 +1150,8 @@ test('a pedigree loaded before its questionnaireUrl arrives gets its answers onc
   await page.evaluate((json) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     window.editor = window.OpenPedigree.initialiseEditor({ questionnaireUrl: 'http://example.org/fhir/Questionnaire/slow-round-trip' });
-    window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, true, true);
+    // As a host's load does (localStorageBackend): with an undo step, so undo can go back to it.
+    window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, false, true);
   }, saved);
 
   const note = () => page.evaluate(() => {
@@ -1159,6 +1160,18 @@ test('a pedigree loaded before its questionnaireUrl arrives gets its answers onc
     return window.editor.getView().getNode(parseInt(id, 10)).getQuestionnaireAnswer('note');
   });
   await expect.poll(note, { timeout: 10000 }).toBe('from the record');
+
+  // Undoing a structural edit (here: adding parents) reloads the load's snapshot - taken
+  // before the answers arrived.
+  await page.evaluate(() => {
+    const map = window.editor.getView().getNodeMap();
+    const id = Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef());
+    document.dispatchEvent(new CustomEvent('pedigree:person:newparent', { detail: { personID: parseInt(id, 10) } }));
+  });
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBeGreaterThan(0);
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBe(0);
+  expect(await note()).toBe('from the record');
 
   const resaved = await exportGA4GH(page);
   expect(resaved).not.toContain('[object Object]');

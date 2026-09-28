@@ -35,6 +35,7 @@ import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
+import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
 // Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
 // setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
@@ -254,6 +255,54 @@ export default class PedigreeEditor {
   }
 
   /**
+   * Turns each person's kept-aside QuestionnaireResponses (loaded for a Questionnaire that
+   * wasn't the one in effect) that match the current Questionnaire into answers, in the graph.
+   * Answers the person already has win. Runs whenever a pedigree is loaded or restored (import,
+   * serialized load, undo/redo), and when a questionnaireUrl fetch resolves, so answers that
+   * arrive late aren't lost to an undo. Returns the ids of the people it changed.
+   */
+  applyPendingQuestionnaireResponses(): any[] {
+    var graph = this.getGraph();
+    var config = this._questionnaireConfig;
+    var changed: any[] = [];
+    if (!graph || !config) {
+      return changed;
+    }
+    for (var id = 0; id <= graph.getMaxNodeId(); id++) {
+      if (!graph.isPerson(id)) {
+        continue;
+      }
+      var properties = graph.getProperties(id);
+      var pending = properties.unrenderedQuestionnaireResponses;
+      if (!pending || pending.length === 0) {
+        continue;
+      }
+      var stillPending: any[] = [];
+      var answers: any = {};
+      pending.forEach(function(qr: any) {
+        var fromQr = GA4GHFHIRConverter.answersFromQuestionnaireResponse(qr, config, { skipResourceMapped: true });
+        if (fromQr === null) {
+          stillPending.push(qr);
+        } else {
+          Object.assign(answers, fromQr);
+        }
+      });
+      if (stillPending.length === pending.length) {
+        continue;
+      }
+      properties.questionnaireAnswers = Object.assign({}, answers, properties.questionnaireAnswers || {});
+      if (stillPending.length > 0) {
+        properties.unrenderedQuestionnaireResponses = stillPending;
+      } else {
+        delete properties.unrenderedQuestionnaireResponses;
+      }
+      graph.setProperties(id, properties);
+      changed.push(id);
+    }
+    return changed;
+  }
+
+  /**
    * Fetches a Questionnaire from questionnaireUrl and, once resolved, replaces the editor's
    * effective Questionnaire and entirely rebuilds the node menu from it (tabs and all - see
    * questionnaire-source-of-truth design D14). Node instances constructed before the fetch
@@ -284,13 +333,17 @@ export default class PedigreeEditor {
           for (var nodeID in nodeMap) {
             if (nodeMap.hasOwnProperty(nodeID) && nodeMap[nodeID].getType && nodeMap[nodeID].getType() === 'Person') {
               nodeMap[nodeID]._synthesizeQuestionnaireSetters();
-              // A pedigree loaded before this fetch resolved was matched against the built-in
-              // default, so its own QuestionnaireResponse was kept aside: apply it now it matches.
-              if (nodeMap[nodeID].applyUnrenderedQuestionnaireResponse(_this._questionnaireConfig)) {
-                _this.getGraph().setProperties(nodeID, nodeMap[nodeID].getProperties());
-              }
             }
           }
+        }
+
+        // A pedigree loaded before this fetch resolved was matched against the built-in
+        // default, so its QuestionnaireResponses were kept aside: apply those that match now.
+        var changed = _this.applyPendingQuestionnaireResponses();
+        if (view) {
+          changed.forEach(function(nodeID: any) {
+            view.getNode(nodeID).assignProperties(_this.getGraph().getProperties(nodeID));
+          });
         }
 
         _this._rebuildNodeMenu();

@@ -129,6 +129,7 @@ export default class SaveLoadEngine {
 
     try {
       var changeSet = editor.getGraph().fromJSON(JSONString);
+      editor.applyPendingQuestionnaireResponses();
     } catch(err) {
       console.log('ERROR loading the graph: ', err);
       alert('Error loading the graph');
@@ -188,6 +189,7 @@ export default class SaveLoadEngine {
       if (changeSet == null) {
         throw 'unable to create a pedigree from imported data';
       }
+      editor.applyPendingQuestionnaireResponses();
     } catch(err) {
       console.log('Error importing pedigree:');
       console.log(err);

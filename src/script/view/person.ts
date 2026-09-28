@@ -4,7 +4,6 @@ import PersonVisuals from 'pedigree/view/personVisuals';
 import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
-import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
 declare const editor: any;
 
@@ -68,7 +67,7 @@ export default class Person extends AbstractPerson {
   _linkedPatientRef: any;
   _linkedRecordRef: any;
   _linkedRecordSnapshot: any;
-  _unrenderedQuestionnaireResponse: any;
+  _unrenderedQuestionnaireResponses: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -153,20 +152,6 @@ export default class Person extends AbstractPerson {
     return this._questionnaireAnswers;
   }
 
-  /**
-   * Turns a QuestionnaireResponse this person was loaded with - kept aside because it didn't
-   * match the Questionnaire configured at the time - into answers, if it matches
-   * questionnaireConfig. Returns whether it did.
-   */
-  applyUnrenderedQuestionnaireResponse(questionnaireConfig: any): boolean {
-    var answers = GA4GHFHIRConverter.answersFromQuestionnaireResponse(this._unrenderedQuestionnaireResponse, questionnaireConfig);
-    if (answers === null) {
-      return false;
-    }
-    this._questionnaireAnswers = Object.assign({}, this._questionnaireAnswers, answers);
-    this._unrenderedQuestionnaireResponse = null;
-    return true;
-  }
 
   /**
    * Sets the answer for a legend-backed (mapsToLegendCondition/mapsToLegendObservation)
@@ -244,7 +229,7 @@ export default class Person extends AbstractPerson {
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
     this._linkedRecordSnapshot = {};
-    this._unrenderedQuestionnaireResponse = null;
+    this._unrenderedQuestionnaireResponses = [];
     this._questionnaireAnswers = {};
   }
 
@@ -1178,8 +1163,10 @@ export default class Person extends AbstractPerson {
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
-    if (this._unrenderedQuestionnaireResponse) {
-      info['unrenderedQuestionnaireResponse'] = this._unrenderedQuestionnaireResponse;
+    // QuestionnaireResponses loaded for a Questionnaire this editor doesn't have: carried as
+    // they came, so they're saved again (see GA4GHFHIRConverter.addQuestionnaireResponse).
+    if (this._unrenderedQuestionnaireResponses.length > 0) {
+      info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
     }
     return info;
   }
@@ -1258,8 +1245,8 @@ export default class Person extends AbstractPerson {
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;
       }
-      if (info.hasOwnProperty('unrenderedQuestionnaireResponse')) {
-        this._unrenderedQuestionnaireResponse = info.unrenderedQuestionnaireResponse;
+      if (info.hasOwnProperty('unrenderedQuestionnaireResponses')) {
+        this._unrenderedQuestionnaireResponses = info.unrenderedQuestionnaireResponses || [];
       }
       return true;
     }

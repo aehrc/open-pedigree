@@ -1328,7 +1328,10 @@ GA4GHFHIRConverter.resolveNodeRef = function(ref, nodeDataLookup) {
   if (!ref) return undefined;
   let node = nodeDataLookup[ref];
   if (!node && ref.startsWith('Patient/')) {
-    node = nodeDataLookup['#' + ref.substring('Patient/'.length)];
+    node = nodeDataLookup['#' + ref.substring('Patient/'.length)]
+      // A pedigree saved twice before open-pedigree 1.4.2 refers to its own people as
+      // "Patient/urn:uuid:..." (see extractDataFromPatient) - still resolve those.
+      || nodeDataLookup[ref.substring('Patient/'.length)];
   }
   return node;
 };
@@ -1847,19 +1850,23 @@ GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, que
   // A QuestionnaireResponse loaded for a Questionnaire this editor never had goes back out as it
   // came - its entries are already FHIR - rather than through answerToFhirValue as if they were
   // answers (which wrote each one as "[object Object]").
-  const pending = nodeProperties['unrenderedQuestionnaireResponse'];
-  if (pending && pending.item && pending.item.length > 0) {
-    questionnaireResponses[ref].push({
-      'resourceType': 'QuestionnaireResponse',
-      'id': generateUUID(),
-      'status': 'completed',
-      'questionnaire': pending.questionnaire,
-      'subject': { 'reference': this.patRefAsRef(ref) },
-      'item': pending.item
-    });
+  for (const pending of (nodeProperties['unrenderedQuestionnaireResponses'] || [])) {
+    if (pending && pending.item && pending.item.length > 0) {
+      questionnaireResponses[ref].push({
+        'resourceType': 'QuestionnaireResponse',
+        'id': generateUUID(),
+        'status': 'completed',
+        'questionnaire': pending.questionnaire,
+        'subject': { 'reference': this.patRefAsRef(ref) },
+        'item': pending.item
+      });
+    }
   }
   return qr;
 };
+
+// Items whose answer is also a Condition/Observation in the bundle - see answersFromQuestionnaireResponse.
+const RESOURCE_MAPPING_KINDS = ['condition', 'observation', 'legendCondition', 'legendObservation'];
 
 /**
  * The answers (linkId => value) a QuestionnaireResponse's items give for the configured
@@ -1868,7 +1875,7 @@ GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, que
  * authoritative (D9). Used on import, and again when a Questionnaire fetched from
  * questionnaireUrl arrives after the pedigree was loaded against the built-in default.
  */
-GA4GHFHIRConverter.answersFromQuestionnaireResponse = function (qr, questionnaireConfig) {
+GA4GHFHIRConverter.answersFromQuestionnaireResponse = function (qr, questionnaireConfig, options) {
   if (!qr || !questionnaireConfig || qr.questionnaire !== questionnaireConfig.canonicalUrl) {
     return null;
   }
@@ -1876,6 +1883,9 @@ GA4GHFHIRConverter.answersFromQuestionnaireResponse = function (qr, questionnair
   for (const item of questionnaireConfig.items) {
     itemsByLinkId[item.linkId] = item;
   }
+  // options.skipResourceMapped: for a response applied after its pedigree loaded against
+  // another Questionnaire. Its items' Conditions/Observations were already taken in then (as
+  // generic disorders/phenotypes/genes), so answering them too would count each fact twice.
   const answers = {};
   for (const qrItem of (qr.item || [])) {
     const item = itemsByLinkId[qrItem.linkId];
@@ -1883,6 +1893,9 @@ GA4GHFHIRConverter.answersFromQuestionnaireResponse = function (qr, questionnair
       continue;
     }
     if (item.mapping && item.mapping.kind === 'field') {
+      continue;
+    }
+    if (options && options.skipResourceMapped && item.mapping && RESOURCE_MAPPING_KINDS.indexOf(item.mapping.kind) !== -1) {
       continue;
     }
     const values = qrItem.answer.map((a) => this.fhirValueToAnswer(item.itemType, a));
@@ -2005,7 +2018,10 @@ GA4GHFHIRConverter.extractDataFromQuestionnaireResponse = function (qrResource, 
     // Kept aside as it came, so a later export doesn't lose it - and so it can still become
     // answers if its Questionnaire is the one a questionnaireUrl fetch is about to deliver
     // (the editor starts on the built-in default, so a pedigree can load before it arrives).
-    nodeData.properties.unrenderedQuestionnaireResponse = { 'questionnaire': qrResource.questionnaire, 'item': qrResource.item || [] };
+    if (!nodeData.properties.unrenderedQuestionnaireResponses) {
+      nodeData.properties.unrenderedQuestionnaireResponses = [];
+    }
+    nodeData.properties.unrenderedQuestionnaireResponses.push({ 'questionnaire': qrResource.questionnaire, 'item': qrResource.item || [] });
     console.warn('QuestionnaireResponse.questionnaire (' + qrResource.questionnaire + ') does not match the configured Questionnaire - answers preserved but not rendered');
     return;
   }
