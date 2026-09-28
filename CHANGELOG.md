@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.0...open-pedigree-v1.4.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* don't show a node-menu tab that has nothing left on it ([#37](https://github.com/aehrc/open-pedigree/issues/37)) ([9a2a568](https://github.com/aehrc/open-pedigree/commit/9a2a568156ba256474b059a0f70390d42f470b3c))
+
 ## [1.4.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.3.0...open-pedigree-v1.4.0) (2026-09-28)
 
 
