@@ -172,7 +172,11 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
     }
 
     if (isUnusableAnswer(setter, answer.value)) {
-      // Leave the node alone and don't snapshot it (see isUnusableAnswer).
+      // Leave the node alone (see isUnusableAnswer), but keep tracking the record's last usable
+      // value, so it can still be cleared once the record empties the field.
+      if (hadLast) {
+        snapshot[linkId] = last[linkId];
+      }
       continue;
     }
     snapshot[linkId] = answer.value;
@@ -218,8 +222,8 @@ export function relinkRefreshInput(
   isUnusable: (linkId: string, value: any) => boolean = () => false
 ): { answers: { linkId: string, value: any }[], snapshot: LinkedRecordSnapshot } {
   const previous = previousSnapshot || {};
-  const all = (answers || []).map((answer) =>
-    (answer && isUnusable(answer.linkId, answer.value) ? { linkId: answer.linkId, value: null } : answer));
+  const all = (answers || []).filter((answer) => !!answer).map((answer) =>
+    (isUnusable(answer.linkId, answer.value) ? { linkId: answer.linkId, value: null } : answer));
   const answered: Record<string, any> = {};
   all.forEach((answer) => {
     answered[answer.linkId] = answer.value;

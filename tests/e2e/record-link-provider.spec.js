@@ -648,6 +648,19 @@ test('a late onLinked for a person who is no longer at that node ID is ignored',
   expect(node.note ?? null).toBeNull();
 });
 
+test('onCreated without answers only sets the ref, keeping the previous record\'s values', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await linkWith(page, personId, 'record:1/instance:1', [{ linkId: 'note', value: 'from record 1' }]);
+  await page.evaluate(() => { window.__pendingCreate = { ref: 'Record/99' }; });
+  await switchToLinkedRecordTab(page);
+  await clickInVisibleMenu(page, '.field-createNewRecord button');
+  await page.waitForTimeout(200);
+  const node = await readRoundTripNode(page, personId);
+  expect(node.ref).toBe('Record/99');
+  expect(node.note).toBe('from record 1');
+});
+
 test('one undo removes a link and the values it brought', async ({ page }) => {
   await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
   const personId = await openNodeMenuForProband(page);

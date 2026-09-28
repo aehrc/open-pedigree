@@ -182,10 +182,29 @@ describe('relinkRefreshInput (linking to a different record)', () => {
     expect(r.snapshot).toEqual({});
   });
 
+  it('skips null entries in the answers', () => {
+    const r = relink([null, { linkId: 'notes', value: 'x' }], { previous: { notes: 'old' } });
+    expect(r.properties).toEqual({ setQuestionnaireAnswer_notes: 'x' });
+  });
+
   it('with no previous record, applies everything the new record has', () => {
     const r = relink([{ linkId: 'first_name', value: 'Carol' }, { linkId: 'notes', value: null }], {
       current: { setFirstName: 'Typed' },
     });
     expect(r.properties).toEqual({ setFirstName: 'Carol' });
+  });
+});
+
+describe('an unparseable date on an ordinary refresh', () => {
+  it('leaves the node alone but keeps tracking the last usable date, so a later empty clears it', () => {
+    const first = refresh([{ linkId: 'dob', value: 'unknown' }], {
+      current: { setBirthDate: new Date('1980-01-01') }, snapshot: { dob: '1980-01-01' },
+    });
+    expect(first.properties).toEqual({});
+    expect(first.snapshot).toEqual({ dob: '1980-01-01' });
+    const later = refresh([{ linkId: 'dob', value: null }], {
+      current: { setBirthDate: new Date('1980-01-01') }, snapshot: first.snapshot,
+    });
+    expect(later.properties).toEqual({ setBirthDate: '' });
   });
 });

@@ -590,7 +590,8 @@ export default class PedigreeEditor {
       var node = (window as any).editor.getView().getNode(nodeId);
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
         function(recordRef: string, answers: {linkId: string, value: any}[]) {
-          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers || [], node);
+          // Without answers (a provider that can't read the new record back), only the ref.
+          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers, node);
         }
       );
     },
