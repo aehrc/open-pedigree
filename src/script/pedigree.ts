@@ -31,7 +31,7 @@ import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider'
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
-import { computeLinkedRecordRefresh } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
@@ -577,30 +577,21 @@ export default class PedigreeEditor {
     },
     linkRecord: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
+      var node = (window as any).editor.getView().getNode(nodeId);
       (window as any).editor.getRecordLinkProvider().openPicker(nodeId,
-        function(recordRef: string, _details: any) {
-          // The node may have been deleted while the picker was open.
-          if (!(window as any).editor.getView().getNode(nodeId)) {
-            return;
-          }
-          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
-          }));
+        function(recordRef: string, _details: any, answers?: {linkId: string, value: any}[]) {
+          // The record's values come too if the provider sent them (link-record-brings-answers).
+          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers, node);
         }
       );
     },
     createNewRecord: function(menu: any): void {
       var nodeId = menu.targetNode.getID();
+      var node = (window as any).editor.getView().getNode(nodeId);
       (window as any).editor.getRecordLinkProvider().createNew(nodeId,
         function(recordRef: string, answers: {linkId: string, value: any}[]) {
-          // The node may have been deleted while the create dialog was open.
-          if (!(window as any).editor.getView().getNode(nodeId)) {
-            return;
-          }
-          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-            detail: { nodeID: nodeId, properties: (window as any).editor._linkedRecordRefProperties(nodeId, recordRef) }
-          }));
-          (window as any).editor._dispatchLinkedRecordRefresh(nodeId, answers, recordRef);
+          // Without answers (a provider that can't read the new record back), only the ref.
+          (window as any).editor._applyLinkedRecord(nodeId, recordRef, answers, node);
         }
       );
     },
@@ -663,8 +654,7 @@ export default class PedigreeEditor {
    * changes are sent, as one flagged event, and a refresh with no changes adds no undo step.
    */
   _dispatchLinkedRecordRefresh(nodeId: any, answers: {linkId: string, value: any}[], expectedRef?: string): void {
-    var editor = (window as any).editor;
-    var node = editor.getView().getNode(nodeId);
+    var node = (window as any).editor.getView().getNode(nodeId);
     if (!node) {
       return;
     }
@@ -672,6 +662,71 @@ export default class PedigreeEditor {
       console.warn('Linked-record refresh for ' + expectedRef + ' skipped: node ' + nodeId + ' is now linked to "' + node.getLinkedRecordRef() + '"');
       return;
     }
+    var changes = this._linkedRecordRefreshChanges(node, answers, false);
+    if (!changes.valuesChanged && !changes.snapshotChanged) {
+      return;
+    }
+    // Only the bookkeeping changed - nothing the user could see or want to undo.
+    this._dispatchLinkedRecordChanges(nodeId, changes, undefined, !changes.valuesChanged);
+  }
+
+  /**
+   * Links a node to `recordRef` (record-link-provider `onLinked`/`onCreated`). With `answers`, the
+   * record's values are applied in the same event, so one undo removes the link and its values
+   * together. For a different record than the node's current one, every value the record has is
+   * applied, and the previous record's values are cleared where it has none - while the node
+   * still holds them, so anything entered in the diagram stays (relinkRefreshInput). The snapshot
+   * then becomes this record's. Re-linking the same record is an ordinary refresh. Without
+   * `answers`, only the ref is stored (see _linkedRecordRefProperties).
+   *
+   * `expectedNode` is the node the action was started on: a provider may call back after an async
+   * step, by when that node may be gone, or node IDs may have shifted so `nodeId` names someone else.
+   */
+  _applyLinkedRecord(nodeId: any, recordRef: string, answers: {linkId: string, value: any}[] | undefined, expectedNode?: any): void {
+    var node = (window as any).editor.getView().getNode(nodeId);
+    if (!node || (expectedNode !== undefined && node !== expectedNode)) {
+      console.warn('Linking to ' + recordRef + ' skipped: node ' + nodeId + ' is no longer the person it was started on');
+      return;
+    }
+    if (!Array.isArray(answers)) {
+      document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+        detail: { nodeID: nodeId, properties: this._linkedRecordRefProperties(nodeId, recordRef) }
+      }));
+      return;
+    }
+    var relink = (node.getLinkedRecordRef() || '') !== (recordRef || '');
+    var changes = this._linkedRecordRefreshChanges(node, answers, relink);
+    this._dispatchLinkedRecordChanges(nodeId, changes, recordRef, false);
+  }
+
+  /**
+   * Sends a linked record's changes (from _linkedRecordRefreshChanges) as one flagged setproperty
+   * event. With `recordRef` (linking), the ref goes ahead of the values, so the value setters'
+   * events already see the node linked to this record, and the snapshot is always replaced;
+   * otherwise it's sent only if it changed.
+   */
+  _dispatchLinkedRecordChanges(nodeId: any, changes: { properties: any, snapshot: any, snapshotChanged: boolean }, recordRef: string | undefined, noUndoRedo: boolean): void {
+    var properties: any = {};
+    if (recordRef !== undefined) {
+      properties.setLinkedRecordRef = recordRef;
+    }
+    Object.keys(changes.properties).forEach(function(setter: string) { properties[setter] = changes.properties[setter]; });
+    if (changes.snapshotChanged || recordRef !== undefined) {
+      properties.setLinkedRecordSnapshot = changes.snapshot;
+    }
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+      detail: { nodeID: nodeId, properties: properties, linkedRecordRefresh: true, noUndoRedo: noUndoRedo }
+    }));
+  }
+
+  /**
+   * The setproperty changes a linked record's `answers` make to `node`, compared with the node's
+   * snapshot (see _dispatchLinkedRecordRefresh) - or, for `relink` (a different record), with the
+   * baseline relinkRefreshInput() makes from it: `properties` to send, the new `snapshot`, and
+   * whether any values or the snapshot changed.
+   */
+  _linkedRecordRefreshChanges(node: any, answers: {linkId: string, value: any}[], relink: boolean): { properties: any, snapshot: any, valuesChanged: boolean, snapshotChanged: boolean } {
+    var editor = (window as any).editor;
     var resolveSetter = function(linkId: string): string {
       return editor._resolveQuestionnaireSetter(linkId);
     };
@@ -700,22 +755,32 @@ export default class PedigreeEditor {
       }
       return String(entry);
     };
+    var isLegend = function(linkId: string): boolean {
+      var item = itemFor(linkId);
+      return isReserved(linkId)
+        || !!(item && item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation'));
+    };
+    var legendKey = function(linkId: string, entry: any): string {
+      return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
+    };
+    var previousSnapshot = node.getLinkedRecordSnapshot();
+    var baseline = previousSnapshot;
+    if (relink) {
+      var input = relinkRefreshInput(answers || [], previousSnapshot, isLegend, legendKey, function(linkId: string, value: any): boolean {
+        return isUnusableAnswer(resolveSetter(linkId), value);
+      });
+      answers = input.answers;
+      baseline = input.snapshot;
+    }
     // An answer for a linkId the effective Questionnaire doesn't declare has no setter on the node.
     var usable = (answers || []).filter(function(answer: any) {
       return answer && typeof node[resolveSetter(answer.linkId)] === 'function';
     });
-    var previousSnapshot = node.getLinkedRecordSnapshot();
     var result = computeLinkedRecordRefresh({
       answers: usable,
       resolveSetter: resolveSetter,
-      isLegend: function(linkId: string): boolean {
-        var item = itemFor(linkId);
-        return isReserved(linkId)
-          || !!(item && item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation'));
-      },
-      legendKey: function(linkId: string, entry: any): string {
-        return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
-      },
+      isLegend: isLegend,
+      legendKey: legendKey,
       legendSetterEntry: function(linkId: string, entry: any): any {
         if (isReserved(linkId)) {
           return entryId(entry);
@@ -728,32 +793,21 @@ export default class PedigreeEditor {
         return { code: String(entry), display: String(entry) };
       },
       current: current,
-      snapshot: previousSnapshot
+      snapshot: baseline
     });
-    var snapshotChanged = JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot);
-    if (!result.valuesChanged && !snapshotChanged) {
-      return;
-    }
-
-    var properties: any = result.properties;
-    if (snapshotChanged) {
-      properties.setLinkedRecordSnapshot = result.snapshot;
-    }
-    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-      detail: {
-        nodeID: nodeId,
-        properties: properties,
-        linkedRecordRefresh: true,
-        // Only the bookkeeping changed - nothing the user could see or want to undo.
-        noUndoRedo: !result.valuesChanged
-      }
-    }));
+    return {
+      properties: result.properties,
+      snapshot: result.snapshot,
+      valuesChanged: result.valuesChanged,
+      snapshotChanged: JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot)
+    };
   }
 
   /**
-   * The setproperty payload for linking a node to `recordRef`: the ref, plus a reset of the
-   * record snapshot when the ref actually changes (what one record sent says nothing about
-   * another). Sent in one event so undo restores both.
+   * The setproperty payload for linking a node to `recordRef` without the record's answers: the
+   * ref, plus a reset of the record snapshot when the ref actually changes (what one record sent
+   * says nothing about another). Sent in one event so undo restores both. With answers,
+   * _applyLinkedRecord replaces the snapshot instead.
    */
   _linkedRecordRefProperties(nodeId: any, recordRef: string): any {
     var node = (window as any).editor.getView().getNode(nodeId);

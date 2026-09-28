@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeLinkedRecordRefresh, CLEAR_VALUES, clearValueFor, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, CLEAR_VALUES, clearValueFor, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 
 const SETTER_FOR = {
   first_name: 'setFirstName', gender: 'setGender', dob: 'setBirthDate', dod: 'setDeathDate', weeks: 'setGestationAge', disorders: 'setDisorders',
@@ -129,5 +129,82 @@ describe('computeLinkedRecordRefresh (compares with what the record sent last ti
       });
       expect(r.properties).toEqual({ setDisorders: [] });
     });
+  });
+});
+
+// Linking to a different record: every value it has is applied; the previous record's values
+// clear where it has none, but only while the node still holds them.
+function relink(answers, { current = {}, previous = {} } = {}) {
+  const isLegend = (linkId) => linkId === 'disorders';
+  const legendKey = (_linkId, e) => sanitise(typeof e === 'object' ? e.id : e);
+  const isUnusable = (linkId, value) => isUnusableAnswer(SETTER_FOR[linkId] || '', value);
+  const input = relinkRefreshInput(answers, previous, isLegend, legendKey, isUnusable);
+  return refresh(input.answers, { current, snapshot: input.snapshot });
+}
+
+describe('relinkRefreshInput (linking to a different record)', () => {
+  it('applies a value the new record shares with the old one, even over a diagram edit', () => {
+    const r = relink([{ linkId: 'notes', value: 'X' }], {
+      current: { setQuestionnaireAnswer_notes: 'Y' }, previous: { notes: 'X' },
+    });
+    expect(r.properties).toEqual({ setQuestionnaireAnswer_notes: 'X' });
+    expect(r.snapshot).toEqual({ notes: 'X' });
+  });
+
+  it('clears the old record\'s value where the new one has none, but keeps a diagram edit', () => {
+    const r = relink([{ linkId: 'notes', value: null }, { linkId: 'first_name', value: null }], {
+      current: { setQuestionnaireAnswer_notes: 'old', setFirstName: 'Typed' }, previous: { notes: 'old', first_name: 'Alice' },
+    });
+    expect(r.properties).toEqual({ setQuestionnaireAnswer_notes: null });
+    expect(r.snapshot).toEqual({});
+  });
+
+  it('clears the old record\'s values for linkIds the new record leaves out entirely', () => {
+    const r = relink([], { current: { setQuestionnaireAnswer_notes: 'old' }, previous: { notes: 'old' } });
+    expect(r.properties).toEqual({ setQuestionnaireAnswer_notes: null });
+    expect(r.snapshot).toEqual({});
+  });
+
+  it('reconciles legends: drops the old record\'s entries, re-adds shared ones, keeps diagram ones', () => {
+    // Old record sent A and C; the user removed A and added D. The new record sends A and B.
+    const r = relink([{ linkId: 'disorders', value: [{ id: 'A' }, { id: 'B' }] }], {
+      current: { setDisorders: ['C', 'D'] }, previous: { disorders: [{ id: 'A' }, { id: 'C' }] },
+    });
+    expect(r.properties.setDisorders.slice().sort()).toEqual(['A', 'B', 'D']);
+    expect(r.snapshot).toEqual({ disorders: [{ id: 'A' }, { id: 'B' }] });
+  });
+
+  it('clears the old record\'s date when the new record\'s can\'t be parsed, instead of leaving it untracked', () => {
+    const r = relink([{ linkId: 'dob', value: 'unknown' }], {
+      current: { setBirthDate: new Date('1980-01-01') }, previous: { dob: '1980-01-01' },
+    });
+    expect(r.properties).toEqual({ setBirthDate: '' });
+    expect(r.snapshot).toEqual({});
+  });
+
+  it('skips null entries in the answers', () => {
+    const r = relink([null, { linkId: 'notes', value: 'x' }], { previous: { notes: 'old' } });
+    expect(r.properties).toEqual({ setQuestionnaireAnswer_notes: 'x' });
+  });
+
+  it('with no previous record, applies everything the new record has', () => {
+    const r = relink([{ linkId: 'first_name', value: 'Carol' }, { linkId: 'notes', value: null }], {
+      current: { setFirstName: 'Typed' },
+    });
+    expect(r.properties).toEqual({ setFirstName: 'Carol' });
+  });
+});
+
+describe('an unparseable date on an ordinary refresh', () => {
+  it('leaves the node alone but keeps tracking the last usable date, so a later empty clears it', () => {
+    const first = refresh([{ linkId: 'dob', value: 'unknown' }], {
+      current: { setBirthDate: new Date('1980-01-01') }, snapshot: { dob: '1980-01-01' },
+    });
+    expect(first.properties).toEqual({});
+    expect(first.snapshot).toEqual({ dob: '1980-01-01' });
+    const later = refresh([{ linkId: 'dob', value: null }], {
+      current: { setBirthDate: new Date('1980-01-01') }, snapshot: first.snapshot,
+    });
+    expect(later.properties).toEqual({ setBirthDate: '' });
   });
 });
