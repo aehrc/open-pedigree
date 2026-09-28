@@ -284,6 +284,11 @@ export default class PedigreeEditor {
           for (var nodeID in nodeMap) {
             if (nodeMap.hasOwnProperty(nodeID) && nodeMap[nodeID].getType && nodeMap[nodeID].getType() === 'Person') {
               nodeMap[nodeID]._synthesizeQuestionnaireSetters();
+              // A pedigree loaded before this fetch resolved was matched against the built-in
+              // default, so its own QuestionnaireResponse was kept aside: apply it now it matches.
+              if (nodeMap[nodeID].applyUnrenderedQuestionnaireResponse(_this._questionnaireConfig)) {
+                _this.getGraph().setProperties(nodeID, nodeMap[nodeID].getProperties());
+              }
             }
           }
         }

@@ -4,6 +4,7 @@ import PersonVisuals from 'pedigree/view/personVisuals';
 import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
+import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
 declare const editor: any;
 
@@ -67,6 +68,7 @@ export default class Person extends AbstractPerson {
   _linkedPatientRef: any;
   _linkedRecordRef: any;
   _linkedRecordSnapshot: any;
+  _unrenderedQuestionnaireResponse: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -152,6 +154,21 @@ export default class Person extends AbstractPerson {
   }
 
   /**
+   * Turns a QuestionnaireResponse this person was loaded with - kept aside because it didn't
+   * match the Questionnaire configured at the time - into answers, if it matches
+   * questionnaireConfig. Returns whether it did.
+   */
+  applyUnrenderedQuestionnaireResponse(questionnaireConfig: any): boolean {
+    var answers = GA4GHFHIRConverter.answersFromQuestionnaireResponse(this._unrenderedQuestionnaireResponse, questionnaireConfig);
+    if (answers === null) {
+      return false;
+    }
+    this._questionnaireAnswers = Object.assign({}, this._questionnaireAnswers, answers);
+    this._unrenderedQuestionnaireResponse = null;
+    return true;
+  }
+
+  /**
    * Sets the answer for a legend-backed (mapsToLegendCondition/mapsToLegendObservation)
    * Questionnaire item to the given list of {system, code, display} terms, diffing against
    * the previous answer and updating the item's per-linkId Legend accordingly - generalises
@@ -227,6 +244,7 @@ export default class Person extends AbstractPerson {
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
     this._linkedRecordSnapshot = {};
+    this._unrenderedQuestionnaireResponse = null;
     this._questionnaireAnswers = {};
   }
 
@@ -1160,6 +1178,9 @@ export default class Person extends AbstractPerson {
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
+    if (this._unrenderedQuestionnaireResponse) {
+      info['unrenderedQuestionnaireResponse'] = this._unrenderedQuestionnaireResponse;
+    }
     return info;
   }
 
@@ -1236,6 +1257,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;
+      }
+      if (info.hasOwnProperty('unrenderedQuestionnaireResponse')) {
+        this._unrenderedQuestionnaireResponse = info.unrenderedQuestionnaireResponse;
       }
       return true;
     }

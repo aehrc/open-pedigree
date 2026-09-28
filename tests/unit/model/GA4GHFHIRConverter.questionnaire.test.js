@@ -99,7 +99,12 @@ describe('GA4GHFHIRConverter.extractDataFromQuestionnaireResponse', () => {
       item: [{ linkId: 'notes', answer: [{ valueString: 'hello' }] }],
     };
     GA4GHFHIRConverter.extractDataFromQuestionnaireResponse(qr, nodeDataLookup);
-    expect(nodeData.properties.questionnaireAnswers.notes).toEqual([{ valueString: 'hello' }]);
+    // Kept aside as it came, not mixed in with the answers (a raw FHIR entry isn't an answer).
+    expect(nodeData.properties.questionnaireAnswers.notes).toBeUndefined();
+    expect(nodeData.properties.unrenderedQuestionnaireResponse).toEqual({
+      questionnaire: 'http://example.org/Questionnaire/other|2.0',
+      item: [{ linkId: 'notes', answer: [{ valueString: 'hello' }] }],
+    });
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -495,5 +500,90 @@ describe('linked record round trip (linked-record-round-trip)', () => {
     baseGraph.properties[0].linkedRecordSnapshot = { notes: 'secret' };
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'minimal', null, null);
     expect(exported).not.toContain('secret');
+  });
+});
+
+describe('a QuestionnaireResponse that arrives before its Questionnaire', () => {
+  const pending = {
+    questionnaire: questionnaireConfig.canonicalUrl,
+    item: [
+      { linkId: 'notes', answer: [{ valueString: 'hello' }] },
+      { linkId: 'carrier', answer: [{ valueBoolean: true }] },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', makeMockEditor(questionnaireConfig));
+  });
+
+  it('becomes answers once a matching Questionnaire is configured (mapped items stay with their property)', () => {
+    expect(GA4GHFHIRConverter.answersFromQuestionnaireResponse(pending, questionnaireConfig)).toEqual({ notes: 'hello' });
+  });
+
+  it('stays pending when the configured Questionnaire is a different one', () => {
+    const other = { ...questionnaireConfig, canonicalUrl: 'http://example.org/Questionnaire/other|2.0' };
+    expect(GA4GHFHIRConverter.answersFromQuestionnaireResponse(pending, other)).toBeNull();
+  });
+
+  it('is written back unchanged if it never matched, not turned into text', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    const unmatched = { questionnaire: 'http://example.org/Questionnaire/other|2.0', item: [{ linkId: 'notes', answer: [{ valueString: 'hello' }] }] };
+    baseGraph.properties[0].unrenderedQuestionnaireResponse = unmatched;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+
+    expect(exported).not.toContain('[object Object]');
+    const qrs = JSON.parse(exported).entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse');
+    expect(qrs).toHaveLength(1);
+    expect(qrs[0].questionnaire).toBe(unmatched.questionnaire);
+    expect(qrs[0].item).toEqual(unmatched.item);
+
+    // And it comes back the same way.
+    const reimported = GA4GHFHIRConverter.initFromFHIR(exported);
+    const john = Object.values(reimported.properties).find((p) => p.fName === 'John');
+    expect(john.unrenderedQuestionnaireResponse).toEqual(unmatched);
+  });
+});
+
+describe('a pedigree saved, loaded and saved again', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', makeMockEditor(questionnaireConfig));
+  });
+
+  function patientReferences(exported) {
+    const bundle = JSON.parse(exported);
+    const patients = new Set(bundle.entry.filter((e) => e.resource.resourceType === 'Patient').map((e) => e.fullUrl));
+    const refs = [];
+    const walk = (o) => {
+      if (Array.isArray(o)) {
+        o.forEach(walk);
+      } else if (o && typeof o === 'object') {
+        if (typeof o.reference === 'string' && (o.type === 'Patient' || /Patient/.test(o.reference) || patients.has(o.reference))) {
+          refs.push(o.reference);
+        }
+        Object.values(o).forEach(walk);
+      }
+    };
+    walk(bundle.entry.map((e) => e.resource).filter((r) => r.resourceType !== 'Composition'));
+    return { patients, refs };
+  }
+
+  it('keeps every reference to a person resolvable, so the family stays connected', () => {
+    const first = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG))) }, 'all', null, null);
+    const reloaded = GA4GHFHIRConverter.initFromFHIR(first);
+    // open-pedigree's own person ids are urn:uuid:... - not a link to someone else's Patient.
+    Object.values(reloaded.properties).forEach((p) => expect(p.linkedPatientRef).toBeUndefined());
+
+    const second = GA4GHFHIRConverter.exportAsFHIR({ GG: reloaded }, 'all', null, null);
+    const { patients, refs } = patientReferences(second);
+    expect(refs.length).toBeGreaterThan(0);
+    refs.forEach((ref) => expect(patients.has(ref.replace(/^Patient\//, '')) || patients.has(ref)).toBe(true));
+    expect(() => GA4GHFHIRConverter.initFromFHIR(second)).not.toThrow();
+  });
+
+  it('treats only an id that isn\'t open-pedigree\'s own as a link to another FHIR Patient', () => {
+    const linkOf = (id) => GA4GHFHIRConverter.extractDataFromPatient({ resourceType: 'Patient', id }, {}, {}).properties.linkedPatientRef;
+    expect(linkOf('urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
+    expect(linkOf('0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
+    expect(linkOf('abc123')).toBe('Patient/abc123');
   });
 });

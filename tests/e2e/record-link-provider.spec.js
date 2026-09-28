@@ -1088,3 +1088,80 @@ test('undoing a life status change away from stillborn restores the status and b
   expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'stillborn', dob: before.dob, dod: before.dod });
 });
 
+
+// GA4GH export through the export dialog, as a user would save it.
+async function exportGA4GH(page) {
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15000 }),
+    page.evaluate(() => {
+      const ga4ghRadio = document.querySelector('input[type=radio][name="export-type"][value="GA4GH"]');
+      ga4ghRadio.checked = true;
+      ga4ghRadio.click();
+      document.getElementById('export_button').click();
+    }),
+  ]);
+  return require('fs').readFileSync(await download.path(), 'utf8');
+}
+
+async function importGA4GH(page, json) {
+  return page.evaluate((j) => window.editor.getSaveLoadEngine().createGraphFromImportData(j, 'GA4GH', {}, true, true) !== false
+    && window.editor.getGraph().getMaxNodeId() > 0, json);
+}
+
+test('a pedigree saved, loaded and saved again still loads with its family intact', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const dialogs = [];
+  page.on('dialog', (d) => dialogs.push(d.message()));
+  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData(
+    'fam1 child dad mum 1 0\nfam1 dad 0 0 1 0\nfam1 mum 0 0 2 0', 'ped', {}, true, true));
+  const people = () => page.evaluate(() => {
+    const g = window.editor.getGraph();
+    let n = 0;
+    for (let id = 0; id <= g.getMaxNodeId(); id++) { if (g.isPerson(id)) n++; }
+    return n;
+  });
+  expect(await people()).toBe(3);
+
+  const first = await exportGA4GH(page);
+  expect(await importGA4GH(page, first)).toBe(true);
+  const second = await exportGA4GH(page);
+  expect(second).not.toMatch(/"reference": "Patient\/urn:uuid:/);
+  expect(await importGA4GH(page, second)).toBe(true);
+  expect(await people()).toBe(3);
+  expect(dialogs).toEqual([]);
+});
+
+test('a pedigree loaded before its questionnaireUrl arrives gets its answers once it does, and saves them', async ({ page }) => {
+  // The saved pedigree: one person with an answer, exported under ROUND_TRIP_QUESTIONNAIRE.
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'from the record' }]);
+  const saved = await exportGA4GH(page);
+
+  // A new editor that gets the same Questionnaire from a slow questionnaireUrl, and is handed
+  // the pedigree straight away - while the built-in default is still in effect.
+  await page.route('**/fhir/Questionnaire/slow-round-trip', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROUND_TRIP_QUESTIONNAIRE) });
+  });
+  await retireAutoCreatedEditor(page);
+  await page.evaluate((json) => {
+    document.querySelectorAll('#work-area').forEach((el) => el.remove());
+    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireUrl: 'http://example.org/fhir/Questionnaire/slow-round-trip' });
+    window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, true, true);
+  }, saved);
+
+  const note = () => page.evaluate(() => {
+    const map = window.editor.getView().getNodeMap();
+    const id = Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef());
+    return window.editor.getView().getNode(parseInt(id, 10)).getQuestionnaireAnswer('note');
+  });
+  await expect.poll(note, { timeout: 10000 }).toBe('from the record');
+
+  const resaved = await exportGA4GH(page);
+  expect(resaved).not.toContain('[object Object]');
+  const qrs = JSON.parse(resaved).entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse');
+  expect(qrs.flatMap((qr) => qr.item)).toContainEqual({ linkId: 'note', answer: [{ valueString: 'from the record' }] });
+});

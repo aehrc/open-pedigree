@@ -690,9 +690,12 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
 
   const rawId = patientResource.id;
   properties.id = rawId;
-  // If the patient ID does not look like a UUID (8-4-4-4-12 hex), preserve it as a linkedPatientRef
-  // so the reference round-trips on re-export.
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // If the patient ID isn't one of open-pedigree's own - a UUID (8-4-4-4-12 hex), bare or as the
+  // urn:uuid: form every export writes - it's a link to another FHIR Patient: preserve it as a
+  // linkedPatientRef so the reference round-trips on re-export. (Taking open-pedigree's own
+  // urn:uuid: ids for links made the next export point every relationship at "Patient/urn:uuid:..",
+  // which matches no entry, so a pedigree saved twice no longer loaded.)
+  const uuidPattern = /^(urn:uuid:)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (rawId && !uuidPattern.test(rawId)) {
     properties.linkedPatientRef = 'Patient/' + rawId;
   }
@@ -1841,7 +1844,51 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
 GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses) {
   const qr = this.buildQuestionnaireResponse(ref, nodeProperties);
   questionnaireResponses[ref] = qr ? [qr] : [];
+  // A QuestionnaireResponse loaded for a Questionnaire this editor never had goes back out as it
+  // came - its entries are already FHIR - rather than through answerToFhirValue as if they were
+  // answers (which wrote each one as "[object Object]").
+  const pending = nodeProperties['unrenderedQuestionnaireResponse'];
+  if (pending && pending.item && pending.item.length > 0) {
+    questionnaireResponses[ref].push({
+      'resourceType': 'QuestionnaireResponse',
+      'id': generateUUID(),
+      'status': 'completed',
+      'questionnaire': pending.questionnaire,
+      'subject': { 'reference': this.patRefAsRef(ref) },
+      'item': pending.item
+    });
+  }
   return qr;
+};
+
+/**
+ * The answers (linkId => value) a QuestionnaireResponse's items give for the configured
+ * Questionnaire, or null when the response is for a different one (or none is configured).
+ * Mapped-to-field items are left out: their property, set from the Patient/Observation, is
+ * authoritative (D9). Used on import, and again when a Questionnaire fetched from
+ * questionnaireUrl arrives after the pedigree was loaded against the built-in default.
+ */
+GA4GHFHIRConverter.answersFromQuestionnaireResponse = function (qr, questionnaireConfig) {
+  if (!qr || !questionnaireConfig || qr.questionnaire !== questionnaireConfig.canonicalUrl) {
+    return null;
+  }
+  const itemsByLinkId = {};
+  for (const item of questionnaireConfig.items) {
+    itemsByLinkId[item.linkId] = item;
+  }
+  const answers = {};
+  for (const qrItem of (qr.item || [])) {
+    const item = itemsByLinkId[qrItem.linkId];
+    if (!item || !qrItem.answer || qrItem.answer.length === 0) {
+      continue;
+    }
+    if (item.mapping && item.mapping.kind === 'field') {
+      continue;
+    }
+    const values = qrItem.answer.map((a) => this.fhirValueToAnswer(item.itemType, a));
+    answers[qrItem.linkId] = item.repeats ? values : values[0];
+  }
+  return answers;
 };
 
 // Derives mapsToCondition/mapsToObservation resources from an already-built
@@ -1948,42 +1995,21 @@ GA4GHFHIRConverter.extractDataFromQuestionnaireResponse = function (qrResource, 
     return;
   }
   var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
-  const itemsByLinkId = {};
-  if (questionnaireConfig) {
-    for (const item of questionnaireConfig.items) {
-      itemsByLinkId[item.linkId] = item;
-    }
-  }
-  const matches = questionnaireConfig && qrResource.questionnaire === questionnaireConfig.canonicalUrl;
 
   if (!nodeData.properties.questionnaireAnswers) {
     nodeData.properties.questionnaireAnswers = {};
   }
 
-  if (!matches) {
-    // Preserve raw answers verbatim so a later export doesn't lose them, without rendering.
-    for (const qrItem of (qrResource.item || [])) {
-      nodeData.properties.questionnaireAnswers[qrItem.linkId] = qrItem.answer;
-    }
+  const answers = this.answersFromQuestionnaireResponse(qrResource, questionnaireConfig);
+  if (answers === null) {
+    // Kept aside as it came, so a later export doesn't lose it - and so it can still become
+    // answers if its Questionnaire is the one a questionnaireUrl fetch is about to deliver
+    // (the editor starts on the built-in default, so a pedigree can load before it arrives).
+    nodeData.properties.unrenderedQuestionnaireResponse = { 'questionnaire': qrResource.questionnaire, 'item': qrResource.item || [] };
     console.warn('QuestionnaireResponse.questionnaire (' + qrResource.questionnaire + ') does not match the configured Questionnaire - answers preserved but not rendered');
     return;
   }
-
-  for (const qrItem of (qrResource.item || [])) {
-    const item = itemsByLinkId[qrItem.linkId];
-    if (!item || !qrItem.answer || qrItem.answer.length === 0) {
-      continue;
-    }
-    const values = qrItem.answer.map((a) => this.fhirValueToAnswer(item.itemType, a));
-    const value = item.repeats ? values : values[0];
-
-    if (item.mapping && item.mapping.kind === 'field') {
-      // D9: the mapped property (already populated from Patient/Observation extraction) is
-      // authoritative - the QR entry is recorded for completeness but never overrides it.
-      continue;
-    }
-    nodeData.properties.questionnaireAnswers[qrItem.linkId] = value;
-  }
+  Object.assign(nodeData.properties.questionnaireAnswers, answers);
 };
 
 export default GA4GHFHIRConverter;
