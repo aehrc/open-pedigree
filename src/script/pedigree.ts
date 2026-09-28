@@ -511,7 +511,9 @@ export default class PedigreeEditor {
     // groups, with all its fields linked; they're sub-headed there instead), or one holding
     // nothing the form can render. That also drops every heading on a left-out tab, which
     // NodeMenu would otherwise put at the form's root, on every tab. The Linked Record tab
-    // always has its action buttons.
+    // always has its action buttons, and its headings are kept as-is (each is emitted just
+    // before a regrouped item, except a linkedRecordSource group's own heading, which is kept
+    // even if none of its items were regrouped).
     fields = fields.filter(function(field: any) {
       return field.type !== 'heading' || (field.tab && field.tab.key === LINKED_RECORD_TAB.key) || groupsWithFields[field.name];
     });
