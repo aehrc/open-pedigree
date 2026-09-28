@@ -16,5 +16,9 @@
 
 ## 3. Release
 
-- [ ] 3.1 PR (`feat:`), merge, release-please minor release
-- [ ] 3.2 `redcap_pedigree_editor`: bundle the release and pass the picked row's answers from its picker
+- [x] 3.1 PR (`feat:`), merge, release-please minor release (aehrc/open-pedigree#34, released via #35 as 1.4.0; this archive ships in the same release)
+- [x] 3.2 `redcap_pedigree_editor`: bundle the release and pass the picked row's answers from its picker. The picker side is done on its branch `feature/link-brings-values`, e2e 46/46 against this change's build. The bundle refresh from the 1.4.0 tag is tracked in that module
+
+## 4. Verify
+
+- [x] 4.1 Every scenario has a named test. "Linking a record can bring its answers": linking with/without answers, relinking replaces, relinking clears but keeps diagram values, a shared value applied over a diagram edit, one undo, a late callback ignored, answerless onCreated (`record-link-provider.spec.js`), plus `relinkRefreshInput` unit tests. The MODIFIED snapshot, refresh and createNew requirements are covered by the existing round-trip tests, which still pass. Four `/code-review` rounds on the full diff; their findings are fixed or recorded in 2.5-2.7. Unit 232/232, e2e 70/70
