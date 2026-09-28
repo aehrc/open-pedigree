@@ -253,8 +253,9 @@ export default class Person extends AbstractPerson {
   }
 
   setLinkedRecordRef(ref: string): void {
-    // The snapshot of what a record last sent is reset by the record-link actions, which send
-    // setLinkedRecordSnapshot({}) in the same event when the ref changes - not here, so an undo
+    // The snapshot of what a record last sent is replaced by the record-link actions, which send
+    // setLinkedRecordSnapshot in the same event as a new ref - the new record's answers, or {}
+    // when the ref comes without answers (Pedigree._applyLinkedRecord). Not here, so an undo
     // (which replays both properties) restores the old snapshot rather than an empty one.
     this._linkedRecordRef = ref;
   }

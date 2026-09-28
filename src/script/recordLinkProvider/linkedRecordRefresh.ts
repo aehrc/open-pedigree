@@ -70,6 +70,12 @@ export function isEmptyAnswer(value: any): boolean {
   return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
 }
 
+// A non-empty answer the setter can't take: an unparseable date (e.g. "31-12-1980" or "unknown"),
+// which would be stored as Invalid Date and could never be cleared again.
+export function isUnusableAnswer(setter: string, value: any): boolean {
+  return DATE_SETTERS.indexOf(setter) !== -1 && !isEmptyAnswer(value) && isNaN(new Date(value).getTime());
+}
+
 export function clearValueFor(setter: string): any {
   return Object.prototype.hasOwnProperty.call(CLEAR_VALUES, setter) ? CLEAR_VALUES[setter] : null;
 }
@@ -165,9 +171,8 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       continue;
     }
 
-    if (DATE_SETTERS.indexOf(setter) !== -1 && isNaN(new Date(answer.value).getTime())) {
-      // An unparseable date (e.g. "31-12-1980" or "unknown") would be stored as Invalid Date and
-      // could never be cleared again - leave the node alone and don't snapshot it.
+    if (isUnusableAnswer(setter, answer.value)) {
+      // Leave the node alone and don't snapshot it (see isUnusableAnswer).
       continue;
     }
     snapshot[linkId] = answer.value;
@@ -192,4 +197,52 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
     snapshot: snapshot,
     valuesChanged: Object.keys(properties).length > 0,
   };
+}
+
+/**
+ * The refresh input for linking a node to a *different* record (link-record-brings-answers).
+ * Every value the new record has is applied, since it's the record the user chose; where it has
+ * none, the previous record's value is cleared, but only while the node still holds it, so
+ * anything entered in the diagram stays. So the baseline passed to computeLinkedRecordRefresh()
+ * is the previous record's snapshot minus whatever the new record sends (for legend lists, minus
+ * the entries it sends). And the previous record's linkIds that the new one leaves out are
+ * answered as empty, so they clear too. So is a value the new record sends that can't be used
+ * (isUnusable, e.g. an unparseable date): the previous record's value mustn't linger untracked.
+ * Re-linking the same record is an ordinary refresh.
+ */
+export function relinkRefreshInput(
+  answers: { linkId: string, value: any }[],
+  previousSnapshot: LinkedRecordSnapshot,
+  isLegend: (linkId: string) => boolean,
+  legendKey: (linkId: string, entry: any) => string,
+  isUnusable: (linkId: string, value: any) => boolean = () => false
+): { answers: { linkId: string, value: any }[], snapshot: LinkedRecordSnapshot } {
+  const previous = previousSnapshot || {};
+  const all = (answers || []).map((answer) =>
+    (answer && isUnusable(answer.linkId, answer.value) ? { linkId: answer.linkId, value: null } : answer));
+  const answered: Record<string, any> = {};
+  all.forEach((answer) => {
+    answered[answer.linkId] = answer.value;
+  });
+  Object.keys(previous).forEach((linkId) => {
+    if (!Object.prototype.hasOwnProperty.call(answered, linkId)) {
+      all.push({ linkId: linkId, value: null });
+    }
+  });
+
+  const baseline: LinkedRecordSnapshot = {};
+  Object.keys(previous).forEach((linkId) => {
+    const incoming = answered[linkId];
+    if (isLegend(linkId)) {
+      const incomingKeys = (Array.isArray(incoming) ? incoming : []).map((e) => legendKey(linkId, e));
+      const kept = (Array.isArray(previous[linkId]) ? previous[linkId] : [])
+        .filter((e: any) => incomingKeys.indexOf(legendKey(linkId, e)) === -1);
+      if (kept.length > 0) {
+        baseline[linkId] = kept;
+      }
+    } else if (isEmptyAnswer(incoming)) {
+      baseline[linkId] = previous[linkId];
+    }
+  });
+  return { answers: all, snapshot: baseline };
 }

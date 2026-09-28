@@ -61,6 +61,10 @@ async function loadEditor(page, { recordLinkProvider, questionnaire, actionLabel
         canLink: () => true,
         canCreateNew: () => true,
         openPicker: (_nodeId, onLinked) => {
+          if (window.__deferLink) {
+            window.__linkCallback = onLinked; // called later by the test, as an async provider would
+            return;
+          }
           window.__pendingLink && onLinked(window.__pendingLink.ref, window.__pendingLink.details, window.__pendingLink.answers);
         },
         openEditor: (_nodeId, onDone) => {
@@ -613,6 +617,35 @@ test('relinking to a record without a value clears the old record\'s value, but 
   expect(node.note ?? null).toBeNull();
   expect(node.count).toBe(7);
   expect(node.snapshot).toEqual({});
+});
+
+test('relinking applies a value the new record shares with the old one, over a diagram edit', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await linkWith(page, personId, 'record:1/instance:1', [{ linkId: 'note', value: 'X' }]);
+  await setNodeProperty(page, personId, { setQuestionnaireAnswer_note: 'Y' });
+
+  await linkWith(page, personId, 'record:1/instance:2', [{ linkId: 'note', value: 'X' }]);
+  const node = await readRoundTripNode(page, personId);
+  expect(node.ref).toBe('record:1/instance:2');
+  expect(node.note).toBe('X');
+  expect(node.snapshot).toEqual({ note: 'X' });
+});
+
+test('a late onLinked for a person who is no longer at that node ID is ignored', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await page.evaluate(() => { window.__deferLink = true; });
+  await switchToLinkedRecordTab(page);
+  await clickInVisibleMenu(page, '.field-linkRecord button');
+  // Before the provider answers, the pedigree is replaced: a different person now has that ID.
+  await page.evaluate(() => {
+    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true);
+    window.__linkCallback('record:1/instance:1', {}, [{ linkId: 'note', value: 'too late' }]);
+  });
+  const node = await readRoundTripNode(page, personId);
+  expect(node.ref || '').toBe('');
+  expect(node.note ?? null).toBeNull();
 });
 
 test('one undo removes a link and the values it brought', async ({ page }) => {
