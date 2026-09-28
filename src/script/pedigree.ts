@@ -431,6 +431,10 @@ export default class PedigreeEditor {
     // would misattribute the later item under the wrong (in-between) heading.
     var lastLinkedRecordGroupKey: any = undefined;
     var linkedRecordHeadingCounts: any = {};
+    // A nested group's key -> its enclosing group's key, and the keys of the groups (at any
+    // depth) that still hold a field on their own tab - see the heading filter below.
+    var enclosingGroupKeys: any = {};
+    var groupsWithFields: any = {};
 
     this._questionnaireConfig.items.forEach(function(item: any) {
       if (item.tab && item.tab.key === LINKED_RECORD_TAB.key && !recordLinkConfigured) {
@@ -491,10 +495,33 @@ export default class PedigreeEditor {
         descriptor.function = _this._resolveQuestionnaireSetter(item.linkId);
       }
 
+      if (item.fieldType === 'heading') {
+        enclosingGroupKeys[item.linkId] = item.parentGroup ? item.parentGroup.key : null;
+      } else if (!tab || tab.key !== LINKED_RECORD_TAB.key) {
+        for (var key = item.parentGroup ? item.parentGroup.key : null; key && !groupsWithFields[key]; key = enclosingGroupKeys[key]) {
+          groupsWithFields[key] = true;
+        }
+      }
+
       fields.push(descriptor);
     });
 
-    var tabs = this._questionnaireConfig.tabs.slice();
+    // A tab or heading with no field left under it isn't shown - e.g. a group whose fields were
+    // all regrouped onto the Linked Record tab (a host's instrument whose section headers become
+    // groups, with all its fields linked; they're sub-headed there instead), or one holding
+    // nothing the form can render. That also drops every heading on a left-out tab, which
+    // NodeMenu would otherwise put at the form's root, on every tab. The Linked Record tab
+    // always has its action buttons, and its headings are kept as-is (each is emitted just
+    // before a regrouped item, except a linkedRecordSource group's own heading, which is kept
+    // even if none of its items were regrouped).
+    fields = fields.filter(function(field: any) {
+      return field.type !== 'heading' || (field.tab && field.tab.key === LINKED_RECORD_TAB.key) || groupsWithFields[field.name];
+    });
+    var tabs = this._questionnaireConfig.tabs.filter(function(tab: any) {
+      return fields.some(function(field: any) {
+        return field.tab && field.tab.key === tab.key && field.type !== 'heading';
+      });
+    });
     if (recordLinkConfigured) {
       tabs.push(LINKED_RECORD_TAB);
     }
