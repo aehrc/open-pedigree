@@ -29,7 +29,7 @@ The editor SHALL accept a `recordLinkProvider` option in `initialiseEditor()`, i
 - **THEN** the editor SHALL store `recordRef` on the node (`Person.setLinkedRecordRef`/`getLinkedRecordRef`), retrievable by any provider method via `window.editor.getView().getNode(nodeId).getLinkedRecordRef()` - the same pattern `SmartPatientProvider` already uses to read node state from inside a concrete provider. `openEditor`/`canLink`/`canCreateNew` deliberately stay nodeId-only (no separate `recordRef` parameter) so all three remain uniform; a provider that needs the current ref to know which record to edit looks it up itself rather than being handed it
 
 ### Requirement: openEditor and createNew dispatch answers through the existing setter-resolution path
-`onDone` (from `openEditor`) SHALL receive an array of `{linkId: string, value: any}` entries, and `onCreated` (from `createNew`) SHALL receive `(recordRef: string, answers: {linkId: string, value: any}[])`. Each entry SHALL be resolved to its target through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`), but applied with the refresh semantics in "A linked-record refresh applies the record's changes". `onCreated`'s `recordRef` argument SHALL be stored on the node the same way `openPicker`'s `onLinked` stores its `recordRef`. A newly-created record has its own ref the instant it exists, and without it the node could never satisfy the `canEditLinkedRecord` predicate (this capability's "Capability flags gate node-menu actions" requirement) afterward.
+`onDone` (from `openEditor`) SHALL receive an array of `{linkId: string, value: any}` entries, and `onCreated` (from `createNew`) SHALL receive `(recordRef: string, answers: {linkId: string, value: any}[])`. Each entry SHALL be resolved to its target through the same per-`linkId` setter-resolution priority already used for `patient-provider`'s `openClinicalImportModal` (reserved legend target → `mapsToField` target → generic `setQuestionnaireAnswer_<linkId>`), but applied with the refresh semantics in "A linked-record refresh applies the record's changes" for `onDone`, and for `onCreated` as for linking a record ("Linking a record can bring its answers"), since the node is linked to the new record in the same event. `onCreated`'s `recordRef` argument SHALL be stored on the node the same way `openPicker`'s `onLinked` stores its `recordRef`. A newly-created record has its own ref the instant it exists, and without it the node could never satisfy the `canEditLinkedRecord` predicate (this capability's "Capability flags gate node-menu actions" requirement) afterward.
 
 #### Scenario: openEditor's onDone updates node properties
 - **WHEN** a provider calls `onDone([{ linkId: "gender", value: "F" }])` for an item mapped via `mapsToField` to `gender`
@@ -38,7 +38,7 @@ The editor SHALL accept a `recordLinkProvider` option in `initialiseEditor()`, i
 #### Scenario: createNew's onCreated stores the new record's ref and behaves identically to onDone for the rest
 - **WHEN** a provider calls `onCreated("Record/99", [{ linkId: "custom_note", value: "some text" }])` after creating a brand-new linked record
 - **THEN** the node's linked record ref SHALL be set to `"Record/99"` (making `canEditLinkedRecord` satisfiable for that node from then on)
-- **AND** the `answers` array's dispatch behavior SHALL be identical to an equivalent `onDone` call with the same entries
+- **AND** the `answers` SHALL be applied as for `onLinked` with the same entries: for a node with no previous record, every non-empty answer is set
 
 ### Requirement: Capability flags gate node-menu actions
 `canLink(nodeId)` and `canCreateNew(nodeId)` SHALL independently control whether linking-to-existing-record and creating-a-new-record actions are available for a given node.
@@ -82,22 +82,22 @@ When a pedigree is exported as GA4GH FHIR, each node's linked record ref SHALL b
 - **THEN** its `Patient` resource SHALL carry no linked-record extension
 
 ### Requirement: The editor remembers what the linked record last sent
-After each `onDone`/`onCreated` dispatch, the node SHALL keep a snapshot of the linked record's non-empty values from that dispatch (legend lists as the record's entries). The answers are taken as the record's full state, so a linkId the dispatch leaves out drops from the snapshot (without clearing the node). The snapshot SHALL be saved and restored with the pedigree in both `internal` format (a `linkedRecordSnapshot` node property) and GA4GH format (a JSON `valueString` extension on the node's `Patient` resource, beside the linked-record ref and under the same privacy gate). The record-link actions SHALL reset it, in the same event as the new ref, only when the ref actually changes, so undoing a relink restores the previous snapshot and re-picking the same record keeps it.
+After each `onDone`/`onCreated` dispatch, and each `onLinked` call with answers, the node SHALL keep a snapshot of the linked record's non-empty values from that dispatch (legend lists as the record's entries). The answers are taken as the record's full state, so a linkId the dispatch leaves out drops from the snapshot (without clearing the node, except as "Linking a record can bring its answers" describes for a different record). The snapshot SHALL be saved and restored with the pedigree in both `internal` format (a `linkedRecordSnapshot` node property) and GA4GH format (a JSON `valueString` extension on the node's `Patient` resource, beside the linked-record ref and under the same privacy gate). A record-link action that changes the ref SHALL replace it in the same event as the new ref: with the new record's answers when it brings them, otherwise with an empty snapshot. So undoing a relink restores the previous snapshot, and re-picking the same record without answers keeps it.
 
 #### Scenario: Snapshot survives a save and reload
 - **WHEN** a refresh sends `note: "from the record"`, and the pedigree is saved as GA4GH and reloaded
 - **THEN** the node's snapshot SHALL still be `{ note: "from the record" }`
 
 #### Scenario: Relinking forgets what the old record sent, and undo brings it back
-- **WHEN** a node's linked record ref changes from `record:1/instance:1` to `record:1/instance:2`, and the user then undoes that
+- **WHEN** a node's linked record ref changes from `record:1/instance:1` to `record:1/instance:2` without answers, and the user then undoes that
 - **THEN** its snapshot SHALL be empty after the relink, and back to the old record's snapshot after the undo
 
 #### Scenario: Re-picking the same record keeps the snapshot
-- **WHEN** a node linked to `record:1/instance:1` is linked to `record:1/instance:1` again
+- **WHEN** a node linked to `record:1/instance:1` is linked to `record:1/instance:1` again without answers
 - **THEN** its snapshot SHALL be unchanged
 
 ### Requirement: A linked-record refresh applies the record's changes
-An `onDone`/`onCreated` dispatch SHALL compare each answer with the node's snapshot (what the record sent last time), not with the node's current value:
+An `onDone` dispatch, and an `onCreated` or `onLinked` dispatch for the record the node is already linked to, SHALL compare each answer with the node's snapshot (what the record sent last time), not with the node's current value (for a different record, see "Linking a record can bring its answers"):
 - An answer equal to the snapshot SHALL change nothing, even if the node reads back differently (open-pedigree may normalise or reject values).
 - A changed non-empty answer SHALL be set.
 - A `null` (empty) answer SHALL clear the target only if the node still holds the snapshot's value. If it holds anything else (a diagram edit, or a value open-pedigree rejected), it SHALL be left alone. A value the record never sent is never cleared.
@@ -155,4 +155,31 @@ For a legend list (the reserved disorders/genes/phenotypes targets, or a custom 
 #### Scenario: Sanitised phenotype IDs don't duplicate and can be removed
 - **WHEN** a refresh sends phenotype `HP:0001250` twice, and later sends none
 - **THEN** the node SHALL have one `HP_C_0001250` after the first two refreshes (the second adding no undo step), and none after the third
+
+### Requirement: Linking a record can bring its answers
+`openPicker`'s `onLinked` callback SHALL accept an optional third argument, `answers`, an array of `{linkId: string, value: any}` entries, the same shape as `onCreated`'s. When it is an array, the editor SHALL store `recordRef` on the node and apply `answers` in one event, as it does for `onCreated`, with the ref ahead of the values in that event. A single undo SHALL remove the link and the values together. For the node's current record (a re-pick), `answers` SHALL be applied as an ordinary refresh ("A linked-record refresh applies the record's changes"). For a different record (including a first link), every non-empty value the record sends SHALL be applied. The previous record's values SHALL be cleared where the new record has none - including linkIds the new record leaves out - but only while the node still holds them, so values entered in the diagram stay. For a legend list, the previous record's entries the new record doesn't send are removed, the new record's entries are added, and entries that never came from a record stay. When `answers` is absent or not an array, `onLinked` SHALL store the ref only, as before.
+
+#### Scenario: Linking brings the record's values in
+- **WHEN** a provider calls `onLinked("Record/42", {}, [{ linkId: "ext_field_a", value: "from the record" }])`
+- **THEN** the node's linked record ref SHALL be `"Record/42"`, and its `ext_field_a` answer SHALL be `"from the record"`
+
+#### Scenario: Linking without answers only sets the ref
+- **WHEN** a provider calls `onLinked("Record/42", {})`
+- **THEN** the node's linked record ref SHALL be `"Record/42"`, and no answers SHALL be applied
+
+#### Scenario: Relinking to another record replaces the old record's values
+- **WHEN** a node linked to `Record/1`, whose answers set `ext_field_a` to `"one"`, is linked to `Record/2` with answers `[{ linkId: "ext_field_a", value: "two" }]`
+- **THEN** `ext_field_a` SHALL be `"two"`, and the node's snapshot SHALL be `Record/2`'s answers only
+
+#### Scenario: Relinking applies a value the new record shares with the old one
+- **WHEN** a node linked to `record:1/instance:1`, whose answers set `note` to `"X"`, has `note` changed to `"Y"` in the diagram, and is then linked to `record:1/instance:2` with answers `note: "X"`
+- **THEN** `note` SHALL be `"X"`
+
+#### Scenario: Relinking to a record without a value clears the old record's value
+- **WHEN** a node linked to `record:1/instance:1`, whose answers set `note` and `count`, has `count` changed in the diagram, and is then linked to `record:1/instance:2` with answers `note: null, count: null`
+- **THEN** `note` SHALL be cleared, `count` SHALL keep the diagram's value, and the snapshot SHALL be empty
+
+#### Scenario: One undo removes a link and its values
+- **WHEN** a node is linked with answers and the user undoes once
+- **THEN** the node SHALL be unlinked, and the values the link brought SHALL be gone
 
