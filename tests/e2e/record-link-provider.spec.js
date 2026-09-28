@@ -225,6 +225,77 @@ test('without a recordLinkProvider the same tab keeps its (disabled) linked item
   await expect(page.locator(`${VISIBLE_MENU} #tab_basic_info .field-ext_field_a input[type=text]`)).toBeDisabled();
 });
 
+const LINKED_EXTENSION = [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }];
+
+// A tab that stays (it has "age"), holding a nested group whose fields are all linked
+// ("Vitals", two levels deep inside "Measurements") and one that still has a field ("History").
+const PARTLY_LINKED_TAB_QUESTIONNAIRE = {
+  resourceType: 'Questionnaire', url: 'http://example.org/Questionnaire/e2e-partly-linked-tab', version: '1.0',
+  item: [{
+    linkId: 'clinical', type: 'group', text: 'Clinical',
+    item: [
+      { linkId: 'age', type: 'string', text: 'Age' },
+      {
+        linkId: 'measurements', type: 'group', text: 'Measurements',
+        item: [{
+          linkId: 'vitals', type: 'group', text: 'Vitals',
+          item: [
+            { linkId: 'height', type: 'string', text: 'Height', extension: LINKED_EXTENSION },
+            { linkId: 'weight', type: 'string', text: 'Weight', extension: LINKED_EXTENSION },
+          ],
+        }],
+      },
+      {
+        linkId: 'history', type: 'group', text: 'History',
+        item: [{
+          linkId: 'history_detail', type: 'group', text: 'History detail',
+          item: [{ linkId: 'onset', type: 'string', text: 'Onset' }],
+        }],
+      },
+    ],
+  }],
+};
+
+test('on a tab that stays, a nested group whose fields are all linked leaves no empty heading', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: PARTLY_LINKED_TAB_QUESTIONNAIRE });
+  await openNodeMenuForProband(page);
+  expect(await page.locator(`${VISIBLE_MENU} .tabs dd a`).allTextContents()).toEqual(['Clinical', 'Linked Record']);
+  // "Measurements" only held "Vitals", so both go; "History" still has a field under it.
+  expect(await page.locator(`${VISIBLE_MENU} #tab_clinical .field-heading .field-name`).allTextContents()).toEqual(['History', 'History detail']);
+  await expect(page.locator(`${VISIBLE_MENU} #tab_clinical .field-age`)).toBeAttached();
+  expect(await page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-heading .field-name`).allTextContents()).toEqual(['Vitals']);
+  await expect(page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-height`)).toBeAttached();
+  await expect(page.locator(`${VISIBLE_MENU} #tab___linked_record__ .field-weight`)).toBeAttached();
+});
+
+test('without a recordLinkProvider, a partly linked tab keeps every heading', async ({ page }) => {
+  await loadEditor(page, { questionnaire: PARTLY_LINKED_TAB_QUESTIONNAIRE });
+  await openNodeMenuForProband(page);
+  expect(await page.locator(`${VISIBLE_MENU} #tab_clinical .field-heading .field-name`).allTextContents())
+    .toEqual(['Measurements', 'Vitals', 'History', 'History detail']);
+});
+
+test('without a recordLinkProvider, a tab or heading with nothing the form can show isn\'t shown', async ({ page }) => {
+  // `display` items (e.g. REDCap descriptive fields) aren't rendered.
+  const questionnaire = {
+    resourceType: 'Questionnaire', url: 'http://example.org/Questionnaire/e2e-display-only', version: '1.0',
+    item: [
+      { linkId: 'intro', type: 'group', text: 'Intro', item: [{ linkId: 'intro_text', type: 'display', text: 'Welcome' }] },
+      {
+        linkId: 'more', type: 'group', text: 'More',
+        item: [
+          { linkId: 'notes', type: 'string', text: 'Notes' },
+          { linkId: 'about', type: 'group', text: 'About', item: [{ linkId: 'about_text', type: 'display', text: 'About' }] },
+        ],
+      },
+    ],
+  };
+  await loadEditor(page, { questionnaire });
+  await openNodeMenuForProband(page);
+  expect(await page.locator(`${VISIBLE_MENU} .tabs dd a`).allTextContents()).toEqual(['More']);
+  expect(await page.locator(`${VISIBLE_MENU} .field-heading`).count()).toBe(0);
+});
+
 const NESTED_INTERRUPTED_GROUP_QUESTIONNAIRE = {
   resourceType: 'Questionnaire',
   url: 'http://example.org/Questionnaire/e2e-linked-record-nested-interrupted-test',
