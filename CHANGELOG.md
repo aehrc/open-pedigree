@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.1...open-pedigree-v1.4.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* keep a GA4GH pedigree loadable, with its answers, after it's saved again ([#39](https://github.com/aehrc/open-pedigree/issues/39)) ([0607796](https://github.com/aehrc/open-pedigree/commit/0607796738efd04e706d75c7a1ece158e47dddcb))
+
 ## [1.4.1](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.0...open-pedigree-v1.4.1) (2026-09-28)
 
 
