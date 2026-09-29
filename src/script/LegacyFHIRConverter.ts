@@ -28,6 +28,15 @@ const LEGACY_PHENOTYPE_SYSTEM = 'http://purl.obolibrary.org/obo/hp.fhir';
 const LEGACY_GENE_SYSTEM = 'http://www.genenames.org/geneId';
 const GA4GH_PEDIGREE_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
 
+/**
+ * Whether a resource declares the GA4GH pedigree profile. meta.profile is a list of canonical URLs,
+ * so whole entries are compared, not substrings.
+ */
+export function hasGA4GHPedigreeProfile(resource) {
+  const profiles = (resource && resource.meta && Array.isArray(resource.meta.profile)) ? resource.meta.profile : [];
+  return profiles.some((profile) => profile === GA4GH_PEDIGREE_PROFILE);
+}
+
 function codeInSystem(codeableConcept, system) {
   const coding = (codeableConcept.coding || []).find((c) => c.system === system);
   return coding ? coding.code : null;
@@ -46,10 +55,7 @@ LegacyFHIRConverter.isLegacyResource = function(inputResource) {
   if (inputResource.resourceType === 'List') {
     return true;
   }
-  // meta.profile is a list of canonical URLs: compare whole entries, not substrings
-  const profiles = (inputResource.meta && Array.isArray(inputResource.meta.profile)) ? inputResource.meta.profile : [];
-  return inputResource.resourceType === 'Composition'
-    && !profiles.some((profile) => profile === GA4GH_PEDIGREE_PROFILE);
+  return inputResource.resourceType === 'Composition' && !hasGA4GHPedigreeProfile(inputResource);
 };
 
 LegacyFHIRConverter.initFromFHIR = function(inputText) {

@@ -2,7 +2,7 @@ import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
-import LegacyFHIRConverter from 'pedigree/LegacyFHIRConverter';
+import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -56,14 +56,12 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   let compositionResource = undefined;
   let containedResources = undefined;
 
-  if (inputResource.resourceType === 'Composition' && inputResource.meta  && inputResource.meta.profile
-    && inputResource.meta.profile.includes('http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree')) {
+  if (inputResource.resourceType === 'Composition' && hasGA4GHPedigreeProfile(inputResource)) {
     compositionResource = inputResource;
     containedResources = inputResource.contained;
   } else if (inputResource.resourceType === 'Bundle' && inputResource.type === 'document' ) {
     compositionResource = inputResource.entry[0].resource;
-    if (compositionResource && compositionResource.resourceType === 'Composition' && compositionResource.meta  && compositionResource.meta.profile
-      && compositionResource.meta.profile.includes('http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree')){
+    if (compositionResource && compositionResource.resourceType === 'Composition' && hasGA4GHPedigreeProfile(compositionResource)){
       containedResources = inputResource.entry.map(entry => entry.resource);
     } else {
       compositionResource = null;

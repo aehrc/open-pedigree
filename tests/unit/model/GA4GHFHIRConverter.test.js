@@ -116,3 +116,17 @@ describe('GA4GHFHIRConverter last name at birth', () => {
     expect(jane.lNameAtB).toBe('Jones');
   });
 });
+
+describe('GA4GHFHIRConverter.initFromFHIR profile check', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('reads a Bundle only if its Composition lists the GA4GH pedigree profile itself', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).not.toThrow();
+    const profile = exported.entry[0].resource.meta.profile;
+    exported.entry[0].resource.meta.profile = profile.map((p) => 'https://example.org/?' + p);
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).toThrow(/not expected JSON format/);
+  });
+});
