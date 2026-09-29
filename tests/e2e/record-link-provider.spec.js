@@ -1216,6 +1216,8 @@ const DATE_QUESTIONNAIRE = {
       linkId: 'dob', type: 'date', text: 'Date of birth',
       definition: 'http://hl7.org/fhir/StructureDefinition/Patient#Patient.birthDate',
       extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+    }, {
+      linkId: 'visit', type: 'date', text: 'Visit date',
     }],
   }],
 };
@@ -1248,6 +1250,25 @@ for (const timezoneId of ['Australia/Brisbane', 'America/New_York']) {
         input._flatpickr.setDate('2016-07-12', true);
       });
       await expect.poll(() => birthDay(page, personId)).toEqual([2016, 7, 12]);
+    });
+
+    test('an ordinary date answer is kept as YYYY-MM-DD, and one an earlier version saved still shows its day', async ({ page }) => {
+      await loadEditor(page, { questionnaire: DATE_QUESTIONNAIRE });
+      const personId = await openNodeMenuForProband(page);
+      const visit = () => page.evaluate((id) => window.editor.getView().getNode(parseInt(id, 10)).getQuestionnaireAnswer('visit'), personId);
+      await page.evaluate(() => {
+        const input = [...document.querySelectorAll('.field-visit input.xwiki-date')].find((el) => el.offsetParent);
+        input._flatpickr.setDate('2016-07-12', true);
+      });
+      await expect.poll(visit).toBe('2016-07-12');
+
+      // Earlier versions stored UTC midnight, saved as an ISO timestamp.
+      await page.evaluate((id) => {
+        const n = window.editor.getView().getNode(parseInt(id, 10));
+        n.setQuestionnaireAnswer('visit', '2016-07-12T00:00:00.000Z');
+        window.editor.getNodeMenu().show(n, 100, 100);
+      }, personId);
+      await expect(page.locator(`${VISIBLE_MENU} .field-visit input.xwiki-date`)).toHaveValue('2016-07-12');
     });
 
     test('a YYYY-MM-DD date of birth set on a person is that day', async ({ page }) => {

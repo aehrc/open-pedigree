@@ -24,7 +24,7 @@
 
 import flatpickr from 'flatpickr';
 import jQuery from 'jquery';
-import { toLocalIsoDate, parseLocalIsoDate } from 'pedigree/model/localDate';
+import { toLocalIsoDate } from 'pedigree/model/localDate';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -552,8 +552,9 @@ export default class NodeMenu {
         }
       });
       (datePicker as any)._getValue = function(this: any) {
-        // The picker's 'Y-m-d' is that day here, not UTC midnight (which is the day before west of UTC).
-        return [parseLocalIsoDate((this as any).alt)];
+        // The picked day as 'YYYY-MM-DD' - not a Date, whose saved form (a UTC timestamp) would
+        // depend on the time zone it was saved in. Date setters read it as that day.
+        return [toLocalIsoDate((this as any).alt) || null];
       }.bind(datePicker);
       this._attachFieldEventListeners(datePicker, ['xwiki:date:changed']);
       return result;

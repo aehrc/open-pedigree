@@ -9,11 +9,14 @@ function pad(n: number): string {
   return (n < 10 ? '0' : '') + n;
 }
 
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+// 'YYYY-MM-DD', alone or at the start of an ISO timestamp (earlier versions saved a date answer
+// as UTC midnight, e.g. '2016-07-12T00:00:00.000Z' - its date part is the day it meant).
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/;
 
 /**
- * A 'YYYY-MM-DD' string as that day at local midnight; any other value as new Date() reads it.
- * Returns null for an empty or unreadable value.
+ * A 'YYYY-MM-DD' string (or ISO timestamp) as that day at local midnight; any other value as
+ * new Date() reads it. Returns null for an empty or unreadable value, including a day or month
+ * that doesn't exist ('2020-13-01' isn't rolled over into 2021).
  */
 export function parseLocalIsoDate(value: any): Date | null {
   if (value === null || value === undefined || value === '') {
@@ -23,8 +26,16 @@ export function parseLocalIsoDate(value: any): Date | null {
     return isNaN(value.getTime()) ? null : value;
   }
   const match = ISO_DATE.exec(String(value));
-  const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
-  return isNaN(d.getTime()) ? null : d;
+  if (!match) {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const d = new Date(2000, month, day);
+  d.setFullYear(year); // not new Date(year, ...), which puts years 0-99 in the 1900s
+  return (d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) ? d : null;
 }
 
 /**
@@ -33,7 +44,11 @@ export function parseLocalIsoDate(value: any): Date | null {
  */
 export function toLocalIsoDate(value: any): string {
   const d = parseLocalIsoDate(value);
-  return d ? d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) : '';
+  if (!d) {
+    return '';
+  }
+  const year = String(d.getFullYear());
+  return '0000'.slice(year.length) + year + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
 /**

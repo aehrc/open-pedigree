@@ -3,6 +3,7 @@ import { toLocalIsoDate, parseLocalIsoDate } from 'pedigree/model/localDate';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
+import { isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 
 // East of UTC, UTC itself, west of UTC, and a half-hour offset.
 const ZONES = ['Australia/Brisbane', 'UTC', 'America/New_York', 'Asia/Kolkata'];
@@ -30,6 +31,31 @@ describe.each(ZONES)('dates are calendar dates, whatever the time zone (%s)', (z
     expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2016, 6, 12]);
     expect(parseLocalIsoDate('')).toBeNull();
     expect(parseLocalIsoDate('nonsense')).toBeNull();
+  });
+
+  it('rejects a day or month that doesn\'t exist, rather than rolling it over', () => {
+    process.env.TZ = zone;
+    expect(parseLocalIsoDate('2020-13-01')).toBeNull();
+    expect(parseLocalIsoDate('2020-00-10')).toBeNull();
+    expect(parseLocalIsoDate('2021-02-29')).toBeNull();
+    expect(toLocalIsoDate('2020-13-45')).toBe('');
+    // So a record's mistyped date is still skipped, not written as some other day.
+    expect(isUnusableAnswer('setBirthDate', '2020-13-45')).toBe(true);
+    expect(isUnusableAnswer('setBirthDate', '2020-02-29')).toBe(false);
+  });
+
+  it('keeps a year below 100 as written', () => {
+    process.env.TZ = zone;
+    expect(parseLocalIsoDate('0050-06-01').getFullYear()).toBe(50);
+    expect(toLocalIsoDate('0050-06-01')).toBe('0050-06-01');
+  });
+
+  it('reads an ISO timestamp (how earlier versions saved a date answer) as its date', () => {
+    process.env.TZ = zone;
+    expect(toLocalIsoDate('2016-07-12T00:00:00.000Z')).toBe('2016-07-12');
+    const d = parseLocalIsoDate('2016-07-12T00:00:00.000Z');
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2016, 6, 12]);
+    expect(GA4GHFHIRConverter.answerToFhirValue('date', '2016-07-12T00:00:00.000Z')).toEqual({ valueDate: '2016-07-12' });
   });
 
   it('writes a date answer as a FHIR date', () => {
