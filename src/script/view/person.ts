@@ -67,6 +67,7 @@ export default class Person extends AbstractPerson {
   _linkedPatientRef: any;
   _linkedRecordRef: any;
   _linkedRecordSnapshot: any;
+  _unrenderedQuestionnaireResponses: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -151,6 +152,7 @@ export default class Person extends AbstractPerson {
     return this._questionnaireAnswers;
   }
 
+
   /**
    * Sets the answer for a legend-backed (mapsToLegendCondition/mapsToLegendObservation)
    * Questionnaire item to the given list of {system, code, display} terms, diffing against
@@ -227,6 +229,7 @@ export default class Person extends AbstractPerson {
     this._linkedPatientRef = '';
     this._linkedRecordRef = '';
     this._linkedRecordSnapshot = {};
+    this._unrenderedQuestionnaireResponses = [];
     this._questionnaireAnswers = {};
   }
 
@@ -1160,6 +1163,11 @@ export default class Person extends AbstractPerson {
     if (Object.keys(this._questionnaireAnswers).length > 0) {
       info['questionnaireAnswers'] = this._questionnaireAnswers;
     }
+    // QuestionnaireResponses loaded for a Questionnaire this editor doesn't have: carried as
+    // they came, so they're saved again (see GA4GHFHIRConverter.addQuestionnaireResponse).
+    if (this._unrenderedQuestionnaireResponses.length > 0) {
+      info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
+    }
     return info;
   }
 
@@ -1236,6 +1244,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('questionnaireAnswers')) {
         this._questionnaireAnswers = info.questionnaireAnswers;
+      }
+      if (info.hasOwnProperty('unrenderedQuestionnaireResponses')) {
+        this._unrenderedQuestionnaireResponses = info.unrenderedQuestionnaireResponses || [];
       }
       return true;
     }

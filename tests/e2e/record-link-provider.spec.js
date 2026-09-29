@@ -1088,3 +1088,118 @@ test('undoing a life status change away from stillborn restores the status and b
   expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'stillborn', dob: before.dob, dod: before.dod });
 });
 
+
+// GA4GH export through the export dialog, as a user would save it.
+async function exportGA4GH(page) {
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15000 }),
+    page.evaluate(() => {
+      const ga4ghRadio = document.querySelector('input[type=radio][name="export-type"][value="GA4GH"]');
+      ga4ghRadio.checked = true;
+      ga4ghRadio.click();
+      document.getElementById('export_button').click();
+    }),
+  ]);
+  return require('fs').readFileSync(await download.path(), 'utf8');
+}
+
+async function importGA4GH(page, json) {
+  return page.evaluate((j) => window.editor.getSaveLoadEngine().createGraphFromImportData(j, 'GA4GH', {}, true, true) !== false
+    && window.editor.getGraph().getMaxNodeId() > 0, json);
+}
+
+test('a pedigree saved, loaded and saved again still loads with its family intact', async ({ page }) => {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const dialogs = [];
+  page.on('dialog', (d) => dialogs.push(d.message()));
+  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData(
+    'fam1 child dad mum 1 0\nfam1 dad 0 0 1 0\nfam1 mum 0 0 2 0', 'ped', {}, true, true));
+  const people = () => page.evaluate(() => {
+    const g = window.editor.getGraph();
+    let n = 0;
+    for (let id = 0; id <= g.getMaxNodeId(); id++) { if (g.isPerson(id)) n++; }
+    return n;
+  });
+  expect(await people()).toBe(3);
+
+  const first = await exportGA4GH(page);
+  expect(await importGA4GH(page, first)).toBe(true);
+  const second = await exportGA4GH(page);
+  expect(second).not.toMatch(/"reference": "Patient\/urn:uuid:/);
+  expect(await importGA4GH(page, second)).toBe(true);
+  expect(await people()).toBe(3);
+  expect(dialogs).toEqual([]);
+});
+
+// A saved pedigree with one linked person and a 'note' answer, loaded into a new editor that
+// gets the same Questionnaire from a slow questionnaireUrl - while the built-in default is still
+// in effect. Returns a function reading the person's 'note' answer.
+async function loadBeforeQuestionnaireArrives(page) {
+  await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+  const personId = await openNodeMenuForProband(page);
+  await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+  await refreshWith(page, personId, [{ linkId: 'note', value: 'from the record' }]);
+  const saved = await exportGA4GH(page);
+
+  await page.route('**/fhir/Questionnaire/slow-round-trip', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROUND_TRIP_QUESTIONNAIRE) });
+  });
+  await retireAutoCreatedEditor(page);
+  await page.evaluate((json) => {
+    document.querySelectorAll('#work-area').forEach((el) => el.remove());
+    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireUrl: 'http://example.org/fhir/Questionnaire/slow-round-trip' });
+    // As a host's load does (localStorageBackend): with an undo step, so undo can go back to it.
+    window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, false, true);
+  }, saved);
+  const linkedPersonId = () => page.evaluate(() => {
+    const map = window.editor.getView().getNodeMap();
+    return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef()), 10);
+  });
+  const note = async () => {
+    const id = await linkedPersonId();
+    return page.evaluate((i) => window.editor.getView().getNode(i).getQuestionnaireAnswer('note'), id);
+  };
+  return { note, linkedPersonId };
+}
+
+function questionnaireResponses(exported) {
+  return JSON.parse(exported).entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse');
+}
+
+test('a pedigree loaded before its questionnaireUrl arrives gets its answers once it does, and an undo keeps them', async ({ page }) => {
+  const { note } = await loadBeforeQuestionnaireArrives(page);
+  await expect.poll(note, { timeout: 10000 }).toBe('from the record');
+
+  // Undoing a structural edit (here: adding parents) reloads the load's snapshot - taken
+  // before the answers arrived.
+  const before = await page.evaluate(() => window.editor.getGraph().getMaxNodeId());
+  await page.evaluate(() => {
+    const map = window.editor.getView().getNodeMap();
+    const id = Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef());
+    document.dispatchEvent(new CustomEvent('pedigree:person:newparent', { detail: { personID: parseInt(id, 10) } }));
+  });
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBeGreaterThan(before);
+  await page.evaluate(() => window.editor.getActionStack().undo());
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBe(before);
+  expect(await note()).toBe('from the record');
+
+  const resaved = await exportGA4GH(page);
+  expect(resaved).not.toContain('[object Object]');
+  expect(questionnaireResponses(resaved).flatMap((qr) => qr.item)).toContainEqual({ linkId: 'note', answer: [{ valueString: 'from the record' }] });
+});
+
+test('an answer that arrived late and was then changed saves as changed, in one QuestionnaireResponse', async ({ page }) => {
+  const { note, linkedPersonId } = await loadBeforeQuestionnaireArrives(page);
+  await expect.poll(note, { timeout: 10000 }).toBe('from the record');
+
+  const id = await linkedPersonId();
+  await setNodeProperty(page, id, { setQuestionnaireAnswer_note: 'changed here' });
+  expect(await note()).toBe('changed here');
+
+  const resaved = await exportGA4GH(page);
+  const responses = questionnaireResponses(resaved);
+  expect(responses).toHaveLength(1);
+  expect(responses[0].item).toContainEqual({ linkId: 'note', answer: [{ valueString: 'changed here' }] });
+});
