@@ -1,5 +1,6 @@
 import { cloneObject, Timer } from 'pedigree/model/helpers';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
+import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
 export default class Controller {
   constructor() {
@@ -138,10 +139,10 @@ export default class Controller {
 
         if (propertySetFunction == 'setDeathDate' || propertySetFunction == 'setBirthDate') {
           if (propValue != '') {
-            try {
-              var parsedDate = new Date(propValue);
+            // 'YYYY-MM-DD' is that day here, not UTC midnight.
+            var parsedDate = parseLocalIsoDate(propValue);
+            if (parsedDate) {
               propValue = parsedDate.toDateString();
-            } catch (err) {
             }
           }
         }
@@ -501,8 +502,8 @@ export default class Controller {
       return properties;
     }
     var currentDeath = node.getDeathDate();
-    var newBirth = properties.setBirthDate ? new Date(properties.setBirthDate) : null;
-    var deathFirst = !!(currentDeath && newBirth && !isNaN(newBirth.getTime()) && newBirth.getTime() >= currentDeath.getTime());
+    var newBirth = parseLocalIsoDate(properties.setBirthDate);
+    var deathFirst = !!(currentDeath && newBirth && newBirth.getTime() >= currentDeath.getTime());
     var ordered: any = {};
     var pair = deathFirst ? ['setDeathDate', 'setBirthDate'] : ['setBirthDate', 'setDeathDate'];
     Object.keys(properties).forEach(function(setter) {

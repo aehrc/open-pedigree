@@ -1,4 +1,5 @@
 import { evaluateGraphPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
+import { dateAnswer } from 'pedigree/model/localDate';
 
 function extractAnswerValue(condition: any): any {
   if (condition.hasOwnProperty('answerBoolean')) {
@@ -39,8 +40,12 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
     return condition.negate ? !result : result;
   }
 
-  const current = currentAnswerValue(answers[condition.question]);
+  let current = currentAnswerValue(answers[condition.question]);
   const expected = extractAnswerValue(condition);
+  if (condition.hasOwnProperty('answerDate') && current !== undefined && current !== null && current !== '') {
+    // Compared as 'YYYY-MM-DD' text, so an earlier version's timestamp or a Date is its day.
+    current = dateAnswer(current);
+  }
 
   switch (condition.operator) {
   case 'exists':

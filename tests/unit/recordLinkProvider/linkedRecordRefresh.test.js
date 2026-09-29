@@ -31,7 +31,7 @@ describe('clear table and comparison', () => {
   });
 
   it('compares dates by day and is strict about 0/false vs empty', () => {
-    expect(sameValue('setBirthDate', new Date('2001-02-03'), '2001-02-03')).toBe(true);
+    expect(sameValue('setBirthDate', new Date(2001, 1, 3), '2001-02-03')).toBe(true);
     expect(sameValue('setQuestionnaireAnswer_count', 0, null)).toBe(false);
     expect(sameValue('setAdopted', false, '')).toBe(false);
   });
@@ -70,7 +70,7 @@ describe('computeLinkedRecordRefresh (compares with what the record sent last ti
   });
 
   it('never clears a value the record never sent', () => {
-    const r = refresh([{ linkId: 'dob', value: null }], { current: { setBirthDate: new Date('1980-01-01') } });
+    const r = refresh([{ linkId: 'dob', value: null }], { current: { setBirthDate: new Date(1980, 0, 1) } });
     expect(r.properties).toEqual({});
   });
 
@@ -176,7 +176,7 @@ describe('relinkRefreshInput (linking to a different record)', () => {
 
   it('clears the old record\'s date when the new record\'s can\'t be parsed, instead of leaving it untracked', () => {
     const r = relink([{ linkId: 'dob', value: 'unknown' }], {
-      current: { setBirthDate: new Date('1980-01-01') }, previous: { dob: '1980-01-01' },
+      current: { setBirthDate: new Date(1980, 0, 1) }, previous: { dob: '1980-01-01' },
     });
     expect(r.properties).toEqual({ setBirthDate: '' });
     expect(r.snapshot).toEqual({});
@@ -198,12 +198,12 @@ describe('relinkRefreshInput (linking to a different record)', () => {
 describe('an unparseable date on an ordinary refresh', () => {
   it('leaves the node alone but keeps tracking the last usable date, so a later empty clears it', () => {
     const first = refresh([{ linkId: 'dob', value: 'unknown' }], {
-      current: { setBirthDate: new Date('1980-01-01') }, snapshot: { dob: '1980-01-01' },
+      current: { setBirthDate: new Date(1980, 0, 1) }, snapshot: { dob: '1980-01-01' },
     });
     expect(first.properties).toEqual({});
     expect(first.snapshot).toEqual({ dob: '1980-01-01' });
     const later = refresh([{ linkId: 'dob', value: null }], {
-      current: { setBirthDate: new Date('1980-01-01') }, snapshot: first.snapshot,
+      current: { setBirthDate: new Date(1980, 0, 1) }, snapshot: first.snapshot,
     });
     expect(later.properties).toEqual({ setBirthDate: '' });
   });

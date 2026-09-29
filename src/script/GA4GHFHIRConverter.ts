@@ -1,6 +1,7 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
+import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -856,16 +857,10 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
 GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
   // let exportObj = [];
   let today = new Date();
-  let tz = today.getTimezoneOffset();
-  let tzHours = tz / 60;
-  let tzMins = Math.abs(tz - (tzHours * 60));
-  let date = today.getFullYear() + '-' + ((today.getMonth() < 9) ? '0' : '') + (today.getMonth() + 1) + '-'
-    + ((today.getDate() < 10) ? '0' : '') + today.getDate();
   let time = ((today.getHours() < 10) ? '0' : '') + today.getHours() + ':' + ((today.getMinutes() < 10) ? '0' : '') + today.getMinutes() + ':'
     + ((today.getSeconds() < 10) ? '0' : '') + today.getSeconds();
-  let timezone = ((tzHours >= 0) ? '+' : '') + tzHours + ':'
-    + ((tzMins < 10) ? '0' : '') + tzMins;
-  let dateTime = date + 'T' + time + timezone;
+  // Local time with its own offset (getTimezoneOffset's sign is the opposite of ISO 8601's).
+  let dateTime = toLocalIsoDate(today) + 'T' + time + localUtcOffset(today);
 
   let pedigreeIndividuals = {}; // will contain map of id/patient resource
   let pedigreeRelationship = []; // all the constructed relationships
@@ -1390,15 +1385,11 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   }
   let unbornFlag = false;
   if (privacySetting === 'all') {
-    if (nodeProperties['dob']) {
-      let d = new Date(nodeProperties['dob']);
-      patientResource['birthDate'] = d.getFullYear() + '-'
-        + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() <= 9 ? '0' : '') + d.getDate();
+    if (toLocalIsoDate(nodeProperties['dob'])) {
+      patientResource['birthDate'] = toLocalIsoDate(nodeProperties['dob']);
     }
-    if (nodeProperties['dod']) {
-      let d = new Date(nodeProperties['dod']);
-      patientResource['deceasedDateTime'] = d.getFullYear() + '-'
-        + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() <= 9 ? '0' : '') + d.getDate();
+    if (toLocalIsoDate(nodeProperties['dod'])) {
+      patientResource['deceasedDateTime'] = toLocalIsoDate(nodeProperties['dod']);
     } else if (nodeProperties['lifeStatus']) {
       let lifeStatus = nodeProperties['lifeStatus'];
       if (lifeStatus === 'stillborn' || lifeStatus === 'miscarriage' || lifeStatus === 'aborted' || lifeStatus === 'unborn') {
@@ -1730,7 +1721,9 @@ GA4GHFHIRConverter.answerToFhirValue = function (itemType, value) {
   case 'decimal':
     return { 'valueDecimal': value };
   case 'date':
-    return { 'valueDate': value };
+    // A FHIR date: YYYY-MM-DD, or partial (YYYY / YYYY-MM) as it was given. A person's dates
+    // are kept as e.g. 'Tue Feb 11 2020'.
+    return { 'valueDate': String(dateAnswer(value)) };
   case 'choice':
   case 'open-choice': {
     // QuestionnaireResponse.item.answer.value[x] only permits Coding, not CodeableConcept
@@ -1776,7 +1769,8 @@ GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
   case 'decimal':
     return answerEntry.valueDecimal;
   case 'date':
-    return answerEntry.valueDate;
+    // An earlier version's answer is a UTC-midnight timestamp: keep it as the date it meant.
+    return dateAnswer(answerEntry.valueDate);
   case 'choice':
   case 'open-choice':
     if (answerEntry.valueCoding) {

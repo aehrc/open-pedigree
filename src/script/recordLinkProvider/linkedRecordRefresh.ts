@@ -1,3 +1,4 @@
+import { parseLocalIsoDate } from 'pedigree/model/localDate';
 /**
  * Pure refresh logic for a linked record's answers (linked-record-round-trip).
  *
@@ -73,7 +74,7 @@ export function isEmptyAnswer(value: any): boolean {
 // A non-empty answer the setter can't take: an unparseable date (e.g. "31-12-1980" or "unknown"),
 // which would be stored as Invalid Date and could never be cleared again.
 export function isUnusableAnswer(setter: string, value: any): boolean {
-  return DATE_SETTERS.indexOf(setter) !== -1 && !isEmptyAnswer(value) && isNaN(new Date(value).getTime());
+  return DATE_SETTERS.indexOf(setter) !== -1 && !isEmptyAnswer(value) && parseLocalIsoDate(value) === null;
 }
 
 export function clearValueFor(setter: string): any {
@@ -85,8 +86,9 @@ function normalise(setter: string, value: any): any {
     if (!value) {
       return '';
     }
-    const date = value instanceof Date ? value : new Date(value);
-    return isNaN(date.getTime()) ? String(value) : date.toDateString();
+    // A record's 'YYYY-MM-DD' is that day here (new Date() would read it as UTC midnight).
+    const date = parseLocalIsoDate(value);
+    return date ? date.toDateString() : String(value);
   }
   if (setter === 'setGestationAge') {
     return (value === null || value === undefined || value === '' || isNaN(parseInt(value, 10))) ? '' : parseInt(value, 10);
