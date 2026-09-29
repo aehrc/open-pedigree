@@ -74,3 +74,61 @@ describe('GA4GHFHIRConverter.exportAsFHIR', () => {
     expect(patients.some(p => /^urn:uuid:[0-9a-f-]{36}$/i.test(p.id))).toBe(true);
   });
 });
+
+describe('GA4GHFHIRConverter last name at birth', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  function roundTrip(properties) {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG));
+    Object.assign(baseGraph.properties[1], properties);
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+    return Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find((p) => p.gender === 'F');
+  }
+
+  it('reads it back, without taking it for the last name', () => {
+    const jane = roundTrip({ lName: 'Smith', lNameAtB: 'Jones' });
+    expect(jane.lName).toBe('Smith');
+    expect(jane.lNameAtB).toBe('Jones');
+  });
+
+  it('takes a maiden name as one, but not an old name that has a period', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG));
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    const janeOf = (names) => {
+      const patient = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'Jane');
+      patient.name = names;
+      return Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)).properties).find((p) => p.fName === 'Jane');
+    };
+    const current = { use: 'official', family: 'Smith', given: ['Jane'] };
+    expect(janeOf([current, { use: 'maiden', family: 'Jones' }]).lNameAtB).toBe('Jones');
+    // an earlier married name, from another FHIR source
+    const earlier = janeOf([current, { use: 'old', family: 'Brown', period: { end: '2012' } }]);
+    expect(earlier.lNameAtB).toBeUndefined();
+    expect(earlier.lName).toBe('Smith');
+  });
+
+  it('reads it back when there is no last name', () => {
+    const jane = roundTrip({ lNameAtB: 'Jones' });
+    expect(jane.fName).toBe('Jane');
+    expect(jane.lName).toBeUndefined();
+    expect(jane.lNameAtB).toBe('Jones');
+  });
+});
+
+describe('GA4GHFHIRConverter.initFromFHIR profile check', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('reads a Bundle only if its Composition lists the GA4GH pedigree profile itself', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).not.toThrow();
+    // A profile that's a string rather than a list, and only contains the URL: includes() on it was a
+    // substring test, which took it for the GA4GH profile.
+    const profile = exported.entry[0].resource.meta.profile;
+    exported.entry[0].resource.meta.profile = 'https://example.org/?' + profile[0];
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).toThrow(/not expected JSON format/);
+  });
+});

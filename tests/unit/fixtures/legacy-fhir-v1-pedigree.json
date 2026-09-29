@@ -1,0 +1,1012 @@
+{
+  "resourceType": "Composition",
+  "status": "preliminary",
+  "type": {
+    "coding": {
+      "system": "http://loinc.org",
+      "code": "11488-4",
+      "display": "Consult note"
+    }
+  },
+  "subject": {
+    "type": "Patient",
+    "reference": "#pat"
+  },
+  "date": "2026-09-30T07:17:44-10:00",
+  "title": "Pedigree Details",
+  "section": [
+    {
+      "title": "Patient Condition",
+      "entry": [
+        {
+          "type": "Condition",
+          "reference": "#cond_0"
+        },
+        {
+          "type": "Condition",
+          "reference": "#cond_1"
+        },
+        {
+          "type": "Observation",
+          "reference": "#fmh_clinical_0_0"
+        },
+        {
+          "type": "Observation",
+          "reference": "#fmh_genes_0_0"
+        }
+      ]
+    },
+    {
+      "title": "Family History",
+      "code": {
+        "coding": {
+          "system": "http://loinc.org",
+          "code": "10157-6",
+          "display": "History of family member diseases"
+        }
+      },
+      "entry": [
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_0"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_1"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_2"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_3"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_4"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_5"
+        },
+        {
+          "type": "Observation",
+          "reference": "#fmh_carrierStatus_5"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_6"
+        },
+        {
+          "type": "Observation",
+          "reference": "#fmh_carrierStatus_6"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_7"
+        },
+        {
+          "type": "FamilyMemberHistory",
+          "reference": "#FMH_8"
+        },
+        {
+          "type": "Observation",
+          "reference": "#fmh_carrierStatus_8"
+        }
+      ]
+    },
+    {
+      "title": "Pedigree Diagram",
+      "entry": [
+        {
+          "type": "DocumentReference",
+          "reference": "#pedigreeImage"
+        }
+      ]
+    }
+  ],
+  "contained": [
+    {
+      "id": "pat",
+      "resourceType": "Patient",
+      "gender": "female",
+      "birthDate": "2016-7-12",
+      "name": [
+        {
+          "family": "Example",
+          "given": [
+            "Maya"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pedigreeImage",
+      "resourceType": "DocumentReference",
+      "status": "current",
+      "docStatus": "preliminary",
+      "subject": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "description": "Pedigree Diagram of Family in SVG format",
+      "content": {
+        "attachment": {
+          "contentType": "image/svg+xml",
+          "data": "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIvPg=="
+        }
+      }
+    },
+    {
+      "resourceType": "Condition",
+      "id": "cond_0",
+      "subject": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "code": {
+        "coding": [
+          {
+            "system": "http://www.omim.org",
+            "code": "615688",
+            "display": "loading..."
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": "Condition",
+      "id": "cond_1",
+      "subject": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "code": {
+        "text": "affected"
+      }
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_0",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Maya Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "female",
+            "display": "Female"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "ONESELF",
+            "display": "self"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NFTH",
+                    "display": "natural father"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_5"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NMTH",
+                    "display": "natural mother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_6"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+          "valueReference": {
+            "type": "Observation",
+            "reference": "#fmh_clinical_0_0"
+          }
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+          "valueReference": {
+            "type": "Observation",
+            "reference": "#fmh_genes_0_0"
+          }
+        }
+      ],
+      "bornDate": "2016-07-12",
+      "condition": [
+        {
+          "code": {
+            "coding": [
+              {
+                "system": "http://www.omim.org",
+                "code": "615688",
+                "display": "loading..."
+              }
+            ]
+          }
+        },
+        {
+          "code": {
+            "text": "affected"
+          }
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "fmh_clinical_0_0",
+      "status": "preliminary",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://purl.obolibrary.org/obo/hp.fhir",
+            "code": "HP:0001250",
+            "display": "loading..."
+          }
+        ]
+      },
+      "subject": {
+        "type": "Patient",
+        "reference": "#pat"
+      }
+    },
+    {
+      "resourceType": "Observation",
+      "id": "fmh_genes_0_0",
+      "status": "preliminary",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://www.genenames.org/geneId",
+            "code": "HGNC:1839",
+            "display": "ADA2"
+          }
+        ]
+      },
+      "subject": {
+        "type": "Patient",
+        "reference": "#pat"
+      }
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_1",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Arthur Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "male",
+            "display": "Male"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "EXT",
+            "display": "extended family member"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:026",
+                    "display": "isPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_2"
+              }
+            }
+          ]
+        }
+      ],
+      "bornDate": "1950-01-15",
+      "deceasedDate": "2012-06-21"
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_2",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Edith Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "female",
+            "display": "Female"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "EXT",
+            "display": "extended family member"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:026",
+                    "display": "isPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_1"
+              }
+            }
+          ]
+        }
+      ],
+      "bornDate": "1953-08-30"
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_3",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Ray Hartley",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "male",
+            "display": "Male"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "MGRFTH",
+            "display": "maternal grandfather"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:048",
+                    "display": "isBrokenPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_4"
+              }
+            }
+          ]
+        }
+      ],
+      "bornDate": "1955-03-11"
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_4",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "June Hartley",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "female",
+            "display": "Female"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "MGRMTH",
+            "display": "maternal grandmother"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:048",
+                    "display": "isBrokenPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_3"
+              }
+            }
+          ]
+        }
+      ],
+      "bornDate": "1958-04-27"
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_5",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Tom Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "male",
+            "display": "Male"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "NFTH",
+            "display": "natural father"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NFTH",
+                    "display": "natural father"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_1"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NMTH",
+                    "display": "natural mother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_2"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:030",
+                    "display": "isConsanguineousPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_6"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+          "valueReference": {
+            "type": "Observation",
+            "reference": "#fmh_carrierStatus_5"
+          }
+        }
+      ],
+      "bornDate": "1984-11-02"
+    },
+    {
+      "resourceType": "Observation",
+      "id": "fmh_carrierStatus_5",
+      "status": "preliminary",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://snomed.info/sct",
+            "code": "87955000",
+            "display": "Carrier state, disease expressed"
+          }
+        ]
+      },
+      "focus": {
+        "type": "FamilyMemberHistory",
+        "reference": "#FMH_5"
+      }
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_6",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Grace Example (Hartley)",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "female",
+            "display": "Female"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "NMTH",
+            "display": "natural mother"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NFTH",
+                    "display": "natural father"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_3"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NMTH",
+                    "display": "natural mother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_4"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://purl.org/ga4gh/kin.fhir",
+                    "code": "KIN:030",
+                    "display": "isConsanguineousPartner"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_5"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+          "valueReference": {
+            "type": "Observation",
+            "reference": "#fmh_carrierStatus_6"
+          }
+        }
+      ],
+      "bornDate": "1986-02-19",
+      "note": [
+        {
+          "text": "Referred by GP"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "fmh_carrierStatus_6",
+      "status": "preliminary",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://snomed.info/sct",
+            "code": "87955000",
+            "display": "Carrier state, disease expressed"
+          }
+        ]
+      },
+      "focus": {
+        "type": "FamilyMemberHistory",
+        "reference": "#FMH_6"
+      }
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_7",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Ruby Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "female",
+            "display": "Female"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "NSIS",
+            "display": "natural sister"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NFTH",
+                    "display": "natural father"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_5"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NMTH",
+                    "display": "natural mother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_6"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "FTWINBRO",
+                    "display": "fraternal twin brother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_8"
+              }
+            }
+          ]
+        }
+      ],
+      "bornDate": "2013-09-08"
+    },
+    {
+      "resourceType": "FamilyMemberHistory",
+      "id": "FMH_8",
+      "status": "completed",
+      "patient": {
+        "type": "Patient",
+        "reference": "#pat"
+      },
+      "name": "Leo Example",
+      "sex": {
+        "coding": [
+          {
+            "system": "http://hl7.org/fhir/administrative-gender",
+            "code": "male",
+            "display": "Male"
+          }
+        ]
+      },
+      "relationship": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+            "code": "NBRO",
+            "display": "natural brother"
+          }
+        ]
+      },
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NFTH",
+                    "display": "natural father"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_5"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "NMTH",
+                    "display": "natural mother"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_6"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling",
+          "extension": [
+            {
+              "url": "type",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    "code": "FTWINSIS",
+                    "display": "fraternal twin sister"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "reference",
+              "valueReference": {
+                "reference": "#FMH_7"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+          "valueReference": {
+            "type": "Observation",
+            "reference": "#fmh_carrierStatus_8"
+          }
+        }
+      ],
+      "bornDate": "2013-09-08"
+    },
+    {
+      "resourceType": "Observation",
+      "id": "fmh_carrierStatus_8",
+      "status": "preliminary",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://snomed.info/sct",
+            "code": "24800002",
+            "display": "Carrier state, disease not expressed"
+          }
+        ]
+      },
+      "focus": {
+        "type": "FamilyMemberHistory",
+        "reference": "#FMH_8"
+      }
+    }
+  ]
+}
