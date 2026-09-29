@@ -428,15 +428,17 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
   if (familyHistoryResource.extension) {
     let motherCodes = [ 'NMTH', 'MTH', 'STPMTH', 'ADOPTM' ];
     let fatherCodes = [ 'NFTH', 'FTH', 'STPFTH', 'ADOPTF' ];
-    let motherRegex = /mother/gi;
-    let fatherRegex = /father/gi;
+    // not /g: test() on a global regex starts where its last match ended, so a second parent or
+    // twin of the same family member could be missed
+    let motherRegex = /mother/i;
+    let fatherRegex = /father/i;
     let extensions = familyHistoryResource.extension;
     let possibleMother = [];
     let possibleFather = [];
     let possibleParent = [];
     let twinCodes = [ 'TWINSIS', 'TWINBRO' ];
     let fraternalTwinCodes = [ 'FTWINSIS', 'FTWINBRO', 'TWIN' ];
-    let twinRegex = /twin/gi;
+    let twinRegex = /twin/i;
     let possibleTwins = null;
 
     for (let i = 0; i < extensions.length; i++) {
@@ -485,8 +487,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
           }
         }
         if (ref == null) {
-          // we didn't find the reference
-          break;
+          // we didn't find the reference (continue, not break: the extensions after it still count)
+          continue;
         }
         if (type == null || 'parent' === type ) {
           // check the reference entity for a gender
@@ -568,7 +570,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         }
         if (!ref || !type || 'sibling' === type) {
           // we didn't find the reference or its a sibling not a twin
-          break;
+          continue;
         }
         if (possibleTwins == null){
           possibleTwins = {};
@@ -596,8 +598,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
           }
         }
         if (!ref || !type) {
-          // we didn't find the reference or its a sibling not a twin
-          break;
+          // we didn't find the reference or the partnership type
+          continue;
         }
         ref = ref.substring(1); // remove leading #
         if (result.hasOwnProperty('partners')){
@@ -753,7 +755,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
 
   if (familyHistoryResource.relationship
       && familyHistoryResource.relationship.coding
-      && familyHistoryResource.relationship.code === 'ONESELF') {
+      && familyHistoryResource.relationship.coding.some((c) => c.code === 'ONESELF')) {
     // this is the patient, use the subject resource if we have one
     if (subjectResource) {
       if (subjectResource.gender === 'male') {

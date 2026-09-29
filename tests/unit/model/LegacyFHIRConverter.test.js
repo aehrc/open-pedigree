@@ -125,6 +125,49 @@ describe('LegacyFHIRConverter', () => {
     expect([0, 1, 2].map((id) => graph.properties[id].monozygotic)).toEqual([undefined, undefined, undefined]);
   });
 
+  it('puts triplets typed only by display in one group', () => {
+    const byDisplay = (ref, display) => ({
+      url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling',
+      extension: [{ url: 'type', valueCodeableConcept: { coding: [{ display }] } }, { url: 'reference', valueReference: { reference: '#' + ref } }],
+    });
+    const parents = [parent('Mum', 'mother'), parent('Dad', 'father')];
+    const graph = LegacyFHIRConverter.initFromFHIR(composition(
+      fmh('A', 'female', [...parents, byDisplay('B', 'twin sister'), byDisplay('C', 'twin brother')]),
+      fmh('B', 'female', parents),
+      fmh('C', 'male', parents),
+      fmh('Mum', 'female'),
+      fmh('Dad', 'male'),
+    ));
+    expect([0, 1, 2].map((id) => graph.properties[id].twinGroup)).toEqual([0, 0, 0]);
+  });
+
+  it('reads the extensions after a plain sibling, or one it can\'t use', () => {
+    const sibling = {
+      url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling',
+      extension: [{ url: 'type', valueCodeableConcept: { coding: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode', code: 'NBRO' }] } },
+        { url: 'reference', valueReference: { reference: '#B' } }],
+    };
+    const noRef = { url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent', extension: [] };
+    const parents = [parent('Mum', 'mother'), parent('Dad', 'father')];
+    const graph = LegacyFHIRConverter.initFromFHIR(composition(
+      fmh('A', 'female', [sibling, noRef, ...parents]),
+      fmh('B', 'male', parents),
+      fmh('Mum', 'female'),
+      fmh('Dad', 'male'),
+    ));
+    const childhub = graph.getOutEdges(graph.getOutEdges(2)[0])[0];
+    expect([...graph.getOutEdges(childhub)].sort()).toEqual([0, 1]);
+    expect(graph.v.length).toBe(6); // no virtual parents for A
+  });
+
+  it('takes the proband\'s sex from the subject Patient', () => {
+    const doc = JSON.parse(composition({ resourceType: 'FamilyMemberHistory', id: 'Me', name: 'Me Test',
+      relationship: { coding: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode', code: 'ONESELF' }] } },
+    { resourceType: 'Patient', id: 'pat', gender: 'female' }));
+    doc.subject = { reference: '#pat' };
+    expect(LegacyFHIRConverter.initFromFHIR(JSON.stringify(doc)).properties[0].gender).toBe('F');
+  });
+
   it('makes no twin group from a twin who is not in the pedigree', () => {
     const parents = [parent('Mum', 'mother'), parent('Dad', 'father')];
     const graph = LegacyFHIRConverter.initFromFHIR(composition(
