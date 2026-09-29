@@ -235,7 +235,9 @@ PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPa
 // ===============================================================================================
 
 PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
-  var image = $('canvas');
+  // Plain DOM calls: this was written against Prototype.js ($('canvas'), .down()), which is gone,
+  // so every call threw - no SVG export, and no image embedded in a saved pedigree.
+  var image = document.getElementById('canvas');
   var background = image.getElementsByClassName('panning-background')[0];
   var backgroundPosition;
   var backgroundParent;
@@ -244,7 +246,7 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
     backgroundParent = background.parentNode;
     backgroundParent.removeChild(background);
   }
-  var bbox = image.down().getBBox();
+  var bbox = (image.firstElementChild as any).getBBox();
   var pedigreeImage = image.innerHTML
     .replace(/xmlns:xlink=".*?"/, '')
     .replace(/width=".*?"/, '')

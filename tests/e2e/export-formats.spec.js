@@ -70,3 +70,31 @@ test('GA4GH FHIR export triggers a download with correct filename', async ({ pag
 
   expect(download.suggestedFilename()).toBe('open-pedigree-GA4GH-fhir.json');
 });
+
+// exportAsSVG also makes the image embedded in a saved GA4GH/PEDX pedigree (localStorageBackend),
+// which hosts such as redcap_pedigree_editor show as the pedigree's thumbnail.
+test('SVG export downloads the drawn pedigree as an SVG image', async ({ page }) => {
+  await loadEditor(page);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (/Error creating svg|is not defined/.test(m.text())) errors.push(m.text()); });
+  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true));
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 10000 }),
+    page.evaluate(() => {
+      const svgRadio = document.querySelector('input[type=radio][name="export-type"][value="svg"]');
+      svgRadio.checked = true;
+      svgRadio.click();
+      document.getElementById('export_button').click();
+    }),
+  ]);
+  const svg = require('fs').readFileSync(await download.path(), 'utf8');
+  expect(errors).toEqual([]);
+  expect(svg).toMatch(/^<svg[\s>]/);
+  // Sized to the drawing (getBBox of the canvas's svg).
+  expect(svg).toMatch(/viewBox="-?[\d.]+ -?[\d.]+ [\d.]+ [\d.]+"/);
+  expect(svg).not.toContain('NaN');
+});
