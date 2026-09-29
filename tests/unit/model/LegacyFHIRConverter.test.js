@@ -110,6 +110,10 @@ describe('LegacyFHIRConverter', () => {
     expect(LegacyFHIRConverter.isLegacyResource(legacyPedigree)).toBe(true);
     expect(LegacyFHIRConverter.isLegacyResource({ resourceType: 'List' })).toBe(true);
     expect(LegacyFHIRConverter.isLegacyResource({ resourceType: 'Patient' })).toBe(false);
+    // a profile is matched whole, not as a substring
+    const profile = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
+    expect(LegacyFHIRConverter.isLegacyResource({ resourceType: 'Composition', meta: { profile: [profile + '-other'] } })).toBe(true);
+    expect(LegacyFHIRConverter.isLegacyResource({ resourceType: 'Composition', meta: { profile } })).toBe(true); // not a list
   });
 
   it('puts every twin in one group, and it is fraternal if any of them is', () => {
