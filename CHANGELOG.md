@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.3...open-pedigree-v1.4.4) (2026-09-29)
+
+
+### Bug Fixes
+
+* make SVG export work again, so saved pedigrees carry their image ([#43](https://github.com/aehrc/open-pedigree/issues/43)) ([0882ddc](https://github.com/aehrc/open-pedigree/commit/0882ddc7e1e308329ac8c2f367c336bfa828ab1e))
+
 ## [1.4.3](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.2...open-pedigree-v1.4.3) (2026-09-29)
 
 
