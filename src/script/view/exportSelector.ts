@@ -267,16 +267,25 @@ export default class ExportSelector {
         var fileName = 'open-pedigree-GA4GH-fhir.json';
         var mimeType = 'application/fhir+json';
         saveAs(new Blob([exportString], {type: mimeType}), fileName);
-      } else if (exportType == 'svg') {
-        var exportString = PedigreeExport.exportAsSVG(editor.getGraph().DG, privacySetting);
-        var fileName = 'open-pedigree.svg';
-        var mimeType = 'image/svg+xml';
-        saveAs(new Blob([exportString], {type: mimeType}), fileName);
-      } else if (exportType == 'pdf') {
-        var pageSize = (document.querySelector('select[name="pdf-page-size"]') as any).value;
-        var layout = (document.querySelector('select[name="pdf-page-orientation"]') as any).value;
-        var legendPos = (document.querySelector('select[name="pdf-legend-pos"]') as any).value;
-        let pdf = PedigreeExport.exportAsPDF(editor.getGraph().DG, privacySetting, pageSize, layout, legendPos);
+      } else if (exportType == 'svg' || exportType == 'pdf') {
+        // Building the image can fail (see PedigreeExport.exportAsSVG): say so, rather than close
+        // the dialog with nothing downloaded.
+        try {
+          if (exportType == 'svg') {
+            var exportString = PedigreeExport.exportAsSVG(editor.getGraph().DG, privacySetting);
+            var fileName = 'open-pedigree.svg';
+            var mimeType = 'image/svg+xml';
+            saveAs(new Blob([exportString], {type: mimeType}), fileName);
+          } else {
+            var pageSize = (document.querySelector('select[name="pdf-page-size"]') as any).value;
+            var layout = (document.querySelector('select[name="pdf-page-orientation"]') as any).value;
+            var legendPos = (document.querySelector('select[name="pdf-legend-pos"]') as any).value;
+            PedigreeExport.exportAsPDF(editor.getGraph().DG, privacySetting, pageSize, layout, legendPos);
+          }
+        } catch (err) {
+          console.log('Error exporting the pedigree image', err);
+          alert('The pedigree image could not be exported: ' + ((err && err.message) || err));
+        }
       }
     }
   }

@@ -250,7 +250,10 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
   var bbox = svgElement.getBBox();
   // Serialised as XML (not innerHTML, which writes e.g. a non-breaking space as the HTML-only
   // entity &nbsp; - not valid XML, so the parse below would give an error page, not the image).
+  // XMLSerializer writes characters XML 1.0 can't hold (control characters, lone surrogates) as
+  // they are; they can't be drawn anyway, so leave them out.
   var pedigreeImage = new XMLSerializer().serializeToString(svgElement)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
     .replace(/xmlns:xlink=".*?"/, '')
     .replace(/width=".*?"/, '')
     .replace(/height=".*?"/, '')

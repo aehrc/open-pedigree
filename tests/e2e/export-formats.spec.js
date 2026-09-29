@@ -99,11 +99,11 @@ test('SVG export downloads the drawn pedigree as an SVG image', async ({ page })
   expect(svg).not.toContain('NaN');
 });
 
-test('SVG export copes with a non-breaking space in a label (e.g. pasted from Word)', async ({ page }) => {
+test('SVG export copes with a non-breaking space, and a character XML can\'t hold, in a label (e.g. pasted from Word)', async ({ page }) => {
   await loadEditor(page);
   await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true));
   await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
-    { detail: { nodeID: 0, properties: { setFirstName: 'Mary Ann', setLastName: 'O’Neil & Co <3>' } } })));
+    { detail: { nodeID: 0, properties: { setFirstName: 'Mary Ann', setLastName: 'O’Neil & Co <3>\u000bX' } } })));
   await page.evaluate(() => window.editor.getExportSelector().show());
   await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
   const [download] = await Promise.all([
@@ -118,5 +118,6 @@ test('SVG export copes with a non-breaking space in a label (e.g. pasted from Wo
   const svg = require('fs').readFileSync(await download.path(), 'utf8');
   expect(svg).toMatch(/^<svg[\s>]/);
   expect(svg).not.toContain('parsererror');
+  expect(svg).not.toContain('\u000b'); // left out: XML 1.0 can't hold it
   expect(svg).toContain('Mary Ann');
 });
