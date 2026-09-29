@@ -342,6 +342,7 @@ export default class PedigreeEditor {
         var changed = _this.applyPendingQuestionnaireResponses();
         if (view) {
           changed.forEach(function(nodeID: any) {
+            // assignProperties starts from the defaults, so the applied responses leave the view too.
             view.getNode(nodeID).assignProperties(_this.getGraph().getProperties(nodeID));
           });
         }

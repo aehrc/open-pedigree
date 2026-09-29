@@ -1132,16 +1132,16 @@ test('a pedigree saved, loaded and saved again still loads with its family intac
   expect(dialogs).toEqual([]);
 });
 
-test('a pedigree loaded before its questionnaireUrl arrives gets its answers once it does, and saves them', async ({ page }) => {
-  // The saved pedigree: one person with an answer, exported under ROUND_TRIP_QUESTIONNAIRE.
+// A saved pedigree with one linked person and a 'note' answer, loaded into a new editor that
+// gets the same Questionnaire from a slow questionnaireUrl - while the built-in default is still
+// in effect. Returns a function reading the person's 'note' answer.
+async function loadBeforeQuestionnaireArrives(page) {
   await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
   const personId = await openNodeMenuForProband(page);
   await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
   await refreshWith(page, personId, [{ linkId: 'note', value: 'from the record' }]);
   const saved = await exportGA4GH(page);
 
-  // A new editor that gets the same Questionnaire from a slow questionnaireUrl, and is handed
-  // the pedigree straight away - while the built-in default is still in effect.
   await page.route('**/fhir/Questionnaire/slow-round-trip', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROUND_TRIP_QUESTIONNAIRE) });
@@ -1153,28 +1153,53 @@ test('a pedigree loaded before its questionnaireUrl arrives gets its answers onc
     // As a host's load does (localStorageBackend): with an undo step, so undo can go back to it.
     window.editor.getSaveLoadEngine().createGraphFromImportData(json, 'GA4GH', {}, false, true);
   }, saved);
-
-  const note = () => page.evaluate(() => {
+  const linkedPersonId = () => page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
-    const id = Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef());
-    return window.editor.getView().getNode(parseInt(id, 10)).getQuestionnaireAnswer('note');
+    return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef()), 10);
   });
+  const note = async () => {
+    const id = await linkedPersonId();
+    return page.evaluate((i) => window.editor.getView().getNode(i).getQuestionnaireAnswer('note'), id);
+  };
+  return { note, linkedPersonId };
+}
+
+function questionnaireResponses(exported) {
+  return JSON.parse(exported).entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse');
+}
+
+test('a pedigree loaded before its questionnaireUrl arrives gets its answers once it does, and an undo keeps them', async ({ page }) => {
+  const { note } = await loadBeforeQuestionnaireArrives(page);
   await expect.poll(note, { timeout: 10000 }).toBe('from the record');
 
   // Undoing a structural edit (here: adding parents) reloads the load's snapshot - taken
   // before the answers arrived.
+  const before = await page.evaluate(() => window.editor.getGraph().getMaxNodeId());
   await page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
     const id = Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' && map[k].getLinkedRecordRef());
     document.dispatchEvent(new CustomEvent('pedigree:person:newparent', { detail: { personID: parseInt(id, 10) } }));
   });
-  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBeGreaterThan(before);
   await page.evaluate(() => window.editor.getActionStack().undo());
-  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.editor.getGraph().getMaxNodeId())).toBe(before);
   expect(await note()).toBe('from the record');
 
   const resaved = await exportGA4GH(page);
   expect(resaved).not.toContain('[object Object]');
-  const qrs = JSON.parse(resaved).entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse');
-  expect(qrs.flatMap((qr) => qr.item)).toContainEqual({ linkId: 'note', answer: [{ valueString: 'from the record' }] });
+  expect(questionnaireResponses(resaved).flatMap((qr) => qr.item)).toContainEqual({ linkId: 'note', answer: [{ valueString: 'from the record' }] });
+});
+
+test('an answer that arrived late and was then changed saves as changed, in one QuestionnaireResponse', async ({ page }) => {
+  const { note, linkedPersonId } = await loadBeforeQuestionnaireArrives(page);
+  await expect.poll(note, { timeout: 10000 }).toBe('from the record');
+
+  const id = await linkedPersonId();
+  await setNodeProperty(page, id, { setQuestionnaireAnswer_note: 'changed here' });
+  expect(await note()).toBe('changed here');
+
+  const resaved = await exportGA4GH(page);
+  const responses = questionnaireResponses(resaved);
+  expect(responses).toHaveLength(1);
+  expect(responses[0].item).toContainEqual({ linkId: 'note', answer: [{ valueString: 'changed here' }] });
 });
