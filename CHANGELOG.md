@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.2...open-pedigree-v1.4.3) (2026-09-29)
+
+
+### Bug Fixes
+
+* keep calendar dates on their own day in every time zone ([#41](https://github.com/aehrc/open-pedigree/issues/41)) ([94021d2](https://github.com/aehrc/open-pedigree/commit/94021d2614b03bd909d1c79da960d422060d0716))
+
 ## [1.4.2](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.1...open-pedigree-v1.4.2) (2026-09-29)
 
 
