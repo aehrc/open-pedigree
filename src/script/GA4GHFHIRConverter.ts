@@ -1,7 +1,7 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
-import { toLocalIsoDate, localUtcOffset } from 'pedigree/model/localDate';
+import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -1721,8 +1721,9 @@ GA4GHFHIRConverter.answerToFhirValue = function (itemType, value) {
   case 'decimal':
     return { 'valueDecimal': value };
   case 'date':
-    // A FHIR date is YYYY-MM-DD; a person's dates are kept as e.g. 'Tue Feb 11 2020'.
-    return { 'valueDate': toLocalIsoDate(value) || String(value) };
+    // A FHIR date: YYYY-MM-DD, or partial (YYYY / YYYY-MM) as it was given. A person's dates
+    // are kept as e.g. 'Tue Feb 11 2020'.
+    return { 'valueDate': String(dateAnswer(value)) };
   case 'choice':
   case 'open-choice': {
     // QuestionnaireResponse.item.answer.value[x] only permits Coding, not CodeableConcept
@@ -1768,7 +1769,8 @@ GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
   case 'decimal':
     return answerEntry.valueDecimal;
   case 'date':
-    return answerEntry.valueDate;
+    // An earlier version's answer is a UTC-midnight timestamp: keep it as the date it meant.
+    return dateAnswer(answerEntry.valueDate);
   case 'choice':
   case 'open-choice':
     if (answerEntry.valueCoding) {

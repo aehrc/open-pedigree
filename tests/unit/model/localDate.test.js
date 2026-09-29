@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { toLocalIsoDate, parseLocalIsoDate } from 'pedigree/model/localDate';
+import { toLocalIsoDate, parseLocalIsoDate, dateAnswer } from 'pedigree/model/localDate';
+import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
@@ -56,6 +57,37 @@ describe.each(ZONES)('dates are calendar dates, whatever the time zone (%s)', (z
     const d = parseLocalIsoDate('2016-07-12T00:00:00.000Z');
     expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2016, 6, 12]);
     expect(GA4GHFHIRConverter.answerToFhirValue('date', '2016-07-12T00:00:00.000Z')).toEqual({ valueDate: '2016-07-12' });
+  });
+
+  it('reads a partial date (a year, or a year and month) as its first day, locally', () => {
+    process.env.TZ = zone;
+    const year = parseLocalIsoDate('1980');
+    const month = parseLocalIsoDate('1980-05');
+    expect([year.getFullYear(), year.getMonth(), year.getDate()]).toEqual([1980, 0, 1]);
+    expect([month.getFullYear(), month.getMonth(), month.getDate()]).toEqual([1980, 4, 1]);
+    expect(parseLocalIsoDate('1980-13')).toBeNull();
+  });
+
+  it('keeps a date answer in one form: partial as written, otherwise YYYY-MM-DD', () => {
+    process.env.TZ = zone;
+    expect(dateAnswer('1980')).toBe('1980');
+    expect(dateAnswer('1980-05')).toBe('1980-05');
+    expect(dateAnswer('2016-07-12')).toBe('2016-07-12');
+    expect(dateAnswer('2016-07-12T00:00:00.000Z')).toBe('2016-07-12');
+    expect(dateAnswer(new Date(2016, 6, 12))).toBe('2016-07-12');
+    expect(GA4GHFHIRConverter.answerToFhirValue('date', '1980-05')).toEqual({ valueDate: '1980-05' });
+    expect(GA4GHFHIRConverter.fhirValueToAnswer('date', { valueDate: '2016-07-12T00:00:00.000Z' })).toBe('2016-07-12');
+    expect(GA4GHFHIRConverter.fhirValueToAnswer('date', { valueDate: '1980' })).toBe('1980');
+  });
+
+  it('compares an older, timestamp-form date answer by its date in enableWhen', () => {
+    process.env.TZ = zone;
+    const rule = (operator) => [{ question: 'visit', operator, answerDate: '2016-07-12' }];
+    for (const saved of ['2016-07-12T00:00:00.000Z', '2016-07-12', new Date(2016, 6, 12)]) {
+      expect(evaluateEnableWhen(rule('='), 'all', { visit: saved })).toBe(true);
+      expect(evaluateEnableWhen(rule('<='), 'all', { visit: saved })).toBe(true);
+      expect(evaluateEnableWhen(rule('>'), 'all', { visit: saved })).toBe(false);
+    }
   });
 
   it('writes a date answer as a FHIR date', () => {

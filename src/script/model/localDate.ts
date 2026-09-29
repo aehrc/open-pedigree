@@ -10,8 +10,10 @@ function pad(n: number): string {
 }
 
 // 'YYYY-MM-DD', alone or at the start of an ISO timestamp (earlier versions saved a date answer
-// as UTC midnight, e.g. '2016-07-12T00:00:00.000Z' - its date part is the day it meant).
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/;
+// as UTC midnight, e.g. '2016-07-12T00:00:00.000Z' - its date part is the day it meant), or a
+// partial date - 'YYYY' or 'YYYY-MM' - as FHIR allows (e.g. a Patient.birthDate of '1980').
+const ISO_DATE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:$|T)/;
+const PARTIAL_DATE = /^\d{4}(?:-\d{2})?$/;
 
 /**
  * A 'YYYY-MM-DD' string (or ISO timestamp) as that day at local midnight; any other value as
@@ -30,9 +32,10 @@ export function parseLocalIsoDate(value: any): Date | null {
     const d = new Date(value);
     return isNaN(d.getTime()) ? null : d;
   }
+  // A partial date is its first day.
   const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
+  const month = match[2] ? Number(match[2]) - 1 : 0;
+  const day = match[3] ? Number(match[3]) : 1;
   const d = new Date(2000, month, day);
   d.setFullYear(year); // not new Date(year, ...), which puts years 0-99 in the 1900s
   return (d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) ? d : null;
@@ -59,4 +62,17 @@ export function localUtcOffset(when: Date): string {
   const minutesAhead = -when.getTimezoneOffset();
   const abs = Math.abs(minutesAhead);
   return (minutesAhead >= 0 ? '+' : '-') + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
+}
+
+/**
+ * The one form a date answer is kept and compared in: a partial date ('1980', '1980-05') as
+ * written - its precision is part of the answer - and anything else (a full date, an earlier
+ * version's UTC timestamp, a Date) as its 'YYYY-MM-DD' day. An unreadable value is returned
+ * as it is.
+ */
+export function dateAnswer(value: any): any {
+  if (typeof value === 'string' && PARTIAL_DATE.test(value) && parseLocalIsoDate(value)) {
+    return value;
+  }
+  return toLocalIsoDate(value) || value;
 }
