@@ -744,6 +744,11 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   if (patientResource.name) {
     for (const humanName of patientResource.name) {
       let use = humanName.use ? humanName.use : '';
+      if (use === 'old' && humanName.family && !(humanName.given && humanName.given.length > 0) && !humanName.text) {
+        // a last name at birth, as buildPedigreeIndividual writes it
+        properties['lNameAtB'] = humanName.family;
+        continue;
+      }
       if (humanName.period && humanName.period.end) {
         const now = Date.now();
         const endDt = Date.parse(humanName.period.end);

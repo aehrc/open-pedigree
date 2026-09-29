@@ -74,3 +74,29 @@ describe('GA4GHFHIRConverter.exportAsFHIR', () => {
     expect(patients.some(p => /^urn:uuid:[0-9a-f-]{36}$/i.test(p.id))).toBe(true);
   });
 });
+
+describe('GA4GHFHIRConverter last name at birth', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  function roundTrip(properties) {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG));
+    Object.assign(baseGraph.properties[1], properties);
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+    return Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find((p) => p.gender === 'F');
+  }
+
+  it('reads it back, without taking it for the last name', () => {
+    const jane = roundTrip({ lName: 'Smith', lNameAtB: 'Jones' });
+    expect(jane.lName).toBe('Smith');
+    expect(jane.lNameAtB).toBe('Jones');
+  });
+
+  it('reads it back when there is no last name', () => {
+    const jane = roundTrip({ lNameAtB: 'Jones' });
+    expect(jane.fName).toBe('Jane');
+    expect(jane.lName).toBeUndefined();
+    expect(jane.lNameAtB).toBe('Jones');
+  });
+});

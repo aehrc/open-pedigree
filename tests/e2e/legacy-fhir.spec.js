@@ -64,7 +64,6 @@ test('format fhir_v1 saves GA4GH, which it opens again', async ({ page, context 
   const reopened = await context.newPage();
   await openWith(reopened, 'fhir_v1', JSON.stringify(saved));
   expect(await names(reopened)).toEqual(NAMES);
-  // (GA4GH doesn't read a last name at birth back - a separate, existing limitation - so Grace's
-  // isn't checked here.)
   expect(await maya(reopened)).toEqual(MAYA);
+  expect(await reopened.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).find((p) => p.fName === 'Grace').lNameAtB)).toBe('Hartley');
 });
