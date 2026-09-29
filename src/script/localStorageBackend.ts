@@ -44,10 +44,8 @@ const LocalStorageBackend = {
                 let jsonData;
                 try {
                     jsonData = null;
-                    if (format === 'fhir_v1') {
-                        // var patientFhirRef = (this._context) ? this._context.patientFhirRef : null;
-                        jsonData = PedigreeExport.exportAsFHIR(editor.getGraph().DG, 'all', null, svg);
-                    } else if (format === 'fhir' || format === 'GA4GH') {
+                    // The Legacy FHIR format (fhir_v1) is read but no longer written: it's saved as GA4GH.
+                    if (format === 'fhir' || format === 'GA4GH' || format === 'fhir_v1') {
                         jsonData = PedigreeExport.exportAsGA4GH(editor.getGraph().DG, 'all', null, svg);
                     } else if (format === 'PED') {
                         jsonData = PedigreeExport.exportAsPED(editor.getGraph().DG, 'all');

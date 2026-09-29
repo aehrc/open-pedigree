@@ -2,6 +2,7 @@ import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
+import LegacyFHIRConverter from 'pedigree/LegacyFHIRConverter';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -47,6 +48,10 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   } catch (err) {
     throw 'Unable to import pedigree: input is not a valid JSON string '
     + err;
+  }
+  if (LegacyFHIRConverter.isLegacyResource(inputResource)) {
+    // saved in the Legacy FHIR format (fhir_v1)
+    return LegacyFHIRConverter.initFromFHIR(inputText);
   }
   let compositionResource = undefined;
   let containedResources = undefined;

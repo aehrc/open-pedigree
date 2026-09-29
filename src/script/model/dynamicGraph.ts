@@ -1271,12 +1271,8 @@ DynamicPositionedGraph.prototype = {
       if (!this._recreateUsingBaseGraph(baseGraph)) {
         return null;
       }  // no changes
-    } else if (importType === 'fhir_v1') {
-      var baseGraph = PedigreeImport.initFromFHIR(importString);
-      if (!this._recreateUsingBaseGraph(baseGraph)) {
-        return null;
-      }  // no changes
-    } else if (importType === 'GA4GH' || importType === 'fhir') {
+    } else if (importType === 'GA4GH' || importType === 'fhir' || importType === 'fhir_v1') {
+      // The GA4GH import also reads the Legacy FHIR format (fhir_v1), which is now saved as GA4GH.
       var baseGraph = PedigreeImport.initFromGA4GH(importString);
       if (!this._recreateUsingBaseGraph(baseGraph)) {
         return null;
