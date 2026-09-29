@@ -653,6 +653,13 @@ async function refreshWith(page, personId, answers) {
   await page.waitForTimeout(200);
 }
 
+// The day a 'YYYY-MM-DD' is, as a person's date reads back (toDateString). Built locally, the
+// way the editor reads it - new Date('YYYY-MM-DD') is UTC midnight, the day before west of UTC.
+function dayString(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toDateString();
+}
+
 async function readRoundTripNode(page, personId) {
   return page.evaluate((id) => {
     const n = window.editor.getView().getNode(parseInt(id, 10));
@@ -727,7 +734,7 @@ test('a refresh clears what the record supplied, leaves diagram-entered values, 
   expect(node.gender).toBe('U');
   expect(node.count).toBeUndefined();
   expect(node.note).toBeUndefined();
-  expect(node.dob).toBe(new Date('1980-01-01').toDateString());
+  expect(node.dob).toBe(dayString('1980-01-01'));
   expect(node.snapshot).toEqual({});
 });
 
@@ -912,20 +919,20 @@ test('moving both dates later, or both earlier, applies both', async ({ page }) 
   await refreshWith(page, personId, [{ linkId: 'dob', value: '1970-01-01' }, { linkId: 'dod', value: '2020-01-01' }]);
 
   let node = await readRoundTripNode(page, personId);
-  expect(node.dob).toBe(new Date('1970-01-01').toDateString());
-  expect(node.dod).toBe(new Date('2020-01-01').toDateString());
+  expect(node.dob).toBe(dayString('1970-01-01'));
+  expect(node.dod).toBe(dayString('2020-01-01'));
 
   // Undo puts both back, in an order the setters accept.
   await page.evaluate(() => window.editor.getActionStack().undo());
   node = await readRoundTripNode(page, personId);
-  expect(node.dob).toBe(new Date('1950-01-01').toDateString());
-  expect(node.dod).toBe(new Date('1960-01-01').toDateString());
+  expect(node.dob).toBe(dayString('1950-01-01'));
+  expect(node.dod).toBe(dayString('1960-01-01'));
 
   // And both earlier, past the old birth date.
   await refreshWith(page, personId, [{ linkId: 'dob', value: '1900-01-01' }, { linkId: 'dod', value: '1910-01-01' }]);
   node = await readRoundTripNode(page, personId);
-  expect(node.dob).toBe(new Date('1900-01-01').toDateString());
-  expect(node.dod).toBe(new Date('1910-01-01').toDateString());
+  expect(node.dob).toBe(dayString('1900-01-01'));
+  expect(node.dod).toBe(dayString('1910-01-01'));
 });
 
 test('a new birth date on the same day as the current death date is applied', async ({ page }) => {
@@ -935,8 +942,8 @@ test('a new birth date on the same day as the current death date is applied', as
   await refreshWith(page, personId, [{ linkId: 'dob', value: '1950-01-01' }, { linkId: 'dod', value: '1960-01-01' }]);
   await refreshWith(page, personId, [{ linkId: 'dob', value: '1960-01-01' }, { linkId: 'dod', value: '1970-01-01' }]);
   const node = await readRoundTripNode(page, personId);
-  expect(node.dob).toBe(new Date('1960-01-01').toDateString());
-  expect(node.dod).toBe(new Date('1970-01-01').toDateString());
+  expect(node.dob).toBe(dayString('1960-01-01'));
+  expect(node.dod).toBe(dayString('1970-01-01'));
 });
 
 test('a refresh still keeps monozygotic twins the same gender (a group rule)', async ({ page }) => {
@@ -1036,7 +1043,7 @@ test('undoing a refresh that set life status and a death date restores both', as
   await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
 
   await refreshWith(page, personId, [{ linkId: 'life', value: 'deceased' }, { linkId: 'dod', value: '2000-01-01' }]);
-  expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'deceased', dod: new Date('2000-01-01').toDateString() });
+  expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'deceased', dod: dayString('2000-01-01') });
   await page.evaluate(() => window.editor.getActionStack().undo());
   expect(await readRoundTripNode(page, personId)).toMatchObject({ life: 'alive', dod: '' });
 });
@@ -1076,7 +1083,7 @@ test('undoing a life status change away from stillborn restores the status and b
     window.editor.getGraph().setProperties(parseInt(id, 10), n.getProperties());
   }, personId);
   const before = await readRoundTripNode(page, personId);
-  expect(before).toMatchObject({ life: 'stillborn', dob: new Date('2000-01-01').toDateString(), dod: new Date('2000-01-02').toDateString() });
+  expect(before).toMatchObject({ life: 'stillborn', dob: dayString('2000-01-01'), dod: dayString('2000-01-02') });
   // undo() needs a state to step back to: give the stack a baseline edit first.
   await setNodeProperty(page, personId, { setFirstName: 'Baseline' });
   const undoSize = await page.evaluate(() => window.editor.getActionStack()._size());
