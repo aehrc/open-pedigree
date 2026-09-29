@@ -9,10 +9,12 @@ function pad(n: number): string {
   return (n < 10 ? '0' : '') + n;
 }
 
-// 'YYYY-MM-DD', alone or at the start of an ISO timestamp (earlier versions saved a date answer
-// as UTC midnight, e.g. '2016-07-12T00:00:00.000Z' - its date part is the day it meant), or a
-// partial date - 'YYYY' or 'YYYY-MM' - as FHIR allows (e.g. a Patient.birthDate of '1980').
-const ISO_DATE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:$|T)/;
+// 'YYYY-MM-DD', or a partial date - 'YYYY' or 'YYYY-MM' - as FHIR allows (e.g. a Patient.birthDate
+// of '1980'), or exactly UTC midnight, which is how earlier versions saved a date answer
+// ('2016-07-12T00:00:00.000Z' - its date part is the day it meant). Any other timestamp is a
+// moment - e.g. a local-midnight Date saved by the undo stack or an internal save, which is
+// '2016-07-11T14:00:00.000Z' in Brisbane - and is read as one, by its local day.
+const ISO_DATE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:$|T00:00:00(?:\.0+)?Z$)/;
 const PARTIAL_DATE = /^\d{4}(?:-\d{2})?$/;
 
 /**
