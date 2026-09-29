@@ -246,8 +246,11 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
     backgroundParent = background.parentNode;
     backgroundParent.removeChild(background);
   }
-  var bbox = (image.firstElementChild as any).getBBox();
-  var pedigreeImage = image.innerHTML
+  var svgElement: any = image.firstElementChild;
+  var bbox = svgElement.getBBox();
+  // Serialised as XML (not innerHTML, which writes e.g. a non-breaking space as the HTML-only
+  // entity &nbsp; - not valid XML, so the parse below would give an error page, not the image).
+  var pedigreeImage = new XMLSerializer().serializeToString(svgElement)
     .replace(/xmlns:xlink=".*?"/, '')
     .replace(/width=".*?"/, '')
     .replace(/height=".*?"/, '')
@@ -262,6 +265,10 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
 
   const parser = new DOMParser();
   const dom = parser.parseFromString(pedigreeImage, 'application/xml');
+  if (dom.getElementsByTagName('parsererror').length > 0) {
+    // Never hand back (or embed in a saved pedigree) an XML error page as the image.
+    throw new Error('Could not build the pedigree SVG: ' + dom.getElementsByTagName('parsererror')[0].textContent);
+  }
 
   function removeHiddenNodes(domNode) {
     let toRemove = [];

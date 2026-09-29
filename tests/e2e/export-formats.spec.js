@@ -98,3 +98,25 @@ test('SVG export downloads the drawn pedigree as an SVG image', async ({ page })
   expect(svg).toMatch(/viewBox="-?[\d.]+ -?[\d.]+ [\d.]+ [\d.]+"/);
   expect(svg).not.toContain('NaN');
 });
+
+test('SVG export copes with a non-breaking space in a label (e.g. pasted from Word)', async ({ page }) => {
+  await loadEditor(page);
+  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, true, true));
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
+    { detail: { nodeID: 0, properties: { setFirstName: 'Mary Ann', setLastName: 'O’Neil & Co <3>' } } })));
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  await expect(page.locator('.pedigree-export-chooser')).toBeVisible({ timeout: 5000 });
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 10000 }),
+    page.evaluate(() => {
+      const svgRadio = document.querySelector('input[type=radio][name="export-type"][value="svg"]');
+      svgRadio.checked = true;
+      svgRadio.click();
+      document.getElementById('export_button').click();
+    }),
+  ]);
+  const svg = require('fs').readFileSync(await download.path(), 'utf8');
+  expect(svg).toMatch(/^<svg[\s>]/);
+  expect(svg).not.toContain('parsererror');
+  expect(svg).toContain('Mary Ann');
+});
