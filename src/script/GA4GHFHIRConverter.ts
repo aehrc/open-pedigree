@@ -744,9 +744,13 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   if (patientResource.name) {
     for (const humanName of patientResource.name) {
       let use = humanName.use ? humanName.use : '';
-      if (use === 'old' && humanName.family && !(humanName.given && humanName.given.length > 0) && !humanName.text) {
-        // a last name at birth, as buildPedigreeIndividual writes it
-        properties['lNameAtB'] = humanName.family;
+      // A last name at birth: written by buildPedigreeIndividual as a family-only "old" name with
+      // no period (an "old" name with a period is just one no longer used), or a "maiden" name.
+      if ((use === 'maiden' || (use === 'old' && !humanName.period)) && humanName.family
+          && !(humanName.given && humanName.given.length > 0) && !humanName.text) {
+        if (!properties['lNameAtB']) {
+          properties['lNameAtB'] = humanName.family;
+        }
         continue;
       }
       if (humanName.period && humanName.period.end) {

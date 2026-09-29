@@ -93,6 +93,22 @@ describe('GA4GHFHIRConverter last name at birth', () => {
     expect(jane.lNameAtB).toBe('Jones');
   });
 
+  it('takes a maiden name as one, but not an old name that has a period', () => {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG));
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    const janeOf = (names) => {
+      const patient = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'Jane');
+      patient.name = names;
+      return Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)).properties).find((p) => p.fName === 'Jane');
+    };
+    const current = { use: 'official', family: 'Smith', given: ['Jane'] };
+    expect(janeOf([current, { use: 'maiden', family: 'Jones' }]).lNameAtB).toBe('Jones');
+    // an earlier married name, from another FHIR source
+    const earlier = janeOf([current, { use: 'old', family: 'Brown', period: { end: '2012' } }]);
+    expect(earlier.lNameAtB).toBeUndefined();
+    expect(earlier.lName).toBe('Smith');
+  });
+
   it('reads it back when there is no last name', () => {
     const jane = roundTrip({ lNameAtB: 'Jones' });
     expect(jane.fName).toBe('Jane');
