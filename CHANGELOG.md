@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.5](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.4...open-pedigree-v1.4.5) (2026-09-29)
+
+
+### Bug Fixes
+
+* open pedigrees saved in the Legacy FHIR format again, and save that format as GA4GH ([#45](https://github.com/aehrc/open-pedigree/issues/45)) ([fa725b8](https://github.com/aehrc/open-pedigree/commit/fa725b8d8606dbff2666a720836bbc00fab3d15c))
+
 ## [1.4.4](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.3...open-pedigree-v1.4.4) (2026-09-29)
 
 
