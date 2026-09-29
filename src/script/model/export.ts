@@ -235,7 +235,9 @@ PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPa
 // ===============================================================================================
 
 PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
-  var image = $('canvas');
+  // Plain DOM calls: this was written against Prototype.js ($('canvas'), .down()), which is gone,
+  // so every call threw - no SVG export, and no image embedded in a saved pedigree.
+  var image = document.getElementById('canvas');
   var background = image.getElementsByClassName('panning-background')[0];
   var backgroundPosition;
   var backgroundParent;
@@ -244,8 +246,14 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
     backgroundParent = background.parentNode;
     backgroundParent.removeChild(background);
   }
-  var bbox = image.down().getBBox();
-  var pedigreeImage = image.innerHTML
+  var svgElement: any = image.firstElementChild;
+  var bbox = svgElement.getBBox();
+  // Serialised as XML (not innerHTML, which writes e.g. a non-breaking space as the HTML-only
+  // entity &nbsp; - not valid XML, so the parse below would give an error page, not the image).
+  // XMLSerializer writes characters XML 1.0 can't hold (control characters, lone surrogates) as
+  // they are; they can't be drawn anyway, so leave them out.
+  var pedigreeImage = new XMLSerializer().serializeToString(svgElement)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
     .replace(/xmlns:xlink=".*?"/, '')
     .replace(/width=".*?"/, '')
     .replace(/height=".*?"/, '')
@@ -260,6 +268,10 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
 
   const parser = new DOMParser();
   const dom = parser.parseFromString(pedigreeImage, 'application/xml');
+  if (dom.getElementsByTagName('parsererror').length > 0) {
+    // Never hand back (or embed in a saved pedigree) an XML error page as the image.
+    throw new Error('Could not build the pedigree SVG: ' + dom.getElementsByTagName('parsererror')[0].textContent);
+  }
 
   function removeHiddenNodes(domNode) {
     let toRemove = [];
