@@ -4,6 +4,7 @@ import PersonVisuals from 'pedigree/view/personVisuals';
 import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
+import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
 declare const editor: any;
 
@@ -513,7 +514,7 @@ export default class Person extends AbstractPerson {
    * @param {Date} newDate Date of conception
    */
   setConceptionDate(newDate: any): void {
-    this._conceptionDate = newDate ? (new Date(newDate)) : '';
+    this._conceptionDate = parseLocalIsoDate(newDate) || '';
     this.getGraphics().updateAgeLabel();
   }
 
@@ -577,7 +578,8 @@ export default class Person extends AbstractPerson {
    * @param {Date} newDate Must be earlier date than deathDate and a later than conception date
    */
   setBirthDate(newDate: any): void {
-    newDate = newDate ? (new Date(newDate)) : '';
+    // A 'YYYY-MM-DD' (e.g. from a linked record) is that day here, not UTC midnight.
+    newDate = parseLocalIsoDate(newDate) || '';
     if (!newDate || !this.getDeathDate() || newDate.getTime() < this.getDeathDate().getTime()) {
       this._birthDate = newDate;
       this.getGraphics().updateAgeLabel();
@@ -601,7 +603,7 @@ export default class Person extends AbstractPerson {
    * @param {Date} deathDate Must be a later date than birthDate
    */
   setDeathDate(deathDate: any): any {
-    deathDate = deathDate ? (new Date(deathDate)) : '';
+    deathDate = parseLocalIsoDate(deathDate) || '';
     // only set death date if it happens to be after the birthdate, or there is no birth or death date
     if (!deathDate || !this.getBirthDate() || deathDate.getTime() > this.getBirthDate().getTime()) {
       this._deathDate = deathDate;

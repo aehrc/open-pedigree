@@ -4,6 +4,7 @@ import DynamicPositionedGraph from 'pedigree/model/dynamicGraph';
 import Ordering from 'pedigree/model/ordering';
 import { Queue, Stack } from 'pedigree/model/queues';
 import { VerticalLevels, XCoord, XCoordScore } from 'pedigree/model/xcoordclass';
+import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
 // PositionedGraph represents the pedigree tree projected to a 2D surface,
 //                 i.e. both the underlying graph and node & edge X and Y coordinates
@@ -1329,10 +1330,10 @@ PositionedGraph.prototype = {
           totalEdgeLengthInChildren += (maxOrder - minOrder);
 
           var leftChildDOB = this.GG.properties[orderedChildren[0]].hasOwnProperty('dob') ?
-            new Date(this.GG.properties[orderedChildren[0]]['dob']) : null;
+            parseLocalIsoDate(this.GG.properties[orderedChildren[0]]['dob']) : null;
           for (var j = 1; j < orderedChildren.length; j++) {
             var thisChildDOB = this.GG.properties[orderedChildren[j]].hasOwnProperty('dob') ?
-              new Date(this.GG.properties[orderedChildren[j]]['dob']) : null;
+              parseLocalIsoDate(this.GG.properties[orderedChildren[j]]['dob']) : null;
 
             if (thisChildDOB != null) {
               if (leftChildDOB == null) {

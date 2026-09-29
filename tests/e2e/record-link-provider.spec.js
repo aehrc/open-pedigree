@@ -1203,3 +1203,76 @@ test('an answer that arrived late and was then changed saves as changed, in one 
   expect(responses).toHaveLength(1);
   expect(responses[0].item).toContainEqual({ linkId: 'note', answer: [{ valueString: 'changed here' }] });
 });
+
+// Calendar dates are the day they are in any time zone - toISOString()/new Date('YYYY-MM-DD')
+// work in UTC, the day before east (showing) or west (reading) of it.
+const DATE_QUESTIONNAIRE = {
+  resourceType: 'Questionnaire',
+  url: 'http://example.org/Questionnaire/e2e-dates',
+  version: '1.0',
+  item: [{
+    linkId: 'person', type: 'group', text: 'Person',
+    item: [{
+      linkId: 'dob', type: 'date', text: 'Date of birth',
+      definition: 'http://hl7.org/fhir/StructureDefinition/Patient#Patient.birthDate',
+      extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
+    }],
+  }],
+};
+
+const birthDay = (page, personId) => page.evaluate((id) => {
+  const d = window.editor.getView().getNode(parseInt(id, 10)).getBirthDate();
+  return d ? [d.getFullYear(), d.getMonth() + 1, d.getDate()] : null;
+}, personId);
+
+for (const timezoneId of ['Australia/Brisbane', 'America/New_York']) {
+  test.describe(`dates in ${timezoneId}`, () => {
+    test.use({ timezoneId });
+
+    test('the node menu shows a person\'s date of birth as that day', async ({ page }) => {
+      await loadEditor(page, { questionnaire: DATE_QUESTIONNAIRE });
+      const personId = await openNodeMenuForProband(page);
+      await page.evaluate((id) => {
+        document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: parseInt(id, 10), properties: { setBirthDate: new Date(2016, 6, 12) } } }));
+        window.editor.getNodeMenu().show(window.editor.getView().getNode(parseInt(id, 10)), 100, 100);
+      }, personId);
+      await expect(page.locator(`${VISIBLE_MENU} .field-dob input.xwiki-date`)).toHaveValue('2016-07-12');
+    });
+
+    test('a date picked in the node menu is stored as that day', async ({ page }) => {
+      await loadEditor(page, { questionnaire: DATE_QUESTIONNAIRE });
+      const personId = await openNodeMenuForProband(page);
+      await page.evaluate(() => {
+        const input = document.querySelector('.menu-box:not([style*="display: none"]) .field-dob input.xwiki-date')
+          || [...document.querySelectorAll('.field-dob input.xwiki-date')].find((el) => el.offsetParent);
+        input._flatpickr.setDate('2016-07-12', true);
+      });
+      await expect.poll(() => birthDay(page, personId)).toEqual([2016, 7, 12]);
+    });
+
+    test('a YYYY-MM-DD date of birth set on a person is that day', async ({ page }) => {
+      await loadEditor(page, { questionnaire: DATE_QUESTIONNAIRE });
+      const personId = await openNodeMenuForProband(page);
+      await setNodeProperty(page, personId, { setBirthDate: '2016-07-12' });
+      expect(await birthDay(page, personId)).toEqual([2016, 7, 12]);
+    });
+
+    test('a date of birth from a linked record is that day', async ({ page }) => {
+      await loadEditor(page, { recordLinkProvider: true, questionnaire: ROUND_TRIP_QUESTIONNAIRE });
+      const personId = await openNodeMenuForProband(page);
+      await setNodeProperty(page, personId, { setLinkedRecordRef: 'record:1/instance:1' });
+      await refreshWith(page, personId, [{ linkId: 'dob', value: '2016-07-12' }]);
+      expect(await birthDay(page, personId)).toEqual([2016, 7, 12]);
+
+      // And the same date again is no change: no new undo step.
+      const undoSize = () => page.evaluate(() => window.editor.getActionStack()._size());
+      const before = await undoSize();
+      await refreshWith(page, personId, [{ linkId: 'dob', value: '2016-07-12' }]);
+      expect(await undoSize()).toBe(before);
+
+      // The person still holds the record's date, so emptying it in the record clears it.
+      await refreshWith(page, personId, [{ linkId: 'dob', value: null }]);
+      expect(await birthDay(page, personId)).toBeNull();
+    });
+  });
+}
