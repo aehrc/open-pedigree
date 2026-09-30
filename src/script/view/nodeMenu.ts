@@ -1104,73 +1104,108 @@ export default class NodeMenu {
     }
   };
 
+  // `disabled` is true (e.g. every linked-record item - see person.ts getSummary()), false/undefined
+  // (enabled again: the same menu is reused for the next node), or, for radio and select, a list of
+  // option values to disable.
   _setFieldDisabled: any = {
     'radio' : function(container: any, disabled: any): any {
-      if (disabled === true) {
-        container.classList.add('hidden');
-      } else {
-        container.classList.remove('hidden');
-        Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
-          if (disabled && Object.prototype.toString.call(disabled) === '[object Array]') {
-            item.disabled = (disabled.indexOf(item.value) >= 0);
-          }
-          if (!disabled) {
-            item.disabled = false;
-          }
-        });
-      }
+      Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
+        item.disabled = Array.isArray(disabled) ? (disabled.indexOf(item.value) >= 0) : !!disabled;
+      });
     },
     'checkbox' : function(container: any, disabled: any): any {
       var target = container.querySelector('input[type=checkbox]');
       if (target) {
-        target.disabled = disabled;
+        target.disabled = !!disabled;
       }
     },
     'text' : function(container: any, disabled: any): any {
       var target = container.querySelector('input[type=text]');
       if (target) {
-        target.disabled = disabled;
+        target.disabled = !!disabled;
       }
     },
-    'textarea' : function(container: any, inactive: any): any {
+    'textarea' : function(container: any, disabled: any): any {
+      var target = container.querySelector('textarea');
+      if (target) {
+        target.disabled = !!disabled;
+      }
+    },
+    'date-picker' : function(container: any, disabled: any): any {
+      var target = container.querySelector('input.xwiki-date');
+      if (target) {
+        target.disabled = !!disabled;
+        if (target._flatpickr) {
+          target._flatpickr.set('clickOpens', !disabled);
+        }
+      }
+    },
+    // The disease/HPO/gene pickers are only in the person-group menu, which has no linked items.
+    'disease-picker' : function(container: any, disabled: any): any {
       // FIXME: Not implemented
     },
-    'date-picker' : function(container: any, inactive: any): any {
+    'hpo-picker' : function(container: any, disabled: any): any {
       // FIXME: Not implemented
     },
-    'disease-picker' : function(container: any, inactive: any): any {
+    'gene-picker' : function(container: any, disabled: any): any {
       // FIXME: Not implemented
     },
-    'hpo-picker' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
+    'select' : function(container: any, disabled: any): any {
+      var target = container.querySelector('select');
+      if (!target) {
+        return;
+      }
+      if (Array.isArray(disabled)) {
+        target.disabled = false;
+        Array.from(target.options).forEach(function(option: any) {
+          option.disabled = disabled.indexOf(option.value) >= 0;
+        });
+      } else {
+        target.disabled = !!disabled;
+        Array.from(target.options).forEach(function(option: any) {
+          option.disabled = false;
+        });
+      }
     },
-    'gene-picker' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
-    },
-    'select' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
-    },
-    'hidden' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
+    'hidden' : function(container: any, disabled: any): any {
+      // no visible input
     },
     'number' : function(container: any, disabled: any): any {
       var target = container.querySelector('input[type=number]');
       if (target) {
-        target.disabled = disabled;
+        target.disabled = !!disabled;
       }
     },
-    'heading' : function(container: any, inactive: any): any {
+    'heading' : function(container: any, disabled: any): any {
       // no interactive value
     },
-    'questionnaire-choice-picker' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
+    'questionnaire-choice-picker' : function(this: any, container: any, disabled: any): any {
+      this._setSelectizeDisabled(container, disabled);
     },
     'button-action': function(container: any, disabled: any) {
       var btn = container.querySelector('button');
-      if (btn) btn.disabled = disabled;
+      if (btn) btn.disabled = !!disabled;
     },
-    'questionnaire-legend-picker' : function(container: any, inactive: any): any {
-      // FIXME: Not implemented
+    'questionnaire-legend-picker' : function(this: any, container: any, disabled: any): any {
+      this._setSelectizeDisabled(container, disabled);
     }
   };
+
+  // The pickers are selectize widgets over a <select>: disable the widget, not just the select.
+  _setSelectizeDisabled(container: any, disabled: any): void {
+    var select = container.querySelector('select');
+    if (!select) {
+      return;
+    }
+    if (select.selectize) {
+      if (disabled) {
+        select.selectize.disable();
+      } else {
+        select.selectize.enable();
+      }
+    } else {
+      select.disabled = !!disabled;
+    }
+  }
+
 }
