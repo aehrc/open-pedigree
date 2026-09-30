@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.6](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.5...open-pedigree-v1.4.6) (2026-09-30)
+
+
+### Bug Fixes
+
+* make every kind of linked-record field read-only, not just text, number and checkbox ([#47](https://github.com/aehrc/open-pedigree/issues/47)) ([25c311c](https://github.com/aehrc/open-pedigree/commit/25c311cc273f496d66f493b1c2f1470fab6d7a0e))
+
 ## [1.4.5](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.4...open-pedigree-v1.4.5) (2026-09-29)
 
 
