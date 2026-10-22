@@ -18,4 +18,4 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
-      - run: npm audit --audit-level=high
+      - run: node scripts/audit-check.js

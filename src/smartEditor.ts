@@ -1,4 +1,4 @@
-import smartFHIR from 'fhirclient';
+import smartFHIR from 'fhirclient/browser';
 import PedigreeEditor from './script/pedigree';
 import SmartFhirBackend from './script/SmartFhirBackend';
 import SmartPatientProvider from './script/patientProvider/SmartPatientProvider';
