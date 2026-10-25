@@ -1,8 +1,1 @@
-[
-    {
-        "id": "GHSA-vfj7-8cjw-p6xm",
-        "package": "braces",
-        "added": "2026-10-23",
-        "reason": "No fixed braces release exists. Reached only via webpack-dev-server -> http-proxy-middleware -> micromatch (local dev server, not in the shipped bundle); webpack-dev-server 6 still depends on it."
-    }
-]
+[]

@@ -1,12 +1,17 @@
 // CI gate over `npm audit` (see .github/workflows/security-scan.yml). Fails on any high or
 // critical advisory, dev dependencies included, unless .github/audit-allowlist.json lists its
-// GHSA id for that package - an advisory with no fixed version anywhere (e.g. one reached
-// only through webpack-dev-server) can't be cleared by an upgrade, and Dependabot raises
-// neither an alert nor a PR for every advisory npm audit reports, so it stays visible here
-// rather than in a log nobody reads. The allowlist never covers an advisory that also reaches
-// a production dependency (npm audit --omit=dev), since that is in the shipped bundle. Also
-// fails when an allowlisted advisory no longer appears at all, so an entry is removed as soon
-// as the fix lands instead of lingering.
+// GHSA id for that package - an advisory with no fixed version anywhere can't be cleared by an
+// upgrade, and Dependabot raises neither an alert nor a PR for every advisory npm audit
+// reports, so it stays visible here rather than in a log nobody reads.
+//
+// An entry never covers an advisory that npm audit --omit=dev also reports. That is only a
+// partial check of what ships: webpack bundles some devDependencies too (raphael,
+// @fortawesome/fontawesome-free, buffer, util), so an entry's reason has to say why the
+// package doesn't reach dist/.
+//
+// An allowlisted advisory that is no longer reported (fixed, or withdrawn upstream) is a
+// warning, not a failure - it can change on the registry side without any change here, and
+// shouldn't turn every open PR red - so remove the entry when the warning appears.
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -19,7 +24,11 @@ const allowed = new Map(allowlist.map(entry => [entry.id + ' ' + entry.package, 
 
 // npm audit exits non-zero whenever it finds anything, so read its JSON rather than its status.
 function audit(extraArgs) {
-  const result = spawnSync('npm', ['audit', '--json', ...extraArgs], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync('npm', ['audit', '--json', ...extraArgs], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    shell: process.platform === 'win32', // npm is npm.cmd there
+  });
   if (result.error) {
     console.error('could not run npm audit: ' + result.error.message);
     process.exit(2);
@@ -72,10 +81,11 @@ for (const [key, a] of blocking) {
   console.error(`BLOCKING  ${a.severity} ${a.name} ${a.id}: ${a.title} (${a.url})${why}`);
 }
 for (const [, entry] of stale) {
-  console.error(`STALE     ${entry.id} (${entry.package}) is allowlisted but no longer reported - remove it from .github/audit-allowlist.json`);
+  // ::warning:: shows as an annotation on the GitHub Actions run.
+  console.log(`::warning::${entry.id} (${entry.package}) is allowlisted but no longer reported - remove it from .github/audit-allowlist.json`);
 }
 
-if (blocking.length || stale.length) {
+if (blocking.length) {
   process.exit(1);
 }
 console.log(`npm audit: no unallowed high/critical advisories (${advisories.size} reported, ${tolerated.length} allowlisted)`);
