@@ -207,6 +207,23 @@ export default class Person extends AbstractPerson {
     return new PersonVisuals(this, x, y);
   }
 
+  /**
+   * Removes this person from the disorder, phenotype and gene legends' case lists (a no-op for
+   * a person not yet assigned any).
+   */
+  _removeLegendCases(): void {
+    var id = this.getID();
+    (this._disorders || []).forEach(function(disorderID: any) {
+      editor.getDisorderLegend().removeCase(disorderID, id);
+    });
+    (this._phenotypes || []).forEach(function(phenotypeID: any) {
+      editor.getPhenotypeLegend().removeCase(phenotypeID, id);
+    });
+    (this._candidateGenes || []).forEach(function(geneID: any) {
+      editor.getGeneLegend().removeCase(geneID, id);
+    });
+  }
+
   _setDefault(): void {
     this._firstName = '';
     this._lastName = '';
@@ -1181,6 +1198,11 @@ export default class Person extends AbstractPerson {
    * @return {Boolean} True if info was successfully assigned
    */
   assignProperties(info: any): any {
+    // _setDefault() empties the disorder/phenotype/gene lists, and the setters below add each
+    // one to its legend again, so take this person's existing cases out of the legends first:
+    // otherwise a re-assign (answers applied when a late questionnaireUrl arrives, or adding a
+    // twin) counts them twice.
+    this._removeLegendCases();
     this._setDefault();
 
     if (super.assignProperties(info)) {
