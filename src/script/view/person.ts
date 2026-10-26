@@ -207,23 +207,6 @@ export default class Person extends AbstractPerson {
     return new PersonVisuals(this, x, y);
   }
 
-  /**
-   * Removes this person from the disorder, phenotype and gene legends' case lists (a no-op for
-   * a person not yet assigned any).
-   */
-  _removeLegendCases(): void {
-    var id = this.getID();
-    (this._disorders || []).forEach(function(disorderID: any) {
-      editor.getDisorderLegend().removeCase(disorderID, id);
-    });
-    (this._phenotypes || []).forEach(function(phenotypeID: any) {
-      editor.getPhenotypeLegend().removeCase(phenotypeID, id);
-    });
-    (this._candidateGenes || []).forEach(function(geneID: any) {
-      editor.getGeneLegend().removeCase(geneID, id);
-    });
-  }
-
   _setDefault(): void {
     this._firstName = '';
     this._lastName = '';
@@ -1198,12 +1181,17 @@ export default class Person extends AbstractPerson {
    * @return {Boolean} True if info was successfully assigned
    */
   assignProperties(info: any): any {
-    // _setDefault() empties the disorder/phenotype/gene lists, and the setters below add each
-    // one to its legend again, so take this person's existing cases out of the legends first:
-    // otherwise a re-assign (answers applied when a late questionnaireUrl arrives, or adding a
-    // twin) counts them twice.
-    this._removeLegendCases();
+    // The disorder, phenotype and gene lists are carried across the reset and always set through
+    // their setters below, which take the person's old cases out of the legends before adding
+    // the new ones. Reset behind the setters' backs, a re-assign (answers applied when a late
+    // questionnaireUrl arrives, or adding a twin) counted every case twice.
+    var disorders = this._disorders;
+    var phenotypes = this._phenotypes;
+    var genes = this._candidateGenes;
     this._setDefault();
+    this._disorders = disorders || [];
+    this._phenotypes = phenotypes || [];
+    this._candidateGenes = genes || [];
 
     if (super.assignProperties(info)) {
       if (info.fName && this.getFirstName() !== info.fName) {
@@ -1218,15 +1206,9 @@ export default class Person extends AbstractPerson {
       if (info.dob && this.getBirthDate() !== info.dob) {
         this.setBirthDate(info.dob);
       }
-      if (info.disorders) {
-        this.setDisorders(info.disorders);
-      }
-      if (info.hpoTerms) {
-        this.setPhenotypes(info.hpoTerms);
-      }
-      if (info.candidateGenes) {
-        this.setGenes(info.candidateGenes);
-      }
+      this.setDisorders(info.disorders || []);
+      this.setPhenotypes(info.hpoTerms || []);
+      this.setGenes(info.candidateGenes || []);
       if (info.hasOwnProperty('isAdopted') && this.isAdopted() !== info.isAdopted) {
         this.setAdopted(info.isAdopted);
       }
