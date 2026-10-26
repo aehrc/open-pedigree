@@ -3,16 +3,157 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Builds and attaches the dist asset for a release that already exists (e.g. one made
+  # before the dist jobs were added), without running release-please. A no-op if the release
+  # already has it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. open-pedigree-v1.4.6'
+        required: true
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # build-dist and upload-dist attach open-pedigree-dist-<version>.zip (the built dist/ plus
+  # LICENSE) and its .sha256 to the release, for hosts that embed a pinned build (e.g.
+  # redcap_pedigree_editor's scripts/update-open-pedigree.sh). They run in this workflow
+  # rather than one triggered by the release being published: release-please creates the
+  # release with GITHUB_TOKEN, and events caused by GITHUB_TOKEN don't start other workflows.
+  #
+  # The build has a read-only token, so npm install scripts can't touch releases or tags;
+  # only upload-dist, which runs no npm, can write.
+  build-dist:
+    needs: release-please
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || needs.release-please.outputs.release_created == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: dist-${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+    outputs:
+      needed: ${{ steps.check.outputs.needed }}
+      asset: ${{ steps.check.outputs.asset }}
+    steps:
+      - name: Check the tag, and whether the release still needs its asset
+        id: check
+        run: |
+          if ! [[ "$TAG" =~ ^open-pedigree-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' is not an open-pedigree-v<major>.<minor>.<patch> tag"
+            exit 1
+          fi
+          asset="open-pedigree-dist-${TAG#open-pedigree-v}.zip"
+          attached=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          needed=false
+          for f in "$asset" "$asset.sha256"; do
+            grep -qxF "$f" <<< "$attached" || needed=true
+          done
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "needed=$needed" >> "$GITHUB_OUTPUT"
+          [ "$needed" = true ] || echo "$TAG already has $asset and $asset.sha256; nothing to do"
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.needed == 'true'
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.needed == 'true'
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - if: steps.check.outputs.needed == 'true'
+        run: npm ci
+      - if: steps.check.outputs.needed == 'true'
+        run: npm run build
+      - name: Package dist/ and LICENSE
+        if: steps.check.outputs.needed == 'true'
+        # Reproducible: sorted entries, no directory entries, fixed permissions, and every
+        # timestamp set to the tagged commit's, so the same build always gives the same zip.
+        env:
+          ASSET: ${{ steps.check.outputs.asset }}
+        run: |
+          find dist LICENSE -type f -exec chmod 644 {} +
+          find dist LICENSE -exec touch -d "@$(git log -1 --format=%ct)" {} +
+          find dist LICENSE -type f | LC_ALL=C sort | TZ=UTC zip -X -D "$ASSET" -@
+          sha256sum "$ASSET" > "$ASSET.sha256"
+          unzip -l "$ASSET"
+          cat "$ASSET.sha256"
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.needed == 'true'
+        with:
+          name: dist-asset
+          path: |
+            ${{ steps.check.outputs.asset }}
+            ${{ steps.check.outputs.asset }}.sha256
+          if-no-files-found: error
+
+  upload-dist:
+    needs: [release-please, build-dist]
+    # release-please is skipped on workflow_dispatch, so this must not depend on its result.
+    if: >-
+      !cancelled() && needs.build-dist.result == 'success'
+      && needs.build-dist.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: dist-${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+      ASSET: ${{ needs.build-dist.outputs.asset }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-asset
+      - name: Upload whichever of the zip and .sha256 the release is missing
+        # Never replace an attached file: hosts pin the zip's sha256, so a published asset
+        # must not change. Anything already attached has to match this build, or the run fails.
+        run: |
+          built=$(cut -d' ' -f1 "$ASSET.sha256")
+          attached=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          upload=()
+          if grep -qxF "$ASSET" <<< "$attached"; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir attached
+            existing=$(sha256sum "attached/$ASSET" | cut -d' ' -f1)
+            if [ "$existing" != "$built" ]; then
+              echo "::error::$TAG's attached $ASSET ($existing) differs from this build ($built)"
+              exit 1
+            fi
+          else
+            upload+=("$ASSET")
+          fi
+          if grep -qxF "$ASSET.sha256" <<< "$attached"; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET.sha256" --dir attached
+            recorded=$(cut -d' ' -f1 "attached/$ASSET.sha256")
+            if [ "$recorded" != "$built" ]; then
+              echo "::error::$TAG's attached $ASSET.sha256 ($recorded) differs from this build ($built)"
+              exit 1
+            fi
+          else
+            upload+=("$ASSET.sha256")
+          fi
+          if [ ${#upload[@]} -gt 0 ]; then
+            gh release upload "$TAG" "${upload[@]}" --repo "$GITHUB_REPOSITORY"
+          fi
