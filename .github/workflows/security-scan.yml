@@ -4,6 +4,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # New advisories land on the registry without any change here; catch them on main weekly
+  # (same slot as codeql.yml) rather than waiting for the next PR.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,4 +23,4 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
-      - run: npm audit --audit-level=high
+      - run: node scripts/audit-check.js
