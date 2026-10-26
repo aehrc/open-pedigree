@@ -3,6 +3,14 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Builds and attaches the dist asset for a release that already exists (e.g. one made
+  # before upload-dist was added), without running release-please. A no-op if the release
+  # already has it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. open-pedigree-v1.4.6'
+        required: true
 
 permissions:
   contents: write
@@ -10,9 +18,66 @@ permissions:
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Attaches open-pedigree-dist-<version>.zip (the built dist/ plus LICENSE) and its .sha256
+  # to the release, for hosts that embed a pinned build (e.g. redcap_pedigree_editor's
+  # scripts/update-open-pedigree.sh). This has to run here rather than in a workflow
+  # triggered by the release being published: release-please creates the release with
+  # GITHUB_TOKEN, and events caused by GITHUB_TOKEN don't start other workflows.
+  upload-dist:
+    needs: release-please
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || needs.release-please.outputs.release_created == 'true')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+    steps:
+      - name: Check the tag names an existing release
+        run: |
+          if ! [[ "$TAG" =~ ^open-pedigree-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' is not an open-pedigree-v<major>.<minor>.<patch> tag"
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Package dist/ and LICENSE
+        # Reproducible: sorted entries, no directory entries, and every timestamp set to the
+        # tagged commit's, so the same tag always gives the same zip and sha256.
+        run: |
+          asset="open-pedigree-dist-${TAG#open-pedigree-v}.zip"
+          find dist LICENSE -exec touch -d "@$(git log -1 --format=%ct)" {} +
+          find dist LICENSE -type f | LC_ALL=C sort | TZ=UTC zip -X -D "$asset" -@
+          sha256sum "$asset" > "$asset.sha256"
+          unzip -l "$asset"
+          cat "$asset.sha256"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+      - name: Upload to the release
+        # Never replace an asset already attached: hosts pin its sha256, so a published asset
+        # must not change. Re-running for a tag that already has one is a no-op.
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qxF "$ASSET"; then
+            echo "$TAG already has $ASSET; leaving it unchanged"
+            exit 0
+          fi
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --repo "$GITHUB_REPOSITORY"
