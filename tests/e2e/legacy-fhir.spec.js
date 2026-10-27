@@ -21,8 +21,9 @@ async function openWith(page, format, value) {
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 }
 
-// Maya's terms, in the systems v0.3.2 saved them with, which today's defaults don't use.
-const MAYA = { disorders: ['615688', 'affected'], hpoTerms: ['HP:0001250'], candidateGenes: ['HGNC:1839'] };
+// Maya's terms. v0.3.2 saved them in systems today's defaults don't use; her gene ("HGNC:1839"
+// in the legacy gene system) is read as today's HGNC system codes it.
+const MAYA = { disorders: ['615688', 'affected'], hpoTerms: ['HP:0001250'], candidateGenes: ['1839'] };
 
 function maya(page) {
   return page.evaluate(() => {

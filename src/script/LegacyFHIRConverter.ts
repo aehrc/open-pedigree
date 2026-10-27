@@ -42,6 +42,16 @@ function codeInSystem(codeableConcept, system) {
   return coding ? coding.code : null;
 }
 
+/**
+ * A gene saved in the legacy gene system ("HGNC:1839"), as today's HGNC system codes it ("1839"),
+ * so it's looked up, named and saved coded again. Only used when the editor's own gene system
+ * isn't the legacy one.
+ */
+function legacyGeneCode(codeableConcept) {
+  const code = codeInSystem(codeableConcept, LEGACY_GENE_SYSTEM);
+  return (typeof code === 'string') ? code.replace(/^HGNC:/i, '') : code;
+}
+
 LegacyFHIRConverter.prototype = {};
 
 /**
@@ -667,7 +677,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
               // a code in a gene or phenotype code system says which it is
               let concept = observationResource.valueCodeableConcept;
               let gene = fhirTerminologyHelper.getGeneFromCodeableConcept(concept, true)
-                ?? codeInSystem(concept, LEGACY_GENE_SYSTEM);
+                ?? legacyGeneCode(concept);
               let phenotype = (gene == null)
                 ? (fhirTerminologyHelper.getPhenotypeFromCodeableConcept(concept, true)
                   ?? codeInSystem(concept, LEGACY_PHENOTYPE_SYSTEM))

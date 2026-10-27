@@ -91,7 +91,8 @@ describe('LegacyFHIRConverter', () => {
     vi.stubGlobal('editor', { getFhirTerminologyHelper: () => today });
     const maya = LegacyFHIRConverter.initFromFHIR(legacyText).properties[0];
     expect(maya.hpoTerms).toEqual(['HP:0001250']);
-    expect(maya.candidateGenes).toEqual(['HGNC:1839']);
+    // as today's HGNC system codes it, so it's looked up and saved coded
+    expect(maya.candidateGenes).toEqual(['1839']);
   });
 
   it('is what the GA4GH import reads it with', () => {
