@@ -49,6 +49,15 @@ describe('Legend', () => {
       }
     });
 
+    it('ignores the "loading..." placeholder older editors saved as a display, so the term is still looked up', () => {
+      const legend = new Legend('Disorders', terminology, 'disorder');
+      legend.seedTermName('615688', 'loading...');
+      expect(legend._cache.hasOwnProperty('615688')).toBe(false);
+      legend.getTerm('233873004');
+      legend.seedTermName('233873004', ' loading... ');
+      expect(legend.getTerm('233873004').isUnknown()).toBe(true);
+    });
+
     it('leaves a confirmed term\'s name alone', () => {
       const legend = new Legend('Disorders', terminology, 'disorder');
       legend.addToCache('233873004', 'Hypertrophic cardiomyopathy');

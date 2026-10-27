@@ -123,13 +123,14 @@ export default class Legend {
   /**
    * Names a term from a saved coding's display (see DefaultFhirTerminologyHelper), so a coded
    * pedigree is named, and exported coded again, without waiting on a lookup. Only a real display
-   * counts - not blank, and not just the code - and only an unnamed or still-unknown term takes
-   * it: a term already confirmed keeps its name.
+   * counts - not blank, not just the code, and not the "loading..." placeholder older editors saved
+   * for a term still being looked up - and only an unnamed or still-unknown term takes it: a term
+   * already confirmed keeps its name.
    */
   seedTermName(termId: any, display: any): void {
     const id = this._terminology.sanitizeID(termId);
     const name = typeof display === 'string' ? display.trim() : '';
-    if (name === '' || name === this._terminology.desanitizeID(id)) {
+    if (name === '' || name === 'loading...' || name === this._terminology.desanitizeID(id)) {
       return;
     }
     const cached = this._cache.hasOwnProperty(id) ? this._cache[id] : null;
