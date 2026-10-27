@@ -65,6 +65,19 @@ describe('DefaultFhirTerminologyHelper', () => {
     expect(seedTermName).toHaveBeenCalledWith('233873004', 'Hypertrophic cardiomyopathy');
   });
 
+  it('reads a coding in another system by its code, not an older editor\'s "loading..." display', () => {
+    vi.stubGlobal('editor', {});
+    const helper = new DefaultFhirTerminologyHelper(SNOMED);
+    expect(helper.getDisorderFromCodeableConcept(
+      { coding: [{ system: 'http://www.omim.org', code: '615688', display: 'loading...' }] }, false)).toBe('615688');
+    expect(helper.getDisorderFromCodeableConcept(
+      { coding: [{ system: 'http://www.omim.org', code: '615688', display: ' loading... ' }] }, false)).toBe('615688');
+    expect(helper.getDisorderFromCodeableConcept(
+      { coding: [{ system: 'http://www.omim.org', code: '615688', display: 123 }] }, false)).toBe(123);
+    expect(helper.getDisorderFromCodeableConcept(
+      { coding: [{ system: 'http://www.omim.org', code: '615688', display: 'ADA2 deficiency' }] }, false)).toBe('ADA2 deficiency');
+  });
+
   it('reads a coding even when there is no editor legend to seed', () => {
     vi.stubGlobal('editor', {});
     expect(new DefaultFhirTerminologyHelper(SNOMED).getDisorderFromCodeableConcept(

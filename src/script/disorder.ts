@@ -1,3 +1,4 @@
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 import { isInt } from 'pedigree/model/helpers';
 
 export default class Disorder {
@@ -10,7 +11,7 @@ export default class Disorder {
     }
 
     this._disorderID = Disorder.sanitizeID(disorderID);
-    this._name = name ? name : 'loading...';
+    this._name = name ? name : LOADING_NAME;
 
     if (!name && callWhenReady) {
       this.load(callWhenReady);

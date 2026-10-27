@@ -1,3 +1,4 @@
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 export default class HPOTerm {
   _hpoID: any;
   _name: any;
@@ -8,7 +9,7 @@ export default class HPOTerm {
     }
 
     this._hpoID = HPOTerm.sanitizeID(hpoID);
-    this._name = name ? name : 'loading...';
+    this._name = name ? name : LOADING_NAME;
 
     if (!name && callWhenReady) {
       this.load(callWhenReady);
