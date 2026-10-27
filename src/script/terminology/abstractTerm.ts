@@ -57,7 +57,12 @@ export default class AbstractTerm {
   load(terminology: any, callWhenReady: any): void {
     terminology.lookupTerm(
       this._id,
-      (id: any, name: any) => (this._name = name),
+      (id: any, name: any) => {
+        // Unknown only while loading: a term whose name was found is known, so it's exported
+        // with its coding (see DefaultFhirTerminologyHelper), not as bare text.
+        this._name = name;
+        this._isUnknown = false;
+      },
       (err: any) => {
         this._name = terminology.desanitizeID(this._originalId);
         this._isUnknown = true;
