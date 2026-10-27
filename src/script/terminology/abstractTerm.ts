@@ -1,3 +1,4 @@
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 import AbstractTerminology from 'pedigree/terminology/abstractTerminology';
 
 export default class AbstractTerm {
@@ -20,7 +21,7 @@ export default class AbstractTerm {
       }
 
       this._id = sanitizedId;
-      this._name = name ? name : 'loading...';
+      this._name = name ? name : LOADING_NAME;
 
       if (!name && callWhenReady) {
         this._isUnknown = true;

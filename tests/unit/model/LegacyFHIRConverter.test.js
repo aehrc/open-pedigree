@@ -95,6 +95,23 @@ describe('LegacyFHIRConverter', () => {
     expect(maya.candidateGenes).toEqual(['1839']);
   });
 
+  it('names a legacy gene read as today\'s HGNC code from its saved display', () => {
+    const today = new DefaultFhirTerminologyHelper('http://www.omim.org', 'http://purl.obolibrary.org/obo/hp.owl',
+      'http://purl.bioontology.org/ontology/HGNC/hgnc.owl');
+    const seedTermName = vi.fn();
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => today, getGeneLegend: () => ({ seedTermName }) });
+    LegacyFHIRConverter.initFromFHIR(legacyText);
+    expect(seedTermName).toHaveBeenCalledWith('1839', 'ADA2');
+  });
+
+  it('reads a legacy gene as saved when the editor\'s gene system isn\'t HGNC', () => {
+    for (const geneSystem of [null, 'http://example.org/custom-genes']) {
+      const helper = new DefaultFhirTerminologyHelper('http://www.omim.org', 'http://purl.obolibrary.org/obo/hp.owl', geneSystem);
+      vi.stubGlobal('editor', { getFhirTerminologyHelper: () => helper });
+      expect(LegacyFHIRConverter.initFromFHIR(legacyText).properties[0].candidateGenes).toEqual(['HGNC:1839']);
+    }
+  });
+
   it('is what the GA4GH import reads it with', () => {
     expect(asVertices(GA4GHFHIRConverter.initFromFHIR(legacyText))).toEqual(V032_READS);
   });

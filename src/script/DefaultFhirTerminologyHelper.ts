@@ -1,3 +1,4 @@
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 import FhirTerminologyHelper from 'pedigree/FhirTerminologyHelper';
 
 // The editor's legend for seeding saved names (see _getCodeFromCodeableConcept), or null outside
@@ -59,8 +60,10 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
 
     if (codeableConcept.coding) {
       for (const coding of codeableConcept.coding) {
+        // a coding in another system is read by its display - unless that's the placeholder an
+        // older editor saved for a term it was still looking up, when the code is all there is
         if (!code && coding.display) {
-          code = coding.display;
+          code = (coding.display === LOADING_NAME) ? coding.code : coding.display;
         }
         if (coding.system && coding.system === codeSystem) {
           code = coding.code;

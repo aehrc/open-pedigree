@@ -1,4 +1,5 @@
 import Raphael from 'pedigree/raphael';
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 
 /**
  * Base class for various "legend" widgets
@@ -130,7 +131,7 @@ export default class Legend {
   seedTermName(termId: any, display: any): void {
     const id = this._terminology.sanitizeID(termId);
     const name = typeof display === 'string' ? display.trim() : '';
-    if (name === '' || name === 'loading...' || name === this._terminology.desanitizeID(id)) {
+    if (name === '' || name === LOADING_NAME || name === this._terminology.desanitizeID(id)) {
       return;
     }
     const cached = this._cache.hasOwnProperty(id) ? this._cache[id] : null;
