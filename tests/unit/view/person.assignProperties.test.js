@@ -30,10 +30,12 @@ function chainStub() {
 function makeLegend() {
   return {
     _affectedNodes: {},
+    removed: [],
     addCase(id, _name, nodeID) {
       this._affectedNodes[id] = (this._affectedNodes[id] || []).concat(nodeID);
     },
     removeCase(id, nodeID) {
+      this.removed.push(id);
       this._affectedNodes[id] = (this._affectedNodes[id] || []).filter((n) => n !== nodeID);
       if (this._affectedNodes[id].length === 0) {
         delete this._affectedNodes[id];
@@ -97,5 +99,20 @@ describe('Person.assignProperties', () => {
     new Person(0, 0, 1, properties);
     expect(legends.disorders._affectedNodes).toEqual({ 233873004: [1], 49436004: [1] });
     expect(legends.genes._affectedNodes).toEqual({ 7551: [1] });
+  });
+
+  it('leaves a kept value in its legend untouched (so its colour and place stay), and keeps the given order', () => {
+    const person = new Person(0, 0, 1, properties);
+    person.assignProperties({ ...properties, disorders: ['49436004', '233873004', '195021004'] });
+    expect(legends.disorders.removed).toEqual([]);
+    expect(person.getDisorders()).toEqual(['49436004', '233873004', '195021004']);
+    expect(legends.disorders._affectedNodes).toEqual({ 233873004: [1], 49436004: [1], 195021004: [1] });
+  });
+
+  it('clears a list given as something other than an array', () => {
+    const person = new Person(0, 0, 1, properties);
+    person.assignProperties({ ...properties, hpoTerms: '80313002' });
+    expect(person.getPhenotypes()).toEqual([]);
+    expect(legends.phenotypes._affectedNodes).toEqual({});
   });
 });

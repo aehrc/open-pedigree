@@ -207,6 +207,40 @@ export default class Person extends AbstractPerson {
     return new PersonVisuals(this, x, y);
   }
 
+  /**
+   * Brings one of this person's legend-backed lists (disorders, phenotypes or candidate genes) to
+   * `values`, taking out only the values dropped and adding only the new ones, so a value kept
+   * keeps its legend entry, its place in the legend and its colour. Values are compared as the
+   * legend stores them (its term IDs, sanitised: e.g. HP:0001250 is HP_C_0001250), and the list
+   * ends up in the order given. Returns whether anything was added or removed.
+   */
+  _syncLegendList(values: any, list: () => any[], toTerm: (value: any) => any, add: (term: any) => void,
+    remove: (id: any) => void, assign: (ids: any[]) => void): boolean {
+    var terms = normalizeLegendAnswerIds(values).map(function(value: any) {
+      return (value && typeof value === 'object' && typeof value.getID === 'function') ? value : toTerm(value);
+    });
+    var wanted = terms.map(function(term: any) { return term.getID(); });
+    var changed = false;
+    list().slice().forEach(function(id: any) {
+      if (wanted.indexOf(id) === -1) {
+        remove(id);
+        changed = true;
+      }
+    });
+    terms.forEach(function(term: any) {
+      if (list().indexOf(term.getID()) === -1) {
+        add(term);
+        changed = true;
+      }
+    });
+    // In the order given, once each (an add may have dropped the virtual 'affected' disorder).
+    var present = list();
+    assign(wanted.filter(function(id: any, i: number) {
+      return wanted.indexOf(id) === i && present.indexOf(id) !== -1;
+    }));
+    return changed;
+  }
+
   _setDefault(): void {
     this._firstName = '';
     this._lastName = '';
@@ -780,17 +814,19 @@ export default class Person extends AbstractPerson {
    * @param {Array} disorders List of Disorder objects
    */
   setDisorders(disorders: any): void {
-    disorders = normalizeLegendAnswerIds(disorders);
-    let i;
-    for (i = this.getDisorders().length - 1; i >= 0; i--) {
-      this.removeDisorder(this.getDisorders()[i]);
+    var _this = this;
+    var changed = this._syncLegendList(disorders,
+      function() { return _this.getDisorders(); },
+      function(value: any) { return editor.getDisorderLegend().getDisorder(value); },
+      function(term: any) { _this.addDisorder(term); },
+      function(id: any) { _this.removeDisorder(id); },
+      function(ids: any[]) { _this._disorders = ids; });
+    if (changed) {
+      this.getGraphics().updateDisorderShapes();
     }
-    for (i = 0; i < disorders.length; i++) {
-      this.addDisorder(disorders[i]);
-    }
-    this.getGraphics().updateDisorderShapes();
     this.setCarrierStatus(); // update carrier status
   }
+
 
   /**
    * Returns a list of all Phenotype terms associated with the patient
@@ -865,20 +901,22 @@ export default class Person extends AbstractPerson {
    * @param {Array} phenotypes List of PhenotypeTerm objects
    */
   setPhenotypes(phenotypes: any): void {
-    let i;
     if (!Array.isArray(phenotypes)) {
       console.log('Warning: trying to setPhenotypes with non-array: ', phenotypes);
       return;
     }
-    phenotypes = normalizeLegendAnswerIds(phenotypes);
-    for (i = this.getPhenotypes().length - 1; i >= 0; i--) {
-      this.removePhenotype(this.getPhenotypes()[i]);
+    var _this = this;
+    var changed = this._syncLegendList(phenotypes,
+      function() { return _this.getPhenotypes(); },
+      function(value: any) { return editor.getPhenotypeLegend().getTerm(value); },
+      function(term: any) { _this.addPhenotype(term); },
+      function(id: any) { _this.removePhenotype(id); },
+      function(ids: any[]) { _this._phenotypes = ids; });
+    if (changed) {
+      this.getGraphics().updateDisorderShapes();
     }
-    for (i = 0; i < phenotypes.length; i++) {
-      this.addPhenotype(phenotypes[i]);
-    }
-    this.getGraphics().updateDisorderShapes();
   }
+
 
   /**
    * @method hasPhenotype
@@ -930,15 +968,18 @@ export default class Person extends AbstractPerson {
       console.log('Warning: trying to setGenes with non-array: ', genes);
       return;
     }
-    genes = normalizeLegendAnswerIds(genes);
-    for (var i = this.getGenes().length - 1; i >= 0; i--) {
-      this.removeGene(this.getGenes()[i]);
+    var _this = this;
+    var changed = this._syncLegendList(genes,
+      function() { return _this.getGenes(); },
+      function(value: any) { return editor.getGeneLegend().getTerm(value); },
+      function(term: any) { _this.addGene(term); },
+      function(id: any) { _this.removeGene(id); },
+      function(ids: any[]) { _this._candidateGenes = ids; });
+    if (changed) {
+      this.getGraphics().updateDisorderShapes();
     }
-    for (var j = 0; j < genes.length; j++) {
-      this.addGene(genes[j]);
-    }
-    this.getGraphics().updateDisorderShapes();
   }
+
 
   /**
    * Returns a list of candidate genes for this person.
@@ -1182,9 +1223,9 @@ export default class Person extends AbstractPerson {
    */
   assignProperties(info: any): any {
     // The disorder, phenotype and gene lists are carried across the reset and always set through
-    // their setters below, which take the person's old cases out of the legends before adding
-    // the new ones. Reset behind the setters' backs, a re-assign (answers applied when a late
-    // questionnaireUrl arrives, or adding a twin) counted every case twice.
+    // their setters below, which take dropped values out of the legends and add new ones (a
+    // value kept is left alone). Reset behind the setters' backs, a re-assign (answers applied
+    // when a late questionnaireUrl arrives, or adding a twin) counted every case twice.
     var disorders = this._disorders;
     var phenotypes = this._phenotypes;
     var genes = this._candidateGenes;
@@ -1206,9 +1247,10 @@ export default class Person extends AbstractPerson {
       if (info.dob && this.getBirthDate() !== info.dob) {
         this.setBirthDate(info.dob);
       }
-      this.setDisorders(info.disorders || []);
-      this.setPhenotypes(info.hpoTerms || []);
-      this.setGenes(info.candidateGenes || []);
+      // A missing or malformed list clears it, as the reset used to.
+      this.setDisorders(Array.isArray(info.disorders) ? info.disorders : []);
+      this.setPhenotypes(Array.isArray(info.hpoTerms) ? info.hpoTerms : []);
+      this.setGenes(Array.isArray(info.candidateGenes) ? info.candidateGenes : []);
       if (info.hasOwnProperty('isAdopted') && this.isAdopted() !== info.isAdopted) {
         this.setAdopted(info.isAdopted);
       }
