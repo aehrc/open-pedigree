@@ -125,6 +125,24 @@ describe('LegacyFHIRConverter', () => {
     expect(seedTermName).not.toHaveBeenCalledWith('ADA2', expect.anything());
   });
 
+  it('reads legacy codes as saved with a host helper that has no code-system accessors', () => {
+    const plain = { getDisorderFromCodeableConcept: () => null, getPhenotypeFromCodeableConcept: () => null, getGeneFromCodeableConcept: () => null };
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => plain });
+    const maya = LegacyFHIRConverter.initFromFHIR(legacyText).properties[0];
+    expect(maya.candidateGenes).toEqual(['HGNC:1839']);
+    expect(maya.hpoTerms).toEqual(['HP:0001250']);
+  });
+
+  it('keeps a legacy code that is not a string, and a pre-v0.3 hp.owl phenotype under another phenotype system', () => {
+    const sct = new DefaultFhirTerminologyHelper('http://snomed.info/sct', 'http://snomed.info/sct',
+      'http://purl.bioontology.org/ontology/HGNC/hgnc.owl');
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => sct });
+    const read = (text) => LegacyFHIRConverter.initFromFHIR(text).properties[0];
+    expect(read(legacyText.replace('"code":"HGNC:1839"', '"code":1839')).candidateGenes).toEqual([1839]);
+    expect(read(legacyText.replace('"system":"http://purl.obolibrary.org/obo/hp.fhir"', '"system":"http://purl.obolibrary.org/obo/hp.owl"')).hpoTerms)
+      .toEqual(['HP:0001250']);
+  });
+
   it('is what the GA4GH import reads it with', () => {
     expect(asVertices(GA4GHFHIRConverter.initFromFHIR(legacyText))).toEqual(V032_READS);
   });

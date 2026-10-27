@@ -73,6 +73,8 @@ describe('DefaultFhirTerminologyHelper', () => {
     expect(helper.getDisorderFromCodeableConcept(
       { coding: [{ system: 'http://www.omim.org', code: '615688', display: ' loading... ' }] }, false)).toBe('615688');
     expect(helper.getDisorderFromCodeableConcept(
+      { coding: [{ system: 'http://www.omim.org', code: '615688', display: 123 }] }, false)).toBe(123);
+    expect(helper.getDisorderFromCodeableConcept(
       { coding: [{ system: 'http://www.omim.org', code: '615688', display: 'ADA2 deficiency' }] }, false)).toBe('ADA2 deficiency');
   });
 

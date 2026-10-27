@@ -23,9 +23,9 @@ const Graph: any = BaseGraph;
 
 // The phenotype and gene code systems this format was saved with (by redcap_pedigree_editor's
 // HPO mode, and every mode for genes): genenames.org/geneId and hp.fhir from October 2021 (v0.3),
-// genenames.org before. Today's defaults differ (hp.owl, hgnc.owl), so these are recognised as well
+// genenames.org and hp.owl before. Today's defaults differ (hp.owl, hgnc.owl), so these are recognised as well
 // as the editor's own.
-const LEGACY_PHENOTYPE_SYSTEMS = ['http://purl.obolibrary.org/obo/hp.fhir'];
+const LEGACY_PHENOTYPE_SYSTEMS = ['http://purl.obolibrary.org/obo/hp.fhir', 'http://purl.obolibrary.org/obo/hp.owl'];
 const LEGACY_GENE_SYSTEMS = ['http://www.genenames.org/geneId', 'http://www.genenames.org'];
 const HGNC_SYSTEM = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
 const HPO_SYSTEM = 'http://purl.obolibrary.org/obo/hp.owl';
@@ -38,11 +38,6 @@ const GA4GH_PEDIGREE_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/Structure
 export function hasGA4GHPedigreeProfile(resource) {
   const profiles = (resource && resource.meta && Array.isArray(resource.meta.profile)) ? resource.meta.profile : [];
   return profiles.some((profile) => profile === GA4GH_PEDIGREE_PROFILE);
-}
-
-function codeInSystem(codeableConcept, system) {
-  const coding = (codeableConcept.coding || []).find((c) => c.system === system);
-  return coding ? coding.code : null;
 }
 
 // How a legacy system's code is coded today: HGNC codes genes by number ("1839" for the legacy
@@ -61,19 +56,19 @@ const TODAYS_CODE = {
 function readLegacy(codeableConcept, legacySystems, todaysSystem, read) {
   for (const legacySystem of legacySystems) {
     const coding = (codeableConcept.coding || []).find((c) => c.system === legacySystem);
-    if (!coding || typeof coding.code !== 'string') {
+    if (!coding) {
       continue;
     }
-    const todaysCode = TODAYS_CODE[todaysSystem] ? TODAYS_CODE[todaysSystem](coding.code) : null;
-    if (todaysCode != null) {
-      const found = read({ coding: [{ ...coding, system: todaysSystem, code: todaysCode }] });
-      if (found != null) {
-        return found;
-      }
-    }
-    return coding.code;
+    const translate = (typeof coding.code === 'string') ? TODAYS_CODE[todaysSystem] : null;
+    const todaysCode = translate ? translate(coding.code) : null;
+    return (todaysCode != null) ? read({ coding: [{ ...coding, system: todaysSystem, code: todaysCode }] }) : coding.code;
   }
   return null;
+}
+
+// A helper's code system for a term type, if it says (a host's own helper may not).
+function helperSystem(helper, getter) {
+  return (helper && typeof helper[getter] === 'function') ? helper[getter]() : null;
 }
 
 LegacyFHIRConverter.prototype = {};
@@ -701,11 +696,11 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
               // a code in a gene or phenotype code system says which it is
               let concept = observationResource.valueCodeableConcept;
               let gene = fhirTerminologyHelper.getGeneFromCodeableConcept(concept, true)
-                ?? readLegacy(concept, LEGACY_GENE_SYSTEMS, fhirTerminologyHelper.getGeneSystem(),
+                ?? readLegacy(concept, LEGACY_GENE_SYSTEMS, helperSystem(fhirTerminologyHelper, 'getGeneSystem'),
                   (c) => fhirTerminologyHelper.getGeneFromCodeableConcept(c, true));
               let phenotype = (gene == null)
                 ? (fhirTerminologyHelper.getPhenotypeFromCodeableConcept(concept, true)
-                  ?? readLegacy(concept, LEGACY_PHENOTYPE_SYSTEMS, fhirTerminologyHelper.getPhenotypeSystem(),
+                  ?? readLegacy(concept, LEGACY_PHENOTYPE_SYSTEMS, helperSystem(fhirTerminologyHelper, 'getPhenotypeSystem'),
                     (c) => fhirTerminologyHelper.getPhenotypeFromCodeableConcept(c, true)))
                 : null;
               if (gene != null) {
