@@ -342,7 +342,8 @@ export default class PedigreeEditor {
         var changed = _this.applyPendingQuestionnaireResponses();
         if (view) {
           changed.forEach(function(nodeID: any) {
-            // assignProperties starts from the defaults, so the applied responses leave the view too.
+            // assignProperties resets the node to what the graph holds, so the view shows the applied
+            // responses too (its disorder/phenotype/gene lists through their setters, see Person).
             view.getNode(nodeID).assignProperties(_this.getGraph().getProperties(nodeID));
           });
         }
