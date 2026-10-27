@@ -28,12 +28,14 @@ export default class DelegatingTerminology extends AbstractAjaxTerminology {
     this._searchAjaxOptionsFn = searchAjaxOptionsFn;
   }
 
+  // The host's lookup functions get the real code (e.g. HP:0001250), not the sanitised ID the
+  // editor keeps it under (HP_C_0001250), as FHIRTerminology.getLookupURL does.
   getLookupURL(id: any): any {
-    return this._lookupUrlFn(id);
+    return this._lookupUrlFn(this.desanitizeID(id));
   }
 
   processLookupResponse(id: any, response: any): any {
-    return this._processLookupResponseFn(id, response);
+    return this._processLookupResponseFn(this.desanitizeID(id), response);
   }
 
   getSearchURL(searchTerm: any): any {
@@ -46,7 +48,7 @@ export default class DelegatingTerminology extends AbstractAjaxTerminology {
 
   getLookupAjaxOptions(id: any): any {
     if (this._lookupAjaxOptionsFn) {
-      return this._lookupAjaxOptionsFn(id);
+      return this._lookupAjaxOptionsFn(this.desanitizeID(id));
     }
     return {};
   }
