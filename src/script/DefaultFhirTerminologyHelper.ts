@@ -63,7 +63,7 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
         // a coding in another system is read by its display - unless that's the placeholder an
         // older editor saved for a term it was still looking up, when the code is all there is
         if (!code && coding.display) {
-          code = (coding.display === LOADING_NAME) ? coding.code : coding.display;
+          code = (coding.display.trim() === LOADING_NAME) ? coding.code : coding.display;
         }
         if (coding.system && coding.system === codeSystem) {
           code = coding.code;
@@ -94,6 +94,14 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
 
   getPhenotypeFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
     return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getPhenotypeLegend'));
+  }
+
+  getPhenotypeSystem(): any {
+    return this._phenotypeCS;
+  }
+
+  getGeneSystem(): any {
+    return this._geneCS;
   }
 
   getGeneFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {

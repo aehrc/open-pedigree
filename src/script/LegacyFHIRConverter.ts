@@ -22,10 +22,13 @@ var LegacyFHIRConverter: any = function() {
 const Graph: any = BaseGraph;
 
 // The phenotype and gene code systems this format was saved with (by redcap_pedigree_editor's
-// HPO mode, and every mode for genes). Today's defaults differ (hp.owl, hgnc.owl), so these are
-// recognised as well as the editor's own.
-const LEGACY_PHENOTYPE_SYSTEM = 'http://purl.obolibrary.org/obo/hp.fhir';
-const LEGACY_GENE_SYSTEM = 'http://www.genenames.org/geneId';
+// HPO mode, and every mode for genes): genenames.org/geneId and hp.fhir from October 2021 (v0.3),
+// genenames.org before. Today's defaults differ (hp.owl, hgnc.owl), so these are recognised as well
+// as the editor's own.
+const LEGACY_PHENOTYPE_SYSTEMS = ['http://purl.obolibrary.org/obo/hp.fhir'];
+const LEGACY_GENE_SYSTEMS = ['http://www.genenames.org/geneId', 'http://www.genenames.org'];
+const HGNC_SYSTEM = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
+const HPO_SYSTEM = 'http://purl.obolibrary.org/obo/hp.owl';
 const GA4GH_PEDIGREE_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
 
 /**
@@ -42,34 +45,35 @@ function codeInSystem(codeableConcept, system) {
   return coding ? coding.code : null;
 }
 
-// Today's code systems a legacy one translates into (see asTodaysConcept): HGNC codes genes by
-// number ("1839", not the legacy "HGNC:1839"); hp.owl codes HPO terms as hp.fhir did.
-const LEGACY_TRANSLATIONS = {
-  [LEGACY_GENE_SYSTEM]: { system: 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl', code: (code) => code.replace(/^HGNC:/i, '') },
-  [LEGACY_PHENOTYPE_SYSTEM]: { system: 'http://purl.obolibrary.org/obo/hp.owl', code: (code) => code },
+// How a legacy system's code is coded today: HGNC codes genes by number ("1839" for the legacy
+// "HGNC:1839" - anything else isn't an HGNC ID, so isn't translated); hp.owl codes HPO terms as
+// hp.fhir did.
+const TODAYS_CODE = {
+  [HGNC_SYSTEM]: (code) => { const match = /^(?:HGNC:)?(\d+)$/i.exec(code.trim()); return match ? match[1] : null; },
+  [HPO_SYSTEM]: (code) => code,
 };
 
 /**
- * A concept's legacy coding as today's system codes it, when that's the system the editor uses -
- * so it's read (and its saved display names it) as if saved today, and saved coded again. Null when
- * the concept has no such coding, or the editor uses another system.
+ * A code saved in one of a term type's legacy systems. When the editor uses today's system for
+ * that type and the code translates into it, it's read through the editor (read) as if saved
+ * today, so its saved display names it and it's saved coded again; otherwise it's read as saved.
  */
-function asTodaysConcept(codeableConcept, legacySystem, todaysSystem) {
-  const translation = LEGACY_TRANSLATIONS[legacySystem];
-  const coding = (codeableConcept.coding || []).find((c) => c.system === legacySystem);
-  if (!coding || typeof coding.code !== 'string' || todaysSystem !== translation.system) {
-    return null;
+function readLegacy(codeableConcept, legacySystems, todaysSystem, read) {
+  for (const legacySystem of legacySystems) {
+    const coding = (codeableConcept.coding || []).find((c) => c.system === legacySystem);
+    if (!coding || typeof coding.code !== 'string') {
+      continue;
+    }
+    const todaysCode = TODAYS_CODE[todaysSystem] ? TODAYS_CODE[todaysSystem](coding.code) : null;
+    if (todaysCode != null) {
+      const found = read({ coding: [{ ...coding, system: todaysSystem, code: todaysCode }] });
+      if (found != null) {
+        return found;
+      }
+    }
+    return coding.code;
   }
-  return { coding: [{ ...coding, system: translation.system, code: translation.code(coding.code) }] };
-}
-
-/**
- * A code saved in a legacy system: read as today's system codes it when the editor uses that
- * system (see asTodaysConcept), else as saved.
- */
-function readLegacy(codeableConcept, legacySystem, todaysSystem, read) {
-  const todays = asTodaysConcept(codeableConcept, legacySystem, todaysSystem);
-  return todays ? read(todays) : codeInSystem(codeableConcept, legacySystem);
+  return null;
 }
 
 LegacyFHIRConverter.prototype = {};
@@ -697,11 +701,11 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
               // a code in a gene or phenotype code system says which it is
               let concept = observationResource.valueCodeableConcept;
               let gene = fhirTerminologyHelper.getGeneFromCodeableConcept(concept, true)
-                ?? readLegacy(concept, LEGACY_GENE_SYSTEM, fhirTerminologyHelper._geneCS,
+                ?? readLegacy(concept, LEGACY_GENE_SYSTEMS, fhirTerminologyHelper.getGeneSystem(),
                   (c) => fhirTerminologyHelper.getGeneFromCodeableConcept(c, true));
               let phenotype = (gene == null)
                 ? (fhirTerminologyHelper.getPhenotypeFromCodeableConcept(concept, true)
-                  ?? readLegacy(concept, LEGACY_PHENOTYPE_SYSTEM, fhirTerminologyHelper._phenotypeCS,
+                  ?? readLegacy(concept, LEGACY_PHENOTYPE_SYSTEMS, fhirTerminologyHelper.getPhenotypeSystem(),
                     (c) => fhirTerminologyHelper.getPhenotypeFromCodeableConcept(c, true)))
                 : null;
               if (gene != null) {

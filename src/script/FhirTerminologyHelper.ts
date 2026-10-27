@@ -24,4 +24,14 @@ export default class FhirTerminologyHelper {
   getGeneFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
     return null;
   }
+
+  /** The code system phenotypes are coded in, or null if none. */
+  getPhenotypeSystem(): any {
+    return null;
+  }
+
+  /** The code system genes are coded in, or null if none. */
+  getGeneSystem(): any {
+    return null;
+  }
 }
