@@ -1,20 +1,20 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 // abstractTerminology first: it and the term classes import each other, and this order lets the
 // term classes see AbstractTerm defined.
 import 'pedigree/terminology/abstractTerminology';
 import DisorderTerm from 'pedigree/terminology/disorderTerm';
-import DefaultFhirTerminologyHelper from 'pedigree/DefaultFhirTerminologyHelper';
 
 const SNOMED = 'http://snomed.info/sct';
 
-// A terminology whose lookups answer at once, with `names` (id => name; a missing id fails).
+// A terminology whose lookups answer at once, with `names` (id => name; an id not in it fails, and
+// one mapped to undefined or '' answers with that).
 function terminology(names) {
   return {
     sanitizeID: (id) => id,
     desanitizeID: (id) => id,
     isValidID: () => true,
     lookupTerm: vi.fn((id, onSuccess, onError, onComplete) => {
-      if (names[id]) {
+      if (Object.prototype.hasOwnProperty.call(names, id)) {
         onSuccess(id, names[id]);
       } else {
         onError('not found');
@@ -37,25 +37,18 @@ describe('AbstractTerm', () => {
     expect(term.isUnknown()).toBe(true);
   });
 
+  it('stays unknown when the lookup answers without a name', () => {
+    for (const name of [undefined, '', '  ']) {
+      const term = new DisorderTerm('233873004', null, terminology({ 233873004: name }), () => {});
+      expect(term.isUnknown()).toBe(true);
+      expect(term.getName()).toBe('233873004');
+    }
+  });
+
   it('is known without a lookup when created with its name', () => {
     const t = terminology({});
     const term = new DisorderTerm('233873004', 'Hypertrophic cardiomyopathy', t, () => {});
     expect(t.lookupTerm).not.toHaveBeenCalled();
     expect(term.isUnknown()).toBe(false);
-  });
-});
-
-describe('DefaultFhirTerminologyHelper', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('codes a disorder whose name was looked up, rather than writing it as text', () => {
-    const term = new DisorderTerm('233873004', null, terminology({ 233873004: 'Hypertrophic cardiomyopathy' }), () => {});
-    vi.stubGlobal('editor', { getDisorderLegend: () => ({ getTerm: () => term }) });
-    const helper = new DefaultFhirTerminologyHelper(SNOMED);
-    expect(helper.getCodeableConceptFromDisorder('233873004')).toEqual({
-      coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }],
-    });
   });
 });

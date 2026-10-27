@@ -59,9 +59,14 @@ export default class AbstractTerm {
       this._id,
       (id: any, name: any) => {
         // Unknown only while loading: a term whose name was found is known, so it's exported
-        // with its coding (see DefaultFhirTerminologyHelper), not as bare text.
-        this._name = name;
-        this._isUnknown = false;
+        // with its coding (see DefaultFhirTerminologyHelper), not as bare text. A lookup that
+        // answers without a name hasn't found it.
+        if (typeof name === 'string' && name.trim() !== '') {
+          this._name = name;
+          this._isUnknown = false;
+        } else {
+          this._name = terminology.desanitizeID(this._originalId);
+        }
       },
       (err: any) => {
         this._name = terminology.desanitizeID(this._originalId);
