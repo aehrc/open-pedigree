@@ -113,21 +113,34 @@ export default class Legend {
     return currentTerms;
   }
 
-  /**
-   * Caches a term under its name. A term already cached keeps its entry, unless it is still
-   * unknown (its name not loaded, or its lookup failed) and `name` is given: then the named term
-   * replaces it, and its legend entry shows the name.
-   */
   addToCache(termId: any, name: any): void {
     const id = this._terminology.sanitizeID(termId);
-    const cached = this._cache.hasOwnProperty(id) ? this._cache[id] : null;
-    if (!cached || (name && typeof cached.isUnknown === 'function' && cached.isUnknown())) {
+    if (!this._cache.hasOwnProperty(id)) {
       this._cache[id] = this._terminology.createTerm(id, name);
-      if (cached) {
-        this._updateTermName(id);
-      }
     }
   }
+
+  /**
+   * Names a term from a saved coding's display (see DefaultFhirTerminologyHelper), so a coded
+   * pedigree is named, and exported coded again, without waiting on a lookup. Only a real display
+   * counts - not blank, and not just the code - and only an unnamed or still-unknown term takes
+   * it: a term already confirmed keeps its name.
+   */
+  seedTermName(termId: any, display: any): void {
+    const id = this._terminology.sanitizeID(termId);
+    const name = typeof display === 'string' ? display.trim() : '';
+    if (name === '' || name === this._terminology.desanitizeID(id)) {
+      return;
+    }
+    const cached = this._cache.hasOwnProperty(id) ? this._cache[id] : null;
+    if (!cached) {
+      this._cache[id] = this._terminology.createTerm(id, name);
+    } else if (cached.isUnknown()) {
+      cached.nameAs(name);
+      this._updateTermName(id);
+    }
+  }
+
 
   /**
    * Retrieve the color associated with the given object

@@ -57,11 +57,17 @@ describe('DefaultFhirTerminologyHelper', () => {
   });
 
   it('names the legend\'s term from a saved coding\'s display when reading it back', () => {
-    const addToCache = vi.fn();
-    vi.stubGlobal('editor', { getDisorderLegend: () => ({ addToCache }) });
+    const seedTermName = vi.fn();
+    vi.stubGlobal('editor', { getDisorderLegend: () => ({ seedTermName }) });
     const code = new DefaultFhirTerminologyHelper(SNOMED).getDisorderFromCodeableConcept(
       { coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }, false);
     expect(code).toBe('233873004');
-    expect(addToCache).toHaveBeenCalledWith('233873004', 'Hypertrophic cardiomyopathy');
+    expect(seedTermName).toHaveBeenCalledWith('233873004', 'Hypertrophic cardiomyopathy');
+  });
+
+  it('reads a coding even when there is no editor legend to seed', () => {
+    vi.stubGlobal('editor', {});
+    expect(new DefaultFhirTerminologyHelper(SNOMED).getDisorderFromCodeableConcept(
+      { coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }, false)).toBe('233873004');
   });
 });

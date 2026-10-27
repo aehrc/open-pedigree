@@ -1,5 +1,12 @@
 import FhirTerminologyHelper from 'pedigree/FhirTerminologyHelper';
 
+// The editor's legend for seeding saved names (see _getCodeFromCodeableConcept), or null outside
+// an editor - seeding is optional, so reading a coding never fails for want of one.
+function editorLegend(getter: 'getDisorderLegend' | 'getPhenotypeLegend' | 'getGeneLegend'): any {
+  const host: any = typeof editor !== 'undefined' ? editor : null;
+  return host && typeof host[getter] === 'function' ? host[getter]() : null;
+}
+
 export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper {
   _disorderCS: any;
   _phenotypeCS: any;
@@ -46,7 +53,7 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     return this._getCodeableConceptFromLegend(gene, editor.getGeneLegend(), this._geneCS);
   }
 
-  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any, legendGetter?: string): any {
+  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any, getLegend?: () => any): any {
     let foundCode = false;
     let code = undefined;
 
@@ -60,8 +67,9 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
           foundCode = true;
           // A saved coding's display names the term straight away, so it doesn't wait on (or
           // depend on) a lookup to be named and exported coded again.
-          if (coding.display) {
-            this._seedLegend(legendGetter, coding.code, coding.display);
+          const legend = coding.display && getLegend ? getLegend() : null;
+          if (legend && typeof legend.seedTermName === 'function') {
+            legend.seedTermName(coding.code, coding.display);
           }
           break;
         }
@@ -76,26 +84,16 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     return code;
   }
 
-  _seedLegend(legendGetter: any, code: any, display: any): void {
-    const host = typeof editor !== 'undefined' ? (editor as any) : null;
-    if (!legendGetter || !host || typeof host[legendGetter] !== 'function') {
-      return;
-    }
-    const legend = host[legendGetter]();
-    if (legend && typeof legend.addToCache === 'function') {
-      legend.addToCache(code, display);
-    }
-  }
 
   getDisorderFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch, 'getDisorderLegend');
+    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getDisorderLegend'));
   }
 
   getPhenotypeFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, 'getPhenotypeLegend');
+    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getPhenotypeLegend'));
   }
 
   getGeneFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch, 'getGeneLegend');
+    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getGeneLegend'));
   }
 }

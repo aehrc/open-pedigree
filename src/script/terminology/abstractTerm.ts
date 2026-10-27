@@ -54,6 +54,12 @@ export default class AbstractTerm {
     return this._isUnknown;
   }
 
+  /** Gives a still-unknown term the name a saved coding confirmed for it (see Legend.seedTermName). */
+  nameAs(name: any): void {
+    this._name = name;
+    this._isUnknown = false;
+  }
+
   load(terminology: any, callWhenReady: any): void {
     // Unknown only while loading: a term whose name was found is known, so it's exported with its
     // coding (see DefaultFhirTerminologyHelper), not as bare text. A lookup that fails, or answers
