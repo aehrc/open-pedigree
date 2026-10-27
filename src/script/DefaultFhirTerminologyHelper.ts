@@ -18,7 +18,9 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
 
   _getCodeableConceptFromLegend(code: any, legend: any, codeSystem: any): any {
     const cachedTerm = legend.getTerm(code);
-    if (cachedTerm.isUnknown()) {
+    // A term that isn't confirmed, or a legend with no code system configured (e.g. genes by
+    // default), can't make a valid coding, so it's written as text.
+    if (cachedTerm.isUnknown() || !codeSystem) {
       console.log('Unknown term, just use text', cachedTerm);
       return { text: code };
     } else {
