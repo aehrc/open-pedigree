@@ -18,22 +18,20 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
 
   _getCodeableConceptFromLegend(code: any, legend: any, codeSystem: any): any {
     const cachedTerm = legend.getTerm(code);
-    // A term that isn't confirmed, or a legend with no code system configured (e.g. genes by
-    // default), can't make a valid coding, so it's written as text.
-    if (cachedTerm.isUnknown() || !codeSystem) {
+    // With no code system configured for the legend (e.g. genes by default) there's no valid
+    // coding to make, so the code is written as text.
+    if (!codeSystem) {
+      return { text: code };
+    }
+    // A term not confirmed by its terminology (its name not loaded, or its lookup failed) is
+    // written as text: coding it would claim the legend's code system for a code that may belong
+    // to another (e.g. a SNOMED CT code under the HPO terminology). A saved coding's display names
+    // its term on load (see _getCodeFromCodeableConcept), so a coded pedigree stays coded.
+    if (cachedTerm.isUnknown()) {
       console.log('Unknown term, just use text', cachedTerm);
       return { text: code };
-    } else {
-      return {
-        coding: [
-          {
-            system: codeSystem,
-            code: code,
-            display: cachedTerm.getName(),
-          },
-        ],
-      };
     }
+    return { coding: [{ system: codeSystem, code: code, display: cachedTerm.getName() }] };
   }
 
   getCodeableConceptFromDisorder(disorder: any): any {
@@ -48,7 +46,7 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     return this._getCodeableConceptFromLegend(gene, editor.getGeneLegend(), this._geneCS);
   }
 
-  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any): any {
+  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any, legendGetter?: string): any {
     let foundCode = false;
     let code = undefined;
 
@@ -60,6 +58,11 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
         if (coding.system && coding.system === codeSystem) {
           code = coding.code;
           foundCode = true;
+          // A saved coding's display names the term straight away, so it doesn't wait on (or
+          // depend on) a lookup to be named and exported coded again.
+          if (coding.display) {
+            this._seedLegend(legendGetter, coding.code, coding.display);
+          }
           break;
         }
       }
@@ -73,15 +76,26 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     return code;
   }
 
+  _seedLegend(legendGetter: any, code: any, display: any): void {
+    const host = typeof editor !== 'undefined' ? (editor as any) : null;
+    if (!legendGetter || !host || typeof host[legendGetter] !== 'function') {
+      return;
+    }
+    const legend = host[legendGetter]();
+    if (legend && typeof legend.addToCache === 'function') {
+      legend.addToCache(code, display);
+    }
+  }
+
   getDisorderFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch);
+    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch, 'getDisorderLegend');
   }
 
   getPhenotypeFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch);
+    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, 'getPhenotypeLegend');
   }
 
   getGeneFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch);
+    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch, 'getGeneLegend');
   }
 }

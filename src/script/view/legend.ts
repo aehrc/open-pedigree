@@ -113,10 +113,19 @@ export default class Legend {
     return currentTerms;
   }
 
+  /**
+   * Caches a term under its name. A term already cached keeps its entry, unless it is still
+   * unknown (its name not loaded, or its lookup failed) and `name` is given: then the named term
+   * replaces it, and its legend entry shows the name.
+   */
   addToCache(termId: any, name: any): void {
     const id = this._terminology.sanitizeID(termId);
-    if (!this._cache.hasOwnProperty(id)) {
+    const cached = this._cache.hasOwnProperty(id) ? this._cache[id] : null;
+    if (!cached || (name && typeof cached.isUnknown === 'function' && cached.isUnknown())) {
       this._cache[id] = this._terminology.createTerm(id, name);
+      if (cached) {
+        this._updateTermName(id);
+      }
     }
   }
 
