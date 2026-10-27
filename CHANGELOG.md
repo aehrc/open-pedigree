@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.8](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.7...open-pedigree-v1.4.8) (2026-10-27)
+
+
+### Bug Fixes
+
+* export looked-up legend terms with their coding, not as bare text ([#58](https://github.com/aehrc/open-pedigree/issues/58)) ([078a934](https://github.com/aehrc/open-pedigree/commit/078a93465aa45f1129ff7521e113119e8d738c5d))
+
 ## [1.4.7](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.6...open-pedigree-v1.4.7) (2026-10-27)
 
 
