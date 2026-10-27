@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.10](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.9...open-pedigree-v1.4.10) (2026-10-27)
+
+
+### Bug Fixes
+
+* keep legacy pedigrees' term names and codes when they're re-saved ([#62](https://github.com/aehrc/open-pedigree/issues/62)) ([17bf756](https://github.com/aehrc/open-pedigree/commit/17bf7566d6dde9d36a841e4f8a4fa181c7b6de20))
+
 ## [1.4.9](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.8...open-pedigree-v1.4.9) (2026-10-27)
 
 
