@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.9](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.8...open-pedigree-v1.4.9) (2026-10-27)
+
+
+### Bug Fixes
+
+* keep legend codings through reloads, and look up HPO codes by their real ID ([#60](https://github.com/aehrc/open-pedigree/issues/60)) ([5f6ae6c](https://github.com/aehrc/open-pedigree/commit/5f6ae6c127c038f1bf1b1efdc193a0aa3a9eb2c9))
+
 ## [1.4.8](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.7...open-pedigree-v1.4.8) (2026-10-27)
 
 
