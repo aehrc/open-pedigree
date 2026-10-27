@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.7](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.6...open-pedigree-v1.4.7) (2026-10-27)
+
+
+### Bug Fixes
+
+* count each person once in the legends after their properties are reassigned ([#56](https://github.com/aehrc/open-pedigree/issues/56)) ([2a38e2a](https://github.com/aehrc/open-pedigree/commit/2a38e2a91a9ab69435cb9acf87e0eb9bac026aa0))
+
 ## [1.4.6](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.5...open-pedigree-v1.4.6) (2026-09-30)
 
 
