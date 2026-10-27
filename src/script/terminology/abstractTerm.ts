@@ -55,24 +55,26 @@ export default class AbstractTerm {
   }
 
   load(terminology: any, callWhenReady: any): void {
+    // Unknown only while loading: a term whose name was found is known, so it's exported with its
+    // coding (see DefaultFhirTerminologyHelper), not as bare text. A lookup that fails, or answers
+    // without a name, hasn't found it: the term is named by its ID and stays unknown.
+    const notFound = () => {
+      this._name = terminology.desanitizeID(this._originalId);
+      this._isUnknown = true;
+    };
     terminology.lookupTerm(
       this._id,
       (id: any, name: any) => {
-        // Unknown only while loading: a term whose name was found is known, so it's exported
-        // with its coding (see DefaultFhirTerminologyHelper), not as bare text. A lookup that
-        // answers without a name hasn't found it.
         if (typeof name === 'string' && name.trim() !== '') {
-          this._name = name;
+          this._name = name.trim();
           this._isUnknown = false;
         } else {
-          this._name = terminology.desanitizeID(this._originalId);
+          notFound();
         }
       },
-      (err: any) => {
-        this._name = terminology.desanitizeID(this._originalId);
-        this._isUnknown = true;
-      },
+      (err: any) => notFound(),
       callWhenReady
     );
   }
+
 }

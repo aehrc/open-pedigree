@@ -38,6 +38,12 @@ describe('DefaultFhirTerminologyHelper', () => {
     });
   });
 
+  it('writes a looked-up gene as text when no gene code system is configured (the default)', () => {
+    const term = lookedUp('7551', 'MYBPC3');
+    vi.stubGlobal('editor', { getGeneLegend: () => ({ getTerm: () => term }) });
+    expect(new DefaultFhirTerminologyHelper().getCodeableConceptFromGene('7551')).toEqual({ text: '7551' });
+  });
+
   it('writes a disorder whose lookup failed as text', () => {
     const term = lookedUp('999', null);
     vi.stubGlobal('editor', { getDisorderLegend: () => ({ getTerm: () => term }) });

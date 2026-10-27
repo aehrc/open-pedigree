@@ -45,6 +45,19 @@ describe('AbstractTerm', () => {
     }
   });
 
+  it('keeps a looked-up name without surrounding whitespace', () => {
+    const term = new DisorderTerm('233873004', null, terminology({ 233873004: ' Hypertrophic cardiomyopathy\n' }), () => {});
+    expect(term.getName()).toBe('Hypertrophic cardiomyopathy');
+  });
+
+  it('becomes unknown when a later lookup answers without a name', () => {
+    const term = new DisorderTerm('233873004', 'Hypertrophic cardiomyopathy', terminology({}), () => {});
+    expect(term.isUnknown()).toBe(false);
+    term.load(terminology({ 233873004: '' }), () => {});
+    expect(term.isUnknown()).toBe(true);
+    expect(term.getName()).toBe('233873004');
+  });
+
   it('is known without a lookup when created with its name', () => {
     const t = terminology({});
     const term = new DisorderTerm('233873004', 'Hypertrophic cardiomyopathy', t, () => {});
