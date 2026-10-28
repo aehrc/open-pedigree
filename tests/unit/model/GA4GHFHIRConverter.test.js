@@ -89,6 +89,35 @@ describe('GA4GHFHIRConverter parent relationships', () => {
     expect(codes).toContain('KIN:028');
     expect(codes).not.toContain('KIN:003');
   });
+
+  // simpleGG with the parents' genders set: John is node 0, Jane node 1.
+  function exportWithParents(johnGender, janeGender) {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.gender = johnGender;
+    gg[1].prop.gender = janeGender;
+    return GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+  }
+  const kinCodes = (exported) => [...exported.matchAll(/"code": "(KIN:0\d\d)"/g)].map((m) => m[1]).filter((c) => c !== 'KIN:026').sort();
+
+  it('codes a parent of unknown gender as a parent, not by guessing from the other parent', () => {
+    expect(kinCodes(exportWithParents('U', 'F'))).toEqual(['KIN:003', 'KIN:027']);
+    expect(kinCodes(exportWithParents('M', 'U'))).toEqual(['KIN:003', 'KIN:028']);
+  });
+
+  // (The import still reads a pedigree only with one mother and one father, so it can't read these back.)
+  it('codes two same-gender parents as parents, not one of them as the other gender', () => {
+    for (const gender of ['M', 'F']) {
+      expect(kinCodes(exportWithParents(gender, gender))).toEqual(['KIN:003', 'KIN:003']);
+    }
+  });
+
+  it('marks twins in twin group 0 as a multiple birth', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.twinGroup = 0;
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+    expect(patients.some((p) => p.multipleBirthBoolean === true)).toBe(true);
+  });
 });
 
 describe('GA4GHFHIRConverter last name at birth', () => {
