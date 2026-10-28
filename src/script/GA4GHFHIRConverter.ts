@@ -1236,8 +1236,9 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   let isAdopted = pedigree.GG.isAdopted(index);
   let parents = pedigree.GG.getParents(index);
 
-  let mother = pedigree.GG.getMother(index) || -1;
-  let father = pedigree.GG.getFather(index) || -2;
+  // node 0 is a real parent, so not '||': getMother/getFather return null for none
+  let mother = pedigree.GG.getMother(index) ?? -1;
+  let father = pedigree.GG.getFather(index) ?? -2;
 
   if (mother < index || father < index) {
     // could be no gender
@@ -1254,10 +1255,10 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
       }
     }
   }
-  if (mother > 0) {
+  if (mother >= 0) {
     relationshipsToBuild[mother] = (isAdopted) ? 'ADOPTMTH' : 'NMTH';
   }
-  if (father > 0) {
+  if (father >= 0) {
     relationshipsToBuild[father] = (isAdopted) ? 'ADOPTFTH' : 'NFTH';
   }
   for (let i = 0; i < parents.length; i++) {

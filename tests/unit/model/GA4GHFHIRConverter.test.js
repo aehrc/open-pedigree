@@ -75,6 +75,22 @@ describe('GA4GHFHIRConverter.exportAsFHIR', () => {
   });
 });
 
+describe('GA4GHFHIRConverter parent relationships', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  // The fixture's father, John, is node 0: a parent with id 0 was once taken for no parent at all,
+  // and exported as a biological parent (KIN:003) rather than a father.
+  it('codes each parent by gender, including a parent that is node 0', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null);
+    const codes = [...exported.matchAll(/"code": "(KIN:0\d\d)"/g)].map((m) => m[1]);
+    expect(codes).toContain('KIN:027');
+    expect(codes).toContain('KIN:028');
+    expect(codes).not.toContain('KIN:003');
+  });
+});
+
 describe('GA4GHFHIRConverter last name at birth', () => {
   beforeEach(() => {
     vi.stubGlobal('editor', mockEditor);
