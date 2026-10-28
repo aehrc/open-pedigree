@@ -30,25 +30,44 @@ function generateUUID() {
  * A child's two parents, from the parent relationships read for it (`claims`: { node, gender } where
  * gender is what the code says - 'F' for a mother, 'M' for a father, null for just a parent). A
  * mother goes in the mother slot and a father in the father slot; a parent coded only as a parent
- * goes where their own gender fits, else in whichever slot is free - so a slot says nothing about a
- * parent's gender unless their code did. Any more than two parents are left out.
+ * goes where their own gender fits (those of known gender first), else in whichever slot is free -
+ * so a slot says nothing about a parent's gender unless their code did. A parent coded more than
+ * once is placed once (by a gendered code if there is one); any more than two are left out.
  */
 function placeParents(claims, genderOf) {
   const slots = { mother: null, father: null };
+  const placed = new Set();
   const place = (claim, preferred) => {
+    if (placed.has(claim.node)) {
+      return;
+    }
     const order = (preferred === 'father') ? ['father', 'mother'] : ['mother', 'father'];
     const slot = order.find((name) => slots[name] == null);
     if (slot) {
       slots[slot] = claim;
+      placed.add(claim.node);
     }
   };
   for (const claim of claims.filter((c) => c.gender != null)) {
     place(claim, (claim.gender === 'M') ? 'father' : 'mother');
   }
-  for (const claim of claims.filter((c) => c.gender == null)) {
+  const known = (c) => genderOf(c.node) === 'M' || genderOf(c.node) === 'F';
+  const parents = claims.filter((c) => c.gender == null);
+  for (const claim of [...parents.filter(known), ...parents.filter((c) => !known(c))]) {
     place(claim, (genderOf(claim.node) === 'M') ? 'father' : 'mother');
   }
   return slots;
+}
+
+/** Why a parent's code contradicts their gender, or null if it doesn't (see placeParents). */
+function parentGenderConflict(claim, gender, reference) {
+  if (claim.gender === 'F' && gender === 'M') {
+    return 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + reference + ')';
+  }
+  if (claim.gender === 'M' && gender === 'F') {
+    return 'Unable to import pedigree: a person declared as female is also declared as being a father (' + reference + ')';
+  }
+  return null;
 }
 
 var GA4GHFHIRConverter = function () {
@@ -277,9 +296,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }, newG.defaultPersonNodeWidth);
     } else {
       fatherID = findReferencedPerson(fatherLink, 'father');
-      if (newG.properties[fatherID].gender === 'F' && parents.father.gender === 'M') {
-        throw 'Unable to import pedigree: a person declared as female is also declared as being a father ('
-        + fatherLink + ')';
+      const fatherConflict = parentGenderConflict(parents.father, newG.properties[fatherID].gender, fatherLink);
+      if (fatherConflict) {
+        throw fatherConflict;
       }
     }
     if (motherLink == null) {
@@ -289,9 +308,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }, newG.defaultPersonNodeWidth);
     } else {
       motherID = findReferencedPerson(motherLink, 'mother');
-      if (newG.properties[motherID].gender === 'M' && parents.mother.gender === 'F') {
-        throw 'Unable to import pedigree: a person declared as male is also declared as being a mother ('
-        + motherLink + ')';
+      const motherConflict = parentGenderConflict(parents.mother, newG.properties[motherID].gender, motherLink);
+      if (motherConflict) {
+        throw motherConflict;
       }
     }
 
@@ -834,7 +853,9 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     properties.lifeStatus = 'deceased';
   }
 
-  let checkUnbornExtension = true;
+  // deceased (deceasedBoolean) isn't unborn: older exports with a privacy setting other than "all"
+  // marked the deceased unborn as well, and nothing marks a real unborn deceasedBoolean
+  let checkUnbornExtension = !patientResource.deceasedBoolean;
   if (patientResource.deceasedString) {
     let deceasedSplitter = /(stillborn|miscarriage|aborted|unborn)( ([1-9][0-9]?) weeks)?/;
     let deceasedSplit = deceasedSplitter.exec(patientResource.deceasedString);
@@ -1412,11 +1433,8 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
       let lifeStatus = nodeProperties['lifeStatus'];
       if (lifeStatus === 'stillborn' || lifeStatus === 'miscarriage' || lifeStatus === 'aborted' || lifeStatus === 'unborn') {
         unbornFlag = true;
-        if (nodeProperties.hasOwnProperty('gestationAge')) {
-          patientResource['deceasedString'] = lifeStatus + ' ' + nodeProperties['gestationAge'] + ' weeks';
-        } else {
-          patientResource['deceasedString'] = lifeStatus;
-        }
+        // no gestational age, as no dates or ages are exported with this privacy setting
+        patientResource['deceasedString'] = lifeStatus;
       } else if (lifeStatus === 'deceased') {
         patientResource['deceasedBoolean'] = true;
       }

@@ -180,15 +180,35 @@ describe('GA4GHFHIRConverter reading parent relationships', () => {
       .toThrow(/declared as male is also declared as being a mother/);
   });
 
-  it('gives a lone parent a made-up partner of the other gender', () => {
-    const exported = JSON.parse(withParentCodes('M', 'F', { 'KIN:028': 'KIN:003' }));
-    // drop John and everything that mentions him, leaving Jane (a parent, F) as the child's only parent
+  it('refuses a code that contradicts a gender, whichever parent slot it lands in', () => {
+    // both coded as fathers: John is placed as the father, Jane (F) in the other slot - still refused
+    expect(() => GA4GHFHIRConverter.initFromFHIR(withParentCodes('M', 'F', { 'KIN:027': 'KIN:028' })))
+      .toThrow(/declared as female is also declared as being a father/);
+  });
+
+  // An export with John and everything that mentions him dropped, leaving Jane (F) the child's only parent.
+  function loneJane() {
+    const exported = JSON.parse(withParentCodes('M', 'F', {}));
     const johnId = exported.entry.find((e) => e.resource.resourceType === 'Patient' && e.resource.name && e.resource.name[0].given[0] === 'John').resource.id;
     exported.entry = exported.entry.filter((e) => e.resource.resourceType === 'Composition' || !JSON.stringify(e).includes(johnId));
     const composition = exported.entry.find((e) => e.resource.resourceType === 'Composition').resource;
     for (const section of composition.section || []) {
       section.entry = (section.entry || []).filter((ref) => !JSON.stringify(ref).includes(johnId));
     }
+    return exported;
+  }
+
+  it('gives a lone parent a made-up partner of the other gender', () => {
+    expect(parentsOfChild(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(loneJane())))).toEqual(['?:M', 'Jane:F']);
+  });
+
+  it('places a parent coded twice only once', () => {
+    const exported = loneJane();
+    const janeLink = exported.entry.find((e) => e.resource.resourceType === 'FamilyMemberHistory' && e.resource.relationship
+      && e.resource.relationship.coding[0].code === 'KIN:027');
+    const again = structuredClone(janeLink);
+    again.resource.relationship.coding[0].code = 'KIN:003';
+    exported.entry.push(again);
     expect(parentsOfChild(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)))).toEqual(['?:M', 'Jane:F']);
   });
 });
@@ -210,6 +230,33 @@ describe('GA4GHFHIRConverter life status', () => {
       expect(unborn.valueBoolean).toBe(false);
     });
   }
+});
+
+describe('GA4GHFHIRConverter life status, reduced privacy', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('reads a deceased person saved as unborn by an older export as deceased', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.lifeStatus = 'deceased';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null));
+    const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.deceasedBoolean === true);
+    john.extension.find((e) => e.url.endsWith('/patient-unborn')).valueBoolean = true; // as older exports wrote it
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const statuses = Object.values(graph.properties).map((p) => p.lifeStatus).filter(Boolean);
+    expect(statuses).toContain('deceased');
+    expect(statuses).not.toContain('unborn');
+  });
+
+  it('leaves the gestational age out', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.lifeStatus = 'stillborn';
+    gg[4].prop.gestationAge = 20;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null);
+    expect(exported).toContain('"deceasedString": "stillborn"');
+    expect(exported).not.toContain('20 weeks');
+  });
 });
 
 describe('GA4GHFHIRConverter last name at birth', () => {
