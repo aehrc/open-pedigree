@@ -82,12 +82,30 @@ describe('GA4GHFHIRConverter parent relationships', () => {
 
   // The fixture's father, John, is node 0: a parent with id 0 was once taken for no parent at all,
   // and exported as a biological parent (KIN:003) rather than a father.
+  // "<relative> <code> <person>" for each relationship in an export, by first name ('?' for none).
+  function relationships(exported) {
+    const resources = JSON.parse(exported).entry;
+    const names = {};
+    for (const { fullUrl, resource } of resources) {
+      if (resource.resourceType === 'Patient') {
+        const name = (resource.name && resource.name[0] && resource.name[0].given && resource.name[0].given[0]) || '?';
+        names[fullUrl] = name;
+        names[`Patient/${resource.id}`] = name;
+        names[`#${resource.id}`] = name;
+        names[resource.id] = name;
+      }
+    }
+    return resources.map(({ resource }) => resource)
+      .filter((r) => r.resourceType === 'FamilyMemberHistory' && r.relationship)
+      .map((r) => `${names[r.extension[0].valueReference.reference]} ${r.relationship.coding[0].code} ${names[r.patient.reference]}`)
+      .sort();
+  }
+
   it('codes each parent by gender, including a parent that is node 0', () => {
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null);
-    const codes = [...exported.matchAll(/"code": "(KIN:0\d\d)"/g)].map((m) => m[1]);
-    expect(codes).toContain('KIN:027');
-    expect(codes).toContain('KIN:028');
-    expect(codes).not.toContain('KIN:003');
+    const parentCodes = relationships(exported).filter((r) => !r.includes('KIN:026'));
+    expect(parentCodes).toEqual(expect.arrayContaining(['Jane KIN:027 ?', 'John KIN:028 ?']));
+    expect(parentCodes.join()).not.toContain('KIN:003');
   });
 
   // simpleGG with the parents' genders set: John is node 0, Jane node 1.
@@ -113,10 +131,13 @@ describe('GA4GHFHIRConverter parent relationships', () => {
 
   it('marks twins in twin group 0 as a multiple birth', () => {
     const gg = structuredClone(simpleGG);
-    gg[4].prop.twinGroup = 0;
-    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
-    const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
-    expect(patients.some((p) => p.multipleBirthBoolean === true)).toBe(true);
+    gg[3].outedges.push({ to: 5 });
+    gg[4].prop = { gender: 'F', fName: 'Ann', twinGroup: 0 };
+    gg.push({ id: 5, prop: { gender: 'F', fName: 'Bea', twinGroup: 0 } });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const twins = JSON.parse(exported).entry.map((e) => e.resource)
+      .filter((r) => r.resourceType === 'Patient' && ['Ann', 'Bea'].includes(r.name[0].given[0]));
+    expect(twins.map((p) => p.multipleBirthBoolean)).toEqual([true, true]);
   });
 });
 

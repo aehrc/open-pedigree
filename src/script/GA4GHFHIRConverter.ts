@@ -1240,8 +1240,9 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   // is unknown or both parents share it (the import reads only one mother and one father) - never
   // guessed from the other parent's.
   const genders = parents.map((parent) => pedigree.GG.getGender(parent));
+  const sameGender = genders.length === 2 && genders[0] === genders[1];
   for (let i = 0; i < parents.length; i++) {
-    const gender = (genders.filter((g) => g === genders[i]).length === 1) ? genders[i] : 'U';
+    const gender = sameGender ? 'U' : genders[i];
     if (gender === 'F') {
       relationshipsToBuild[parents[i]] = (isAdopted) ? 'ADOPTMTH' : 'NMTH';
     } else if (gender === 'M') {
