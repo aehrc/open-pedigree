@@ -122,10 +122,15 @@ describe('GA4GHFHIRConverter parent relationships', () => {
     expect(kinCodes(exportWithParents('M', 'U'))).toEqual(['KIN:003', 'KIN:028']);
   });
 
-  // (The import still reads a pedigree only with one mother and one father, so it can't read these back.)
-  it('codes two same-gender parents as parents, not one of them as the other gender', () => {
+  it('codes two same-gender parents as parents, and reads them back as the child\'s parents', () => {
     for (const gender of ['M', 'F']) {
-      expect(kinCodes(exportWithParents(gender, gender))).toEqual(['KIN:003', 'KIN:003']);
+      const exported = exportWithParents(gender, gender);
+      expect(kinCodes(exported)).toEqual(['KIN:003', 'KIN:003']);
+      const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+      const byName = (name) => Object.keys(graph.properties).map(Number).find((v) => graph.properties[v].fName === name);
+      const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
+      expect(graph.getParents(child).sort()).toEqual([byName('John'), byName('Jane')].sort());
+      expect([graph.properties[byName('John')].gender, graph.properties[byName('Jane')].gender]).toEqual([gender, gender]);
     }
   });
 
@@ -139,6 +144,72 @@ describe('GA4GHFHIRConverter parent relationships', () => {
       .filter((r) => r.resourceType === 'Patient' && ['Ann', 'Bea'].includes(r.name[0].given[0]));
     expect(twins.map((p) => p.multipleBirthBoolean)).toEqual([true, true]);
   });
+});
+
+describe('GA4GHFHIRConverter reading parent relationships', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  // An export of simpleGG with John (node 0) and Jane's genders set, then each parent code replaced.
+  function withParentCodes(johnGender, janeGender, codes) {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.gender = johnGender;
+    gg[1].prop.gender = janeGender;
+    let exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    for (const [from, to] of Object.entries(codes)) {
+      exported = exported.split(`"code": "${from}"`).join(`"code": "${to}"`);
+    }
+    return exported;
+  }
+  const parentsOfChild = (graph) => {
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    const child = people.find((v) => graph.getParents(v).length === 2);
+    return graph.getParents(child).map((v) => `${graph.properties[v].fName || '?'}:${graph.properties[v].gender}`).sort();
+  };
+
+  it('reads two mothers (or two fathers) coded as such, whatever order they come in', () => {
+    expect(parentsOfChild(GA4GHFHIRConverter.initFromFHIR(withParentCodes('F', 'F', { 'KIN:003': 'KIN:027' }))))
+      .toEqual(['Jane:F', 'John:F']);
+    expect(parentsOfChild(GA4GHFHIRConverter.initFromFHIR(withParentCodes('M', 'M', { 'KIN:003': 'KIN:028' }))))
+      .toEqual(['Jane:M', 'John:M']);
+  });
+
+  it('still refuses a man coded as a mother', () => {
+    expect(() => GA4GHFHIRConverter.initFromFHIR(withParentCodes('M', 'F', { 'KIN:028': 'KIN:027' })))
+      .toThrow(/declared as male is also declared as being a mother/);
+  });
+
+  it('gives a lone parent a made-up partner of the other gender', () => {
+    const exported = JSON.parse(withParentCodes('M', 'F', { 'KIN:028': 'KIN:003' }));
+    // drop John and everything that mentions him, leaving Jane (a parent, F) as the child's only parent
+    const johnId = exported.entry.find((e) => e.resource.resourceType === 'Patient' && e.resource.name && e.resource.name[0].given[0] === 'John').resource.id;
+    exported.entry = exported.entry.filter((e) => e.resource.resourceType === 'Composition' || !JSON.stringify(e).includes(johnId));
+    const composition = exported.entry.find((e) => e.resource.resourceType === 'Composition').resource;
+    for (const section of composition.section || []) {
+      section.entry = (section.entry || []).filter((ref) => !JSON.stringify(ref).includes(johnId));
+    }
+    expect(parentsOfChild(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)))).toEqual(['?:M', 'Jane:F']);
+  });
+});
+
+describe('GA4GHFHIRConverter life status', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  for (const privacy of ['all', 'nopersonal', 'minimal']) {
+    it(`exports a deceased person as deceased, not unborn (privacy ${privacy})`, () => {
+      const gg = structuredClone(simpleGG);
+      gg[0].prop.lifeStatus = 'deceased';
+      const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, privacy, null, null));
+      const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+      const deceased = patients.find((p) => p.deceasedBoolean === true);
+      expect(deceased).toBeDefined();
+      const unborn = deceased.extension.find((e) => e.url.endsWith('/patient-unborn'));
+      expect(unborn.valueBoolean).toBe(false);
+    });
+  }
 });
 
 describe('GA4GHFHIRConverter last name at birth', () => {
