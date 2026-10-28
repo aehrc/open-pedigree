@@ -1236,32 +1236,18 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   let isAdopted = pedigree.GG.isAdopted(index);
   let parents = pedigree.GG.getParents(index);
 
-  let mother = pedigree.GG.getMother(index) || -1;
-  let father = pedigree.GG.getFather(index) || -2;
-
-  if (mother < index || father < index) {
-    // could be no gender
-
-    if (parents.length > 0) {
-      if (mother === parents[0]) {
-        father = parents[1];
-      } else if (mother === parents[1]) {
-        father = parents[0];
-      } else if (father === parents[0]) {
-        mother = parents[1];
-      } else if (father === parents[1]) {
-        mother = parents[0];
-      }
-    }
-  }
-  if (mother > 0) {
-    relationshipsToBuild[mother] = (isAdopted) ? 'ADOPTMTH' : 'NMTH';
-  }
-  if (father > 0) {
-    relationshipsToBuild[father] = (isAdopted) ? 'ADOPTFTH' : 'NFTH';
-  }
+  // Each parent is coded by their own gender: a mother, a father, or just a parent when their gender
+  // is unknown or both parents share it (the import reads only one mother and one father) - never
+  // guessed from the other parent's.
+  const genders = parents.map((parent) => pedigree.GG.getGender(parent));
+  const sameGender = genders.length === 2 && genders[0] === genders[1];
   for (let i = 0; i < parents.length; i++) {
-    if (!relationshipsToBuild[parents[i]]) {
+    const gender = sameGender ? 'U' : genders[i];
+    if (gender === 'F') {
+      relationshipsToBuild[parents[i]] = (isAdopted) ? 'ADOPTMTH' : 'NMTH';
+    } else if (gender === 'M') {
+      relationshipsToBuild[parents[i]] = (isAdopted) ? 'ADOPTFTH' : 'NFTH';
+    } else {
       relationshipsToBuild[parents[i]] = (isAdopted) ? 'ADOPTPRN' : 'NPRN';
     }
   }
@@ -1275,7 +1261,6 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
 
       if (relNode != null) {
         let relProperties = pedigree.GG.properties[relNode];
-        console.log('relProperties', relProperties);
 
         let consangr = relProperties['consangr'] ? relProperties['consangr'] : 'A';
         if (consangr === 'Y'){
@@ -1442,7 +1427,8 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   }
   );
 
-  if (nodeProperties.twinGroup) {
+  // twin groups are numbered from 0
+  if (nodeProperties.twinGroup != null) {
     patientResource.multipleBirthBoolean = true;
   }
 
