@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.11](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.10...open-pedigree-v1.4.11) (2026-10-28)
+
+
+### Bug Fixes
+
+* code each parent in the GA4GH export as mother, father or parent by their own gender ([#65](https://github.com/aehrc/open-pedigree/issues/65)) ([12b6a34](https://github.com/aehrc/open-pedigree/commit/12b6a3413bf28a2f617aded37d85cbca7ce7b978))
+
 ## [1.4.10](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.9...open-pedigree-v1.4.10) (2026-10-27)
 
 
