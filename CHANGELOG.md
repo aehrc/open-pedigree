@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.12](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.11...open-pedigree-v1.4.12) (2026-10-28)
+
+
+### Bug Fixes
+
+* read back same-sex parents, and don't export the deceased as unborn ([#67](https://github.com/aehrc/open-pedigree/issues/67)) ([534e105](https://github.com/aehrc/open-pedigree/commit/534e105d14ec815846cb975e5fa29e67bcda1f68))
+
 ## [1.4.11](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.10...open-pedigree-v1.4.11) (2026-10-28)
 
 
