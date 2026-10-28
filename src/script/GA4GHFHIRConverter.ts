@@ -34,27 +34,27 @@ function generateUUID() {
  * so a slot says nothing about a parent's gender unless their code did. A parent coded more than
  * once is placed once (by a gendered code if there is one); any more than two are left out.
  */
-function placeParents(claims, genderOf) {
+export function placeParents(claims, genderOf) {
   const slots = { mother: null, father: null };
   const placed = new Set();
-  const place = (claim, preferred) => {
-    if (placed.has(claim.node)) {
-      return;
-    }
-    const order = (preferred === 'father') ? ['father', 'mother'] : ['mother', 'father'];
+  const place = (claim, order) => {
     const slot = order.find((name) => slots[name] == null);
-    if (slot) {
+    if (slot && !placed.has(claim.node)) {
       slots[slot] = claim;
       placed.add(claim.node);
     }
   };
-  for (const claim of claims.filter((c) => c.gender != null)) {
-    place(claim, (claim.gender === 'M') ? 'father' : 'mother');
+  const coded = claims.filter((c) => c.gender != null);
+  // a mother or father in their own slot first, so a second of either can't push one out
+  for (const claim of coded) {
+    place(claim, [(claim.gender === 'M') ? 'father' : 'mother']);
   }
-  const known = (c) => genderOf(c.node) === 'M' || genderOf(c.node) === 'F';
-  const parents = claims.filter((c) => c.gender == null);
-  for (const claim of [...parents.filter(known), ...parents.filter((c) => !known(c))]) {
-    place(claim, (genderOf(claim.node) === 'M') ? 'father' : 'mother');
+  for (const claim of coded) {
+    place(claim, ['mother', 'father']);
+  }
+  const known = (c) => (genderOf(c.node) === 'M' || genderOf(c.node) === 'F') ? 1 : 0;
+  for (const claim of claims.filter((c) => c.gender == null).sort((a, b) => known(b) - known(a))) {
+    place(claim, (genderOf(claim.node) === 'M') ? ['father', 'mother'] : ['mother', 'father']);
   }
   return slots;
 }
@@ -278,6 +278,13 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
+    // every code for a parent must fit their gender, not just the one that placed them
+    for (const claim of nextPerson.parentClaims || []) {
+      const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
+      if (conflict) {
+        throw conflict;
+      }
+    }
     const parents = placeParents(nextPerson.parentClaims || [], (node) => nodeData[node].properties.gender);
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
@@ -296,10 +303,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }, newG.defaultPersonNodeWidth);
     } else {
       fatherID = findReferencedPerson(fatherLink, 'father');
-      const fatherConflict = parentGenderConflict(parents.father, newG.properties[fatherID].gender, fatherLink);
-      if (fatherConflict) {
-        throw fatherConflict;
-      }
     }
     if (motherLink == null) {
       motherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
@@ -308,10 +311,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }, newG.defaultPersonNodeWidth);
     } else {
       motherID = findReferencedPerson(motherLink, 'mother');
-      const motherConflict = parentGenderConflict(parents.mother, newG.properties[motherID].gender, motherLink);
-      if (motherConflict) {
-        throw motherConflict;
-      }
     }
 
     if (fatherID === personID || motherID === personID) {
@@ -853,8 +852,9 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     properties.lifeStatus = 'deceased';
   }
 
-  // deceased (deceasedBoolean) isn't unborn: older exports with a privacy setting other than "all"
-  // marked the deceased unborn as well, and nothing marks a real unborn deceasedBoolean
+  // deceased (deceasedBoolean) wins over the unborn extension: this editor's own reduced-privacy
+  // exports before 1.4.12 marked every deceased person unborn too (a fetus they exported has a
+  // deceasedString, read below). Another producer's deceased fetus coded this way reads as deceased.
   let checkUnbornExtension = !patientResource.deceasedBoolean;
   if (patientResource.deceasedString) {
     let deceasedSplitter = /(stillborn|miscarriage|aborted|unborn)( ([1-9][0-9]?) weeks)?/;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import GA4GHFHIRConverter, { placeParents } from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
@@ -184,6 +184,29 @@ describe('GA4GHFHIRConverter reading parent relationships', () => {
     // both coded as fathers: John is placed as the father, Jane (F) in the other slot - still refused
     expect(() => GA4GHFHIRConverter.initFromFHIR(withParentCodes('M', 'F', { 'KIN:027': 'KIN:028' })))
       .toThrow(/declared as female is also declared as being a father/);
+  });
+
+  it('refuses a parent coded as both mother and father, in either order', () => {
+    for (const order of ['father-first', 'mother-first']) {
+      const exported = JSON.parse(withParentCodes('M', 'F', {}));
+      const johnLink = exported.entry.find((e) => e.resource.resourceType === 'FamilyMemberHistory' && e.resource.relationship
+        && e.resource.relationship.coding[0].code === 'KIN:028');
+      const asMother = structuredClone(johnLink);
+      asMother.resource.relationship.coding[0].code = 'KIN:027';
+      exported.entry.splice(exported.entry.indexOf(johnLink) + (order === 'father-first' ? 1 : 0), 0, asMother);
+      expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).toThrow(/declared as male is also declared as being a mother/);
+    }
+  });
+
+  it('places a coded mother and father in their own slots before any spill over', () => {
+    const genders = { x: 'M', y: 'M', z: 'F', u: 'U', f: 'F' };
+    const place = (claims) => { const slots = placeParents(claims, (n) => genders[n]); return [slots.mother && slots.mother.node, slots.father && slots.father.node]; };
+    // two fathers then a mother: the mother keeps the mother slot
+    expect(place([{ node: 'x', gender: 'M' }, { node: 'y', gender: 'M' }, { node: 'z', gender: 'F' }])).toEqual(['z', 'x']);
+    // parents of known gender before unknown: the female parent takes the mother slot
+    expect(place([{ node: 'u', gender: null }, { node: 'f', gender: null }])).toEqual(['f', 'u']);
+    // a parent coded twice fills one slot
+    expect(place([{ node: 'f', gender: 'F' }, { node: 'f', gender: null }])).toEqual(['f', null]);
   });
 
   // An export with John and everything that mentions him dropped, leaving Jane (F) the child's only parent.
