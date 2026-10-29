@@ -540,13 +540,16 @@ export default class PedigreeEditor {
         if (item.range) {
           descriptor.range = item.range;
         }
-        // An answer-option choice gets a '-' choice to show it's unanswered (not its first option,
-        // as if that were the answer) - unless it's mapped (its property's own default shows, e.g.
-        // heredity's "None") or an option's value is '' already. A required one's '-' shows a
-        // blank answer but can't be chosen. `nullValue` asks for '-' on any other select (e.g. a
-        // range).
+        // A drop-down gets a '-' choice to show it's unanswered (not its first choice, as if that
+        // were the answer) - unless it's mapped (its property's own default shows, e.g. heredity's
+        // "None"), repeating, or an option's value is '' already (that option means unanswered).
+        // A required item's '-' shows a blank answer but can't be chosen. `nullValue` asks for a
+        // choosable '-' on any drop-down (e.g. gestation age's).
         var hasEmptyOption = !!(item.answerOption && item.answerOption.some(function(opt: any) { return opt.value === ''; }));
-        if (item.nullValue || (item.fieldType === 'select' && item.answerOption && !item.repeats && !mapped && !hasEmptyOption)) {
+        var hasChoices = (item.answerOption && item.answerOption.length > 0) || item.range;
+        if (item.fieldType === 'select' && item.nullValue) {
+          descriptor.nullValue = true;
+        } else if (item.fieldType === 'select' && hasChoices && !item.repeats && !mapped && !hasEmptyOption) {
           descriptor.nullValue = true;
           descriptor.nullValueChoosable = !item.required;
         }

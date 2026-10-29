@@ -22,6 +22,8 @@ const QUESTIONNAIRE = {
         { linkId: 'grade', type: 'choice', text: 'Grade', required: true, answerOption: [option('g1', 'One'), option('g2', 'Two')] },
         // a range select asks for '-' with nullValue
         { linkId: 'weeks', type: 'integer', text: 'Weeks', nullValue: true, range: { start: 1, end: 3, item: ['week', 'weeks'] } },
+        // an unmapped range drop-down gets one without asking
+        { linkId: 'days', type: 'integer', text: 'Days', range: { start: 1, end: 2, item: ['day', 'days'] } },
         {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
           extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
@@ -197,9 +199,16 @@ test('a required choice shows \'-\' when unanswered but can\'t be cleared to it,
     window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
     const select = (name) => document.querySelector(`.menu-box select[name="${name}"]`);
     const values = (name) => [...select(name).options].map((o) => o.value + (o.disabled ? '(disabled)' : ''));
-    return { grade: values('grade'), gradeShown: select('grade').value, weeks: values('weeks'), size: values('size') };
+    const before = { grade: values('grade'), gradeShown: select('grade').value, weeks: values('weeks'), size: values('size'), days: values('days') };
+    // the form's disabled state toggling (e.g. disabledWhen) leaves the required item's '-' fixed
+    const menu = window.editor.getNodeMenu();
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, true);
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, false);
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, ['g2']);
+    return { ...before, gradeAfterToggles: values('grade') };
   }, first);
   expect(options).toEqual({
     grade: ['(disabled)', 'g1', 'g2'], gradeShown: '', weeks: ['', '1', '2', '3'], size: ['', 'small', 'large'],
+    days: ['', '1', '2'], gradeAfterToggles: ['(disabled)', 'g1', 'g2(disabled)'],
   });
 });

@@ -696,7 +696,7 @@ export default class NodeMenu {
         _generateSelectOption({'actual' : '', displayed : '-'});
         if (data.nullValueChoosable === false) {
           // a required item's '-' shows it's unanswered, but can't be chosen to clear it
-          select.dataset.nullFixed = '1';
+          (select.options[0] as any)._nullFixed = true;
           select.options[0].disabled = true;
         }
       }
@@ -1020,9 +1020,9 @@ export default class NodeMenu {
       }
       // Set once: a single select reselects its first option whenever none is selected, so
       // deselecting option by option would misreport. With no value (or none matching), the empty
-      // '-' choice if the item has one (every unmapped, optional answer-option choice does - see
-      // generateNodeMenu in pedigree.ts), else the first option (a mapped item's own default, e.g.
-      // heredity's "None").
+      // '-' choice if the item has one (every unmapped single choice does - see
+      // _buildFieldDescriptors in pedigree.ts), else the first option (a mapped item's own default,
+      // e.g. heredity's "None").
       var options = Array.from(select.options);
       var index = options.findIndex(function(o: any) { return values.indexOf(o.value) >= 0; });
       if (index < 0) {
@@ -1213,7 +1213,7 @@ export default class NodeMenu {
         return;
       }
       // a required item's '-' stays unchoosable (see the select generator)
-      var fixed = function(option: any) { return option.value === '' && target.dataset.nullFixed === '1'; };
+      var fixed = function(option: any) { return !!option._nullFixed; };
       if (Array.isArray(disabled)) {
         target.disabled = false;
         Array.from(target.options).forEach(function(option: any) {
