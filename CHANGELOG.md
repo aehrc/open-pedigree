@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.14](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.13...open-pedigree-v1.4.14) (2026-10-29)
+
+
+### Bug Fixes
+
+* an unanswered drop-down shows '-', not its first option ([#71](https://github.com/aehrc/open-pedigree/issues/71)) ([36f308a](https://github.com/aehrc/open-pedigree/commit/36f308a19adb923d097e84490ec772e9618a0a31))
+
 ## [1.4.13](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.12...open-pedigree-v1.4.13) (2026-10-29)
 
 
