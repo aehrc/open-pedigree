@@ -37,6 +37,10 @@ var EMPTY_SNAPSHOT = snapshotKey({});
  * last took in from it (the snapshot) - or, with nothing taken in yet (an empty snapshot: linked
  * before snapshots were kept, or to a record with nothing to bring in), from what the person
  * shows. A value changed in the diagram is not a change to the record.
+ *
+ * `valuesChanged` must mean "would change what the person shows" (linkedRowsCheck's
+ * _changesFor), not the refresh's own valuesChanged, which is true for any value missing from the
+ * snapshot - so for every non-empty record when the snapshot is empty.
  */
 export function isRowChanged(changes: { valuesChanged: boolean, snapshotChanged: boolean }, snapshot: string): boolean {
   return snapshot === EMPTY_SNAPSHOT ? changes.valuesChanged : changes.snapshotChanged;

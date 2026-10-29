@@ -22,13 +22,13 @@ const LINKED = {
  * `diagramEdits` made in the diagram), and opens it in a new editor whose provider answers
  * fetchLinkedRows with `rows` (a value, 'reject', or omitted for a provider without the method).
  */
-async function openSavedPedigree(page, { rows, diagramEdits, configured = true } = {}) {
+async function openSavedPedigree(page, { rows, diagramEdits, extraLinks, configured = true } = {}) {
   page.on('dialog', (dialog) => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
 
   await retireAutoCreatedEditor(page);
-  const saved = await page.evaluate(({ linked, edits }) => {
+  const saved = await page.evaluate(({ linked, edits, extra }) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     const builder = window.OpenPedigree.initialiseEditor({});
     window.editor = builder;
@@ -38,13 +38,15 @@ async function openSavedPedigree(page, { rows, diagramEdits, configured = true }
     const people = Object.keys(map).filter((id) => map[id].getType && map[id].getType() === 'Person').map(Number);
     builder._applyLinkedRecord(people[1], Object.keys(linked)[0], linked[Object.keys(linked)[0]]);
     builder._applyLinkedRecord(people[2], Object.keys(linked)[1], linked[Object.keys(linked)[1]]);
+    // More links: { person, ref, answers } (answers null: the ref only, an empty snapshot).
+    (extra || []).forEach((link) => builder._applyLinkedRecord(people[link.person], link.ref, link.answers || undefined));
     (edits || []).forEach((edit) => {
       document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
         detail: { nodeID: people[edit.person], properties: edit.properties },
       }));
     });
     return builder.getGraph().toJSON();
-  }, { linked: LINKED, edits: diagramEdits || [] });
+  }, { linked: LINKED, edits: diagramEdits || [], extra: extraLinks || [] });
 
   await retireAutoCreatedEditor(page);
   await page.evaluate(({ json, rowsAnswer, hasMethod, isConfigured }) => {
@@ -194,4 +196,70 @@ test('a marked person re-linked before Update loses the mark and is left alone',
 
   await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
   expect(await firstNames(page)).toEqual(['', 'Rita', 'Samuel']);
+});
+
+test('Update leaves the lines about rows it can\'t update until they are dismissed', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: {
+      [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] },
+      [SAM]: { missing: true },
+    },
+  });
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+
+  await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists: Sam Sample.');
+  await expect(page.locator(NOTICE)).not.toContainText('changed since');
+  await expect(page.locator(`${NOTICE} button`, { hasText: 'Update' })).toHaveCount(0);
+  await expect(page.locator(MARK)).toHaveCount(0);
+  await page.locator(`${NOTICE} button`, { hasText: 'Dismiss' }).click();
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+});
+
+test('undoing a re-link puts the person\'s mark back', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  const ruth = await personNamed(page, 'Ruth');
+  await page.evaluate((id) => window.editor._applyLinkedRecord(id, 'record:1/instance:7', [{ linkId: 'first_name', value: 'Rita' }]), ruth);
+  await expect(page.locator(MARK)).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  await expect(page.locator(MARK)).toHaveCount(1);
+  await expect(page.locator(NOTICE)).toContainText('1 person\'s linked record has changed');
+});
+
+test('two people linked to one row are each counted and named once', async ({ page }) => {
+  await openSavedPedigree(page, {
+    extraLinks: [{ person: 0, ref: RUTH, answers: LINKED[RUTH] }],
+    rows: { [RUTH]: { missing: true }, [SAM]: { answers: LINKED[SAM] } },
+  });
+  await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists: Ruth Sample, Ruth Sample.');
+});
+
+test('a person with nothing taken in yet loses the mark once the diagram matches the record', async ({ page }) => {
+  const ROW = 'record:1/instance:3';
+  await openSavedPedigree(page, {
+    extraLinks: [{ person: 0, ref: ROW, answers: null }],
+    rows: { [ROW]: { answers: [{ linkId: 'first_name', value: 'Dev' }] }, [RUTH]: { answers: LINKED[RUTH] }, [SAM]: { answers: LINKED[SAM] } },
+  });
+  await expect(page.locator(MARK)).toHaveCount(1);
+
+  const dev = await personNamed(page, '');
+  await page.evaluate((id) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+    detail: { nodeID: id, properties: { setFirstName: 'Dev' } },
+  })), dev);
+  await expect(page.locator(MARK)).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+});
+
+test('a person with nothing taken in yet, already showing the record\'s values, is not reported', async ({ page }) => {
+  const ROW = 'record:1/instance:3';
+  await openSavedPedigree(page, {
+    extraLinks: [{ person: 0, ref: ROW, answers: null }],
+    diagramEdits: [{ person: 0, properties: { setFirstName: 'Dev' } }],
+    rows: { [ROW]: { answers: [{ linkId: 'first_name', value: 'Dev' }] }, [RUTH]: { answers: LINKED[RUTH] }, [SAM]: { answers: LINKED[SAM] } },
+  });
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+  await expect(page.locator(MARK)).toHaveCount(0);
 });

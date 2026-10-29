@@ -31,7 +31,7 @@ import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider'
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
-import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
@@ -850,8 +850,7 @@ export default class PedigreeEditor {
       return editor._resolveQuestionnaireSetter(linkId);
     };
     var current = function(setter: string): any {
-      var getter = SETTER_TO_GETTER[setter] || setter.replace(/^set/, 'get');
-      return typeof node[getter] === 'function' ? node[getter]() : undefined;
+      return editor._currentLinkedValue(node, setter);
     };
     var itemFor = function(linkId: string): any {
       var config = editor._questionnaireConfig;
@@ -920,6 +919,24 @@ export default class PedigreeEditor {
       valuesChanged: result.valuesChanged,
       snapshotChanged: JSON.stringify(result.snapshot) !== JSON.stringify(previousSnapshot)
     };
+  }
+
+  /** The node's value behind a setter, as the linked-record refresh compares it. */
+  _currentLinkedValue(node: any, setter: string): any {
+    var getter = SETTER_TO_GETTER[setter] || setter.replace(/^set/, 'get');
+    return typeof node[getter] === 'function' ? node[getter]() : undefined;
+  }
+
+  /**
+   * Whether applying a refresh's `properties` (from _linkedRecordRefreshChanges) would change what
+   * the node shows. Not the same as its valuesChanged: a value missing from the snapshot is always
+   * set, even when the node already holds it.
+   */
+  _linkedRecordValuesDiffer(node: any, properties: any): boolean {
+    var _this = this;
+    return Object.keys(properties || {}).some(function(setter: string) {
+      return !sameValue(setter, _this._currentLinkedValue(node, setter), properties[setter]);
+    });
   }
 
   /**
