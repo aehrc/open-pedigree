@@ -14,10 +14,16 @@ const QUESTIONNAIRE = {
     {
       linkId: 'custom_tab', type: 'group', text: 'Custom',
       item: [
-        // a choice that may be left unanswered (as REDCap's are) has a '-' choice for that
+        // an answer-option choice may be left unanswered, so has a '-' choice for that, whether or
+        // not it says nullValue
         { linkId: 'colour', type: 'choice', text: 'Colour', nullValue: true, answerOption: [option('red', 'Red'), option('green', 'Green')] },
-        // without one, no answer shows the first option, as a new form does
         { linkId: 'size', type: 'choice', text: 'Size', answerOption: [option('small', 'Small'), option('large', 'Large')] },
+        // required: a '-' to show it's unanswered, that can't be chosen
+        { linkId: 'grade', type: 'choice', text: 'Grade', required: true, answerOption: [option('g1', 'One'), option('g2', 'Two')] },
+        // a range select asks for '-' with nullValue
+        { linkId: 'weeks', type: 'integer', text: 'Weeks', nullValue: true, range: { start: 1, end: 3, item: ['week', 'weeks'] } },
+        // an unmapped range drop-down gets one without asking
+        { linkId: 'days', type: 'integer', text: 'Days', range: { start: 1, end: 2, item: ['day', 'days'] } },
         {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
           extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
@@ -78,7 +84,7 @@ test('a person with no answers shows none, not the previous person\'s', async ({
 
   expect(await shown(page, first)).toEqual({ colour: 'red', size: 'large', shade: ['dark'], features: ['A'], notes: 'first person' });
   await page.evaluate(() => window.editor.getNodeMenu().hide());
-  expect(await shown(page, second)).toEqual({ colour: '', size: 'small', shade: [], features: [], notes: '' });
+  expect(await shown(page, second)).toEqual({ colour: '', size: '', shade: [], features: [], notes: '' });
 });
 
 test('a repeating choice shows every ticked option', async ({ page }) => {
@@ -175,4 +181,34 @@ test('a coded answer (e.g. from a linked record) shows as its code', async ({ pa
   const result = await shown(page, first);
   expect(result.colour).toBe('green');
   expect(result.features).toEqual(['1', '-1']);
+});
+
+test('a mapped drop-down with no value shows its property\'s default, e.g. heredity\'s "None"', async ({ page }) => {
+  const [first] = await loadFamily(page, null);
+  const heredity = await page.evaluate((id) => {
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
+    const select = document.querySelector('.menu-box select[name="childlessSelect"]');
+    return { value: select.value, options: [...select.options].map((o) => o.value) };
+  }, first);
+  expect(heredity).toEqual({ value: 'none', options: ['none', 'childless', 'infertile'] });
+});
+
+test('a required choice shows \'-\' when unanswered but can\'t be cleared to it, and a range select has \'-\' only when it asks', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  const options = await page.evaluate((id) => {
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
+    const select = (name) => document.querySelector(`.menu-box select[name="${name}"]`);
+    const values = (name) => [...select(name).options].map((o) => o.value + (o.disabled ? '(disabled)' : ''));
+    const before = { grade: values('grade'), gradeShown: select('grade').value, weeks: values('weeks'), size: values('size'), days: values('days') };
+    // the form's disabled state toggling (e.g. disabledWhen) leaves the required item's '-' fixed
+    const menu = window.editor.getNodeMenu();
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, true);
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, false);
+    menu._setFieldDisabled.select(menu.fieldMap.grade.element, ['g2']);
+    return { ...before, gradeAfterToggles: values('grade') };
+  }, first);
+  expect(options).toEqual({
+    grade: ['(disabled)', 'g1', 'g2'], gradeShown: '', weeks: ['', '1', '2', '3'], size: ['', 'small', 'large'],
+    days: ['', '1', '2'], gradeAfterToggles: ['(disabled)', 'g1', 'g2(disabled)'],
+  });
 });

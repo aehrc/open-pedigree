@@ -529,10 +529,10 @@ export default class PedigreeEditor {
       };
 
       if (item.fieldType === 'select' || item.fieldType === 'radio') {
+        // A mapped item's setter takes the option's code (e.g. setChildlessStatus('none')); any
+        // other item stores the option's typed answer (see parseAnswerOptions).
+        var mapped = !!(item.mapping && item.mapping.kind === 'field');
         if (item.answerOption) {
-          // A mapped item's setter takes the option's code (e.g. setChildlessStatus('none')); any
-          // other item stores the option's typed answer (see parseAnswerOptions).
-          var mapped = item.mapping && item.mapping.kind === 'field';
           descriptor.values = item.answerOption.map(function(opt: any) {
             return { 'actual': opt.value, 'displayed': opt.display, 'answer': mapped ? undefined : opt.answer };
           });
@@ -540,8 +540,18 @@ export default class PedigreeEditor {
         if (item.range) {
           descriptor.range = item.range;
         }
-        if (item.nullValue) {
-          descriptor.nullValue = item.nullValue;
+        // A drop-down gets a '-' choice to show it's unanswered (not its first choice, as if that
+        // were the answer) - unless it's mapped (its property's own default shows, e.g. heredity's
+        // "None"), repeating, or an option's value is '' already (that option means unanswered).
+        // A required item's '-' shows a blank answer but can't be chosen. `nullValue` asks for a
+        // choosable '-' on any drop-down (e.g. gestation age's).
+        var hasEmptyOption = !!(item.answerOption && item.answerOption.some(function(opt: any) { return opt.value === ''; }));
+        var hasChoices = (item.answerOption && item.answerOption.length > 0) || item.range;
+        if (item.fieldType === 'select' && item.nullValue) {
+          descriptor.nullValue = true;
+        } else if (item.fieldType === 'select' && hasChoices && !item.repeats && !mapped && !hasEmptyOption) {
+          descriptor.nullValue = true;
+          descriptor.nullValueChoosable = !item.required;
         }
         if (item.columns) {
           descriptor.columns = item.columns;
