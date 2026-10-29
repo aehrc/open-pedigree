@@ -18,6 +18,10 @@ const QUESTIONNAIRE = {
         // not it says nullValue
         { linkId: 'colour', type: 'choice', text: 'Colour', nullValue: true, answerOption: [option('red', 'Red'), option('green', 'Green')] },
         { linkId: 'size', type: 'choice', text: 'Size', answerOption: [option('small', 'Small'), option('large', 'Large')] },
+        // required: a '-' to show it's unanswered, that can't be chosen
+        { linkId: 'grade', type: 'choice', text: 'Grade', required: true, answerOption: [option('g1', 'One'), option('g2', 'Two')] },
+        // a range select asks for '-' with nullValue
+        { linkId: 'weeks', type: 'integer', text: 'Weeks', nullValue: true, range: { start: 1, end: 3, item: ['week', 'weeks'] } },
         {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
           extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
@@ -185,4 +189,17 @@ test('a mapped drop-down with no value shows its property\'s default, e.g. hered
     return { value: select.value, options: [...select.options].map((o) => o.value) };
   }, first);
   expect(heredity).toEqual({ value: 'none', options: ['none', 'childless', 'infertile'] });
+});
+
+test('a required choice shows \'-\' when unanswered but can\'t be cleared to it, and a range select has \'-\' only when it asks', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  const options = await page.evaluate((id) => {
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
+    const select = (name) => document.querySelector(`.menu-box select[name="${name}"]`);
+    const values = (name) => [...select(name).options].map((o) => o.value + (o.disabled ? '(disabled)' : ''));
+    return { grade: values('grade'), gradeShown: select('grade').value, weeks: values('weeks'), size: values('size') };
+  }, first);
+  expect(options).toEqual({
+    grade: ['(disabled)', 'g1', 'g2'], gradeShown: '', weeks: ['', '1', '2', '3'], size: ['', 'small', 'large'],
+  });
 });

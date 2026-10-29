@@ -694,6 +694,11 @@ export default class NodeMenu {
       };
       if (data.nullValue) {
         _generateSelectOption({'actual' : '', displayed : '-'});
+        if (data.nullValueChoosable === false) {
+          // a required item's '-' shows it's unanswered, but can't be chosen to clear it
+          select.dataset.nullFixed = '1';
+          select.options[0].disabled = true;
+        }
       }
       if (data.values) {
         data.values.forEach(_generateSelectOption);
@@ -1015,8 +1020,9 @@ export default class NodeMenu {
       }
       // Set once: a single select reselects its first option whenever none is selected, so
       // deselecting option by option would misreport. With no value (or none matching), the empty
-      // '-' choice if the item has one, else the first option - what a new form shows (some items
-      // rely on it, e.g. heredity's "None").
+      // '-' choice if the item has one (every unmapped, optional answer-option choice does - see
+      // generateNodeMenu in pedigree.ts), else the first option (a mapped item's own default, e.g.
+      // heredity's "None").
       var options = Array.from(select.options);
       var index = options.findIndex(function(o: any) { return values.indexOf(o.value) >= 0; });
       if (index < 0) {
@@ -1206,15 +1212,17 @@ export default class NodeMenu {
       if (!target) {
         return;
       }
+      // a required item's '-' stays unchoosable (see the select generator)
+      var fixed = function(option: any) { return option.value === '' && target.dataset.nullFixed === '1'; };
       if (Array.isArray(disabled)) {
         target.disabled = false;
         Array.from(target.options).forEach(function(option: any) {
-          option.disabled = disabled.indexOf(option.value) >= 0;
+          option.disabled = fixed(option) || disabled.indexOf(option.value) >= 0;
         });
       } else {
         target.disabled = !!disabled;
         Array.from(target.options).forEach(function(option: any) {
-          option.disabled = false;
+          option.disabled = fixed(option);
         });
       }
     },

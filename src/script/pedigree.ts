@@ -529,10 +529,10 @@ export default class PedigreeEditor {
       };
 
       if (item.fieldType === 'select' || item.fieldType === 'radio') {
+        // A mapped item's setter takes the option's code (e.g. setChildlessStatus('none')); any
+        // other item stores the option's typed answer (see parseAnswerOptions).
+        var mapped = !!(item.mapping && item.mapping.kind === 'field');
         if (item.answerOption) {
-          // A mapped item's setter takes the option's code (e.g. setChildlessStatus('none')); any
-          // other item stores the option's typed answer (see parseAnswerOptions).
-          var mapped = item.mapping && item.mapping.kind === 'field';
           descriptor.values = item.answerOption.map(function(opt: any) {
             return { 'actual': opt.value, 'displayed': opt.display, 'answer': mapped ? undefined : opt.answer };
           });
@@ -540,11 +540,15 @@ export default class PedigreeEditor {
         if (item.range) {
           descriptor.range = item.range;
         }
-        // An answer-option choice can be left unanswered, so it gets a '-' choice to show that
-        // (not its first option, as if that were the answer). A mapped item keeps its property's
-        // own default (e.g. heredity's "None"), and `nullValue` asks for '-' on any other select.
-        if (item.nullValue || (item.fieldType === 'select' && item.answerOption && !item.repeats && !mapped)) {
+        // An answer-option choice gets a '-' choice to show it's unanswered (not its first option,
+        // as if that were the answer) - unless it's mapped (its property's own default shows, e.g.
+        // heredity's "None") or an option's value is '' already. A required one's '-' shows a
+        // blank answer but can't be chosen. `nullValue` asks for '-' on any other select (e.g. a
+        // range).
+        var hasEmptyOption = !!(item.answerOption && item.answerOption.some(function(opt: any) { return opt.value === ''; }));
+        if (item.nullValue || (item.fieldType === 'select' && item.answerOption && !item.repeats && !mapped && !hasEmptyOption)) {
           descriptor.nullValue = true;
+          descriptor.nullValueChoosable = !item.required;
         }
         if (item.columns) {
           descriptor.columns = item.columns;

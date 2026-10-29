@@ -309,6 +309,7 @@ function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
       fieldType: fieldType,
       tab: tab,
       repeats: !!item.repeats,
+      required: !!item.required,
       answerValueSet: item.answerValueSet,
       answerOption: parseAnswerOptions(item),
       enableWhen: parseConditions(item.enableWhen),
