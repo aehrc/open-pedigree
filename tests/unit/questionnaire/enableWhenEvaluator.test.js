@@ -103,4 +103,14 @@ describe('evaluateEnableWhen', () => {
     expect(evaluateEnableWhen(enableWhen, 'all', {}, fetusTrue)).toBe(false);
     expect(evaluateEnableWhen(enableWhen, 'all', {}, adoptedTrue)).toBe(false);
   });
+
+  it('reads a repeating item\'s list of answers: exists if any, equal if any value is', () => {
+    const when = (operator, value) => [{ question: 'features', operator, ...(typeof value === 'boolean' ? { answerBoolean: value } : { answerCoding: { code: value } }) }];
+    expect(evaluateEnableWhen(when('=', '1'), 'all', { features: ['A', '1'] })).toBe(true);
+    expect(evaluateEnableWhen(when('=', '2'), 'all', { features: ['A', '1'] })).toBe(false);
+    expect(evaluateEnableWhen(when('!=', '2'), 'all', { features: ['A', '1'] })).toBe(true);
+    expect(evaluateEnableWhen(when('exists', true), 'all', { features: [] })).toBe(false);
+    expect(evaluateEnableWhen(when('exists', false), 'all', { features: [] })).toBe(true);
+    expect(evaluateEnableWhen(when('=', 'X1'), 'all', { features: [{ code: 'X1', display: 'X' }] })).toBe(true);
+  });
 });

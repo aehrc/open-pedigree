@@ -53,7 +53,9 @@ function shown(page, personId) {
     window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
     const select = (name) => document.querySelector(`.menu-box select[name="${name}"]`);
     return {
-      colour: [...select('colour').selectedOptions].map((o) => o.value),
+      // a single select's empty choice ('') is "no value"
+      colour: [...select('colour').selectedOptions].map((o) => o.value).filter((v) => v !== ''),
+      colourShowsBlank: select('colour').selectedOptions.length === 1 && select('colour').value === '',
       shade: [...document.querySelectorAll('.menu-box .field-shade input[type=radio]')].filter((r) => r.checked).map((r) => r.value),
       features: [...select('features').selectedOptions].map((o) => o.value),
       featuresMultiple: select('features').multiple,
@@ -72,9 +74,9 @@ test('a person with no answers shows none, not the previous person\'s', async ({
     node.setQuestionnaireAnswer('notes', 'first person');
   }, first);
 
-  expect(await shown(page, first)).toEqual({ colour: ['red'], shade: ['dark'], features: ['A'], featuresMultiple: true, notes: 'first person' });
+  expect(await shown(page, first)).toEqual({ colour: ['red'], colourShowsBlank: false, shade: ['dark'], features: ['A'], featuresMultiple: true, notes: 'first person' });
   await page.evaluate(() => window.editor.getNodeMenu().hide());
-  expect(await shown(page, second)).toEqual({ colour: [], shade: [], features: [], featuresMultiple: true, notes: '' });
+  expect(await shown(page, second)).toEqual({ colour: [], colourShowsBlank: true, shade: [], features: [], featuresMultiple: true, notes: '' });
 });
 
 test('a repeating choice shows every ticked option', async ({ page }) => {
@@ -109,4 +111,41 @@ test('a legend picker shows a term\'s current name, not the one it had when firs
     return [...document.querySelectorAll('.menu-box .field-disorders .selectize-input [data-value]')].map((e) => e.textContent.replace(/×$/, '').trim());
   }, id);
   expect(pickerText).toEqual(['Example disorder']);
+});
+
+test('opening one person straight after another, without closing the form, shows the second\'s answers', async ({ page }) => {
+  const [first, second] = await loadFamily(page);
+  await page.evaluate((id) => {
+    const node = window.editor.getView().getNode(id);
+    node.setQuestionnaireAnswer('colour', 'red');
+    node.setQuestionnaireAnswer('notes', 'first person');
+  }, first);
+  await shown(page, first);
+  const result = await shown(page, second); // no hide() between
+  expect(result.colour).toEqual([]);
+  expect(result.notes).toBe('');
+});
+
+test('an answer matching no option shows nothing, not the first option', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => window.editor.getView().getNode(id).setQuestionnaireAnswer('colour', 'blue'), first);
+  const result = await shown(page, first);
+  expect(result.colour).toEqual([]);
+  expect(result.colourShowsBlank).toBe(true);
+});
+
+test('a legend picker shows no terms for a person with none, not the last person\'s', async ({ page }) => {
+  const [first, second] = await loadFamily(page, null);
+  const pickers = await page.evaluate(({ first, second }) => {
+    window.editor.getDisorderLegend().addToCache('111111', 'Example disorder');
+    window.editor.getView().getNode(first).setDisorders(['111111']);
+    const menu = window.editor.getNodeMenu();
+    const chips = () => [...document.querySelectorAll('.menu-box .field-disorders .selectize-input [data-value]')].map((e) => e.getAttribute('data-value'));
+    menu.show(window.editor.getView().getNode(first), 100, 100);
+    const a = chips();
+    menu.hide();
+    menu.show(window.editor.getView().getNode(second), 100, 100);
+    return [a, chips()];
+  }, { first, second });
+  expect(pickers).toEqual([['111111'], []]);
 });

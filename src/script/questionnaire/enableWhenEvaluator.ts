@@ -40,8 +40,23 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
     return condition.negate ? !result : result;
   }
 
-  let current = currentAnswerValue(answers[condition.question]);
   const expected = extractAnswerValue(condition);
+  // A repeating item's answer is a list: it exists if it has any value, and equals an expected
+  // value if any of its values does.
+  if (Array.isArray(answers[condition.question])) {
+    const values = answers[condition.question].map(currentAnswerValue);
+    switch (condition.operator) {
+    case 'exists':
+      return expected === false ? values.length === 0 : values.length > 0;
+    case '=':
+      return values.indexOf(expected) >= 0;
+    case '!=':
+      return values.indexOf(expected) < 0;
+    default:
+      return false;
+    }
+  }
+  let current = currentAnswerValue(answers[condition.question]);
   if (condition.hasOwnProperty('answerDate') && current !== undefined && current !== null && current !== '') {
     // Compared as 'YYYY-MM-DD' text, so an earlier version's timestamp or a Date is its day.
     current = dateAnswer(current);

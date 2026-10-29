@@ -463,10 +463,15 @@
   border-bottom: 1px solid #ccc;
   padding-bottom: .2em;
 }
-/* The pickers (selectize) in the same font as the other fields, not the page's. */
+/* The pickers (selectize) in the same font as the other fields, not the page's. Selectize gives a
+   picker's dropdown its select's classes, which scopes these to the node form's pickers. */
 .menu-box .selectize-input,
 .menu-box .selectize-input input,
-.selectize-dropdown {
+.selectize-dropdown.suggest-omim,
+.selectize-dropdown.suggest-hpo,
+.selectize-dropdown.suggest-genes,
+.selectize-dropdown.suggest-questionnaire,
+.selectize-dropdown.suggest-questionnaire-legend {
   font-family: Arial, Helvetica, sans-serif;
 }
 /* Read-only fields (e.g. a linked person's, edited in REDCap): one readable style for every kind

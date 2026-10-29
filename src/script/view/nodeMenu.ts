@@ -44,20 +44,6 @@ function tabLabel(tab: any): any {
 // the swatch it adds would be wiped out the next time the field re-renders. `container` is
 // expected to be the field's own field-box element, so a plain descendant query is already
 // correctly scoped to this one field (no risk of matching another field's chips).
-/**
- * Adds a picker option, or updates its text if the picker already has one for that value:
- * clearOptions() keeps the options of selected values, and addOption() ignores a value that
- * already has one, so a selected term would otherwise keep the name it had when first shown
- * (e.g. "loading..." while its lookup was pending).
- */
-function putSelectizeOption(selectize: any, option: any): void {
-  if (selectize.options.hasOwnProperty(option.value)) {
-    selectize.updateOption(option.value, option);
-  } else {
-    selectize.addOption(option);
-  }
-}
-
 function applySelectizeSwatches(container: any, legend: any): void {
   if (!legend) {
     return;
@@ -653,9 +639,14 @@ export default class NodeMenu {
         option.value = v.actual;
         option.textContent = v.displayed;
         select.appendChild(option);
+        return option;
       };
-      if(data.nullValue) {
-        _generateSelectOption({'actual' : '', displayed : '-'});
+      // A single select always has an empty choice to show "no value": '-' where the item allows
+      // one, otherwise blank and not offered in the list. (Without it, a single select with
+      // nothing selected falls back to its first option - shown, and saved on a change.)
+      if (!select.multiple) {
+        var empty = _generateSelectOption({'actual' : '', displayed : data.nullValue ? '-' : ''});
+        empty.hidden = !data.nullValue;
       }
       if (data.values) {
         data.values.forEach(_generateSelectOption);
@@ -882,7 +873,11 @@ export default class NodeMenu {
   _setCrtData(data: any): any {
     var _this = this;
     Object.keys(this.fieldMap).forEach(function (name: any) {
-      _this.fieldMap[name].crtValue = data && data[name] && typeof(data[name].value) != 'undefined' ? data[name].value : _this.fieldMap[name].crtValue || _this.fieldMap[name]['default'];
+      // A field in `data` with no value has none (the form's controls are reused between people,
+      // so the last person's value mustn't stay); only a field `data` leaves out keeps its value.
+      _this.fieldMap[name].crtValue = data && data[name]
+        ? (typeof(data[name].value) != 'undefined' ? data[name].value : _this.fieldMap[name]['default'])
+        : _this.fieldMap[name].crtValue || _this.fieldMap[name]['default'];
       _this.fieldMap[name].inactive = (data && data[name] && (typeof(data[name].inactive) == 'boolean' || typeof(data[name].inactive) == 'object')) ? data[name].inactive : _this.fieldMap[name].inactive;
       _this.fieldMap[name].disabled = (data && data[name] && (typeof(data[name].disabled) == 'boolean' || typeof(data[name].disabled) == 'object')) ? data[name].disabled : _this.fieldMap[name].disabled;
       (_this._setFieldValue as any)[_this.fieldMap[name].type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].crtValue);
@@ -934,7 +929,8 @@ export default class NodeMenu {
     'disease-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-omim');
       if (target && target[0] && (target[0] as any).selectize) {
-        if (Array.isArray(values)) {
+        values = Array.isArray(values) ? values : []; // none, not the last person's
+        {
           var ids: any[] = [];
           // Diseases are an array of {id, value} objects
           values.forEach(function (value: any) {
@@ -942,10 +938,13 @@ export default class NodeMenu {
               ids.push(value.id);
             }
           });
+          // clearOptions keeps the options of selected values (with the text they had - e.g.
+          // "loading..." while a term was looked up), so the selection goes first
+          (target[0] as any).selectize.clear(true);
           (target[0] as any).selectize.clearOptions(true);
           var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
           for (var disorder of currentDisorders){
-            putSelectizeOption((target[0] as any).selectize, {'text': disorder.getName(), 'value': disorder.getID()});
+            (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -956,7 +955,8 @@ export default class NodeMenu {
     'hpo-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-hpo');
       if (target && target[0] && (target[0] as any).selectize) {
-        if (Array.isArray(values)) {
+        values = Array.isArray(values) ? values : []; // none, not the last person's
+        {
           var ids: any[] = [];
           // HPO terms are an array of {id, value} objects
           values.forEach(function (value: any) {
@@ -964,10 +964,13 @@ export default class NodeMenu {
               ids.push(value.id);
             }
           });
+          // clearOptions keeps the options of selected values (with the text they had - e.g.
+          // "loading..." while a term was looked up), so the selection goes first
+          (target[0] as any).selectize.clear(true);
           (target[0] as any).selectize.clearOptions(true);
           var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
           for (var phenotype of currentPhenotypes){
-            putSelectizeOption((target[0] as any).selectize, {'text': phenotype.getName(), 'value': phenotype.getID()});
+            (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -977,13 +980,17 @@ export default class NodeMenu {
     'gene-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-genes');
       if (target && target[0] && (target[0] as any).selectize) {
-        if (Array.isArray(values)) {
+        values = Array.isArray(values) ? values : []; // none, not the last person's
+        {
           // Genes are just a straight array of strings
+          // clearOptions keeps the options of selected values (with the text they had - e.g.
+          // "loading..." while a term was looked up), so the selection goes first
+          (target[0] as any).selectize.clear(true);
           (target[0] as any).selectize.clearOptions(true);
           var currentGenes = editor.getGeneLegend().getCurrentTerms();
           for (var gene of currentGenes){
             console.log("Adding options " + gene.getID() + "=>" + gene.getName());
-            putSelectizeOption((target[0] as any).selectize, {'text': gene.getName(), 'value': gene.getID()});
+            (target[0] as any).selectize.addOption({'text': gene.getName(), 'value': gene.getID()});
           }
           (target[0] as any).selectize.setValue(values, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -999,18 +1006,20 @@ export default class NodeMenu {
       var values = (Array.isArray(value) ? value : [value])
         .filter(function(v: any) { return v !== null && v !== undefined && v !== ''; })
         .map(String);
+      var matched = false;
       Array.from(select.options).forEach(function(option: any) {
-        // with no value, the empty ('-') option if there is one, else nothing
-        option.selected = values.length ? values.indexOf(option.value) >= 0 : option.value === '';
+        option.selected = values.indexOf(option.value) >= 0;
+        matched = matched || option.selected;
       });
-      if (!values.length && !select.multiple && select.value !== '') {
-        select.selectedIndex = -1;
+      // no value (or one matching no option): a single select's empty choice
+      if (!select.multiple && !matched) {
+        select.value = '';
       }
     },
     'hidden' : function(container: any, value: any): any {
       var target = container.querySelector('input[type=hidden]');
       if (target) {
-        target.value = value;
+        target.value = (value === null || value === undefined) ? '' : value;
       }
     },
     'number' : function(container: any, value: any): any {
@@ -1027,10 +1036,11 @@ export default class NodeMenu {
       if (target && target[0] && (target[0] as any).selectize) {
         var selectizeInstance = (target[0] as any).selectize;
         var answers = Array.isArray(value) ? value : (value ? [value] : []);
+        selectizeInstance.clear(true);
         selectizeInstance.clearOptions(true);
         answers.forEach(function(answer: any) {
           if (answer && answer.code) {
-            putSelectizeOption(selectizeInstance, { text: answer.display || answer.code, value: answer.code, system: answer.system });
+            selectizeInstance.addOption({ text: answer.display || answer.code, value: answer.code, system: answer.system });
           }
         });
         selectizeInstance.setValue(answers.map(function(a: any) { return a.code; }), true);
@@ -1043,17 +1053,21 @@ export default class NodeMenu {
       if (target && target[0] && (target[0] as any).selectize) {
         var linkId = (target[0] as any).dataset.linkid;
         var legend = editor.getQuestionnaireLegend && editor.getQuestionnaireLegend(linkId);
-        if (Array.isArray(values) && legend) {
+        values = Array.isArray(values) ? values : []; // none, not the last person's
+        if (legend) {
           var ids: any[] = [];
           values.forEach(function(v: any) {
             if (v && v.code) {
               ids.push(v.code);
             }
           });
+          // clearOptions keeps the options of selected values (with the text they had - e.g.
+          // "loading..." while a term was looked up), so the selection goes first
+          (target[0] as any).selectize.clear(true);
           (target[0] as any).selectize.clearOptions(true);
           var currentTerms = legend.getCurrentTerms();
           for (var term of currentTerms) {
-            putSelectizeOption((target[0] as any).selectize, {'text': term.getName(), 'value': term.getID()});
+            (target[0] as any).selectize.addOption({'text': term.getName(), 'value': term.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
