@@ -214,6 +214,7 @@ describe('valuesChanged', () => {
     // Empty snapshot (nothing taken in yet), node already holding the record's value.
     const r = refresh([{ linkId: 'first_name', value: 'Ruth' }], { current: { setFirstName: 'Ruth' } });
     expect(r.valuesChanged).toBe(false);
+    expect(r.properties).toEqual({});
     expect(r.snapshot).toEqual({ first_name: 'Ruth' });
   });
 
@@ -226,5 +227,11 @@ describe('valuesChanged', () => {
   it('is false for a record change the diagram already made', () => {
     const r = refresh([{ linkId: 'first_name', value: 'Ruthie' }], { current: { setFirstName: 'Ruthie' }, snapshot: { first_name: 'Ruth' } });
     expect(r.valuesChanged).toBe(false);
+    expect(r.snapshot).toEqual({ first_name: 'Ruthie' });
+  });
+
+  it('does not rewrite a value equal once normalised', () => {
+    const r = refresh([{ linkId: 'weeks', value: '20' }], { current: { setGestationAge: 20 }, snapshot: { weeks: '19' } });
+    expect(r.properties).toEqual({});
   });
 });

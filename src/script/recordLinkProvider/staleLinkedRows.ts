@@ -3,8 +3,8 @@ import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkPr
 /**
  * The check on opening a pedigree (pedigree-editor-stale-linked-rows): which linked people's
  * records have changed since the pedigree last took them in. Pure - the editor supplies the
- * people, the provider's answer and the refresh comparison; see linkedRowsCheck.ts for the marks
- * and notice.
+ * people and the provider's answer; linkedRowsCheck.ts decides who has changed (with the refresh's
+ * own comparison), and shows the marks and notice.
  *
  * A person's record has changed (design D1) when refreshing them from it - what Update and
  * closing Edit in REDCap do - would change what they show. The refresh only applies what the
@@ -20,10 +20,17 @@ import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkPr
 export type LinkedPerson<K> = { key: K, ref: string, snapshot: string };
 
 export type LinkedRowsResult<K> = {
-  changed: LinkedPerson<K>[],
+  // Their record's answers came back: whether each has changed is decided from those answers and
+  // what the person shows at the time (it can change as the diagram is edited).
+  answered: LinkedPerson<K>[],
   missing: LinkedPerson<K>[],
   otherRecord: LinkedPerson<K>[]
 };
+
+/** The key identifying a linked person's state: their ref and snapshot (see snapshotKey). */
+export function stateKey(ref: string, snapshot: string): string {
+  return ref + '\n' + snapshot;
+}
 
 /**
  * A snapshot in comparable form: key order doesn't matter, so two snapshots with the same entries
@@ -40,18 +47,15 @@ export function snapshotKey(snapshot: any): string {
 /**
  * Sorts the people asked about by the provider's answer. Left out: anyone whose ref or snapshot
  * has changed since they were asked about (re-linked, or refreshed by Edit in REDCap, before the
- * answer came - `current` says what they have now, or null if they're gone), anyone the answer
- * says nothing usable about, and anyone unchanged.
- *
- * @param wouldChange Whether refreshing the person from these answers would change what they show.
+ * answer came - `current` says what they have now, or null if they're gone), and anyone the answer
+ * says nothing usable about.
  */
 export function classifyLinkedRows<K>(
   people: LinkedPerson<K>[],
   rows: { [ref: string]: LinkedRow } | null | undefined,
-  current: (key: K) => { ref: string, snapshot: string } | null,
-  wouldChange: (key: K, answers: {linkId: string, value: any}[]) => boolean
+  current: (key: K) => { ref: string, snapshot: string } | null
 ): LinkedRowsResult<K> {
-  var result: LinkedRowsResult<K> = { changed: [], missing: [], otherRecord: [] };
+  var result: LinkedRowsResult<K> = { answered: [], missing: [], otherRecord: [] };
   if (!rows || typeof rows !== 'object') {
     return result;
   }
@@ -68,8 +72,8 @@ export function classifyLinkedRows<K>(
       result.otherRecord.push(person);
     } else if (row.missing) {
       result.missing.push(person);
-    } else if (Array.isArray(row.answers) && wouldChange(person.key, row.answers)) {
-      result.changed.push(person);
+    } else if (Array.isArray(row.answers)) {
+      result.answered.push(person);
     }
   });
   return result;

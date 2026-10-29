@@ -8,15 +8,9 @@ function person(key, ref, snapshot = SNAPSHOT) {
   return { key, ref, snapshot };
 }
 
-// people: the people asked about; now: key -> their state when the answer arrives (default: as asked);
-// changes: the keys whose refresh would change what they show.
-function classify(people, rows, { now = {}, changes = [] } = {}) {
-  return classifyLinkedRows(
-    people,
-    rows,
-    (key) => (key in now ? now[key] : people.find((p) => p.key === key)),
-    (key) => changes.includes(key)
-  );
+// people: the people asked about; now: key -> their state when the answer arrives (default: as asked).
+function classify(people, rows, { now = {} } = {}) {
+  return classifyLinkedRows(people, rows, (key) => (key in now ? now[key] : people.find((p) => p.key === key)));
 }
 
 describe('snapshotKey', () => {
@@ -29,18 +23,18 @@ describe('snapshotKey', () => {
 describe('classifyLinkedRows', () => {
   const answers = [{ linkId: 'first_name', value: 'Ruth' }];
 
-  it('reports a person whose refresh would change what they show, and only them', () => {
-    const changed = person(1, 'record:1/instance:1');
-    const same = person(2, 'record:1/instance:2', EMPTY);
-    const result = classify([changed, same], { [changed.ref]: { answers }, [same.ref]: { answers } }, { changes: [1] });
-    expect(result).toEqual({ changed: [changed], missing: [], otherRecord: [] });
+  it('collects the people whose records answered', () => {
+    const one = person(1, 'record:1/instance:1');
+    const two = person(2, 'record:1/instance:2', EMPTY);
+    const result = classify([one, two], { [one.ref]: { answers }, [two.ref]: { answers: [] } });
+    expect(result).toEqual({ answered: [one, two], missing: [], otherRecord: [] });
   });
 
   it('reports missing rows and other-record links, not as changed', () => {
     const gone = person(1, 'record:1/instance:9');
     const other = person(2, 'record:2/instance:1');
-    const result = classify([gone, other], { [gone.ref]: { missing: true }, [other.ref]: { otherRecord: true } }, { changes: [1, 2] });
-    expect(result).toEqual({ changed: [], missing: [gone], otherRecord: [other] });
+    const result = classify([gone, other], { [gone.ref]: { missing: true }, [other.ref]: { otherRecord: true } });
+    expect(result).toEqual({ answered: [], missing: [gone], otherRecord: [other] });
   });
 
   it('skips a person re-linked or refreshed before the answer arrived, or gone', () => {
@@ -54,15 +48,14 @@ describe('classifyLinkedRows', () => {
         2: { ref: refreshed.ref, snapshot: snapshotKey({ first_name: 'Ruthie' }) },
         3: null,
       },
-      changes: [2],
     });
-    expect(result).toEqual({ changed: [], missing: [], otherRecord: [] });
+    expect(result).toEqual({ answered: [], missing: [], otherRecord: [] });
   });
 
   it('says nothing about a ref the answer leaves out or garbles', () => {
     const left = person(1, 'record:1/instance:1');
     const garbled = person(2, 'record:1/instance:2');
-    expect(classify([left, garbled], { [garbled.ref]: 'nonsense' })).toEqual({ changed: [], missing: [], otherRecord: [] });
-    expect(classify([left], null)).toEqual({ changed: [], missing: [], otherRecord: [] });
+    expect(classify([left, garbled], { [garbled.ref]: 'nonsense' })).toEqual({ answered: [], missing: [], otherRecord: [] });
+    expect(classify([left], null)).toEqual({ answered: [], missing: [], otherRecord: [] });
   });
 });

@@ -42,8 +42,8 @@ export interface LinkedRecordRefreshResult {
   // Setter name -> new value, clears first.
   properties: Record<string, any>;
   snapshot: LinkedRecordSnapshot;
-  // Whether applying `properties` changes what the node shows. A value the snapshot didn't have
-  // is always set, but may already be what the node holds (e.g. entered in the diagram).
+  // Whether applying `properties` changes what the node shows: each one does, as a value the node
+  // already holds (e.g. entered in the diagram) isn't sent.
   valuesChanged: boolean;
 }
 
@@ -121,7 +121,6 @@ function sameJson(a: any, b: any): boolean {
 export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): LinkedRecordRefreshResult {
   const clears: Record<string, any> = {};
   const sets: Record<string, any> = {};
-  let valuesChanged = false;
   const last = input.snapshot || {};
   // The answers are the record's full state: the new snapshot is exactly what it sent now, so a
   // linkId it left out (or one no longer in the Questionnaire) doesn't linger.
@@ -159,7 +158,6 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       const currentKeys = currentEntries.map((e) => input.legendKey(linkId, e));
       if (!sameJson(nextKeys, currentKeys)) {
         sets[setter] = next;
-        valuesChanged = true;
       }
       continue;
     }
@@ -172,7 +170,6 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
         const cleared = clearValueFor(setter);
         if (!sameValue(setter, input.current(setter), cleared)) {
           clears[setter] = cleared;
-          valuesChanged = true;
         }
       }
       continue;
@@ -187,11 +184,10 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       continue;
     }
     snapshot[linkId] = answer.value;
-    if (!hadLast || !sameJson(last[linkId], answer.value)) {
+    // Only what the record changed since the snapshot, and only where the node doesn't already
+    // hold it - a value equal only once normalised (e.g. 20 and '20') isn't rewritten unseen.
+    if ((!hadLast || !sameJson(last[linkId], answer.value)) && !sameValue(setter, input.current(setter), answer.value)) {
       sets[setter] = answer.value;
-      if (!sameValue(setter, input.current(setter), answer.value)) {
-        valuesChanged = true;
-      }
     }
   }
 
@@ -209,7 +205,7 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
   return {
     properties: properties,
     snapshot: snapshot,
-    valuesChanged: valuesChanged,
+    valuesChanged: Object.keys(properties).length > 0,
   };
 }
 

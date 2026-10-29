@@ -121,6 +121,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this.updateDisorderShapes();
     this.updateCarrierGraphic();
     this.updateEvaluationLabel();
+    // The redrawn shape went in where the mark was: put the mark back over it.
+    if (this._linkedRecordChangedMark && !editor.isReadOnlyMode() && this.getHoverBox()) {
+      this._linkedRecordChangedMark.insertBefore(this.getHoverBox().getFrontElements());
+    }
   }
 
   generateProbandArrow(): any {

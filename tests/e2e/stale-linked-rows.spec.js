@@ -323,3 +323,46 @@ test('pointing at the mark keeps the person\'s hover box working and shows the m
   const ruth = await personNamed(page, 'Ruth');
   expect(await page.evaluate((id) => !window.editor.getView().getNode(id).getGraphics().getHoverBox()._hidden, ruth)).toBe(true);
 });
+
+test('a person whose record matches the diagram is marked once the diagram is edited away from it', async ({ page }) => {
+  // The record changed Ruth to Ruthie since the save, and the diagram already says Ruthie.
+  await openSavedPedigree(page, {
+    diagramEdits: [{ person: 1, properties: { setFirstName: 'Ruthie' } }],
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+
+  const ruth = await personNamed(page, 'Ruthie');
+  await page.evaluate((id) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+    detail: { nodeID: id, properties: { setFirstName: 'Rue' } },
+  })), ruth);
+  await expect(page.locator(MARK)).toHaveCount(1);
+  await expect(page.locator(NOTICE)).toContainText('1 person\'s linked record has changed');
+});
+
+test('a record deleted between opening and Update is reported as no longer existing', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+    rowsLater: { [RUTH]: { missing: true } },
+  });
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+  await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists: Ruth Sample.');
+  await expect(page.locator(MARK)).toHaveCount(0);
+  expect(await firstNames(page)).toEqual(['', 'Ruth', 'Sam']);
+});
+
+test('the mark stays over the person\'s shape when the shape is redrawn', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  const ruth = await personNamed(page, 'Ruth');
+  // As a gender or proband change does.
+  await page.evaluate((id) => window.editor.getView().getNode(id).getGraphics().setGenderGraphics(), ruth);
+  const markAboveShape = await page.evaluate((id) => {
+    const graphics = window.editor.getView().getNode(id).getGraphics();
+    const shape = graphics.getGenderShape().node;
+    const mark = document.querySelector('.linked-record-changed-mark');
+    return !!(shape.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }, ruth);
+  expect(markAboveShape).toBe(true);
+});

@@ -1,4 +1,4 @@
-import { classifyLinkedRows, snapshotKey } from 'pedigree/recordLinkProvider/staleLinkedRows';
+import { classifyLinkedRows, snapshotKey, stateKey } from 'pedigree/recordLinkProvider/staleLinkedRows';
 import type { LinkedPerson } from 'pedigree/recordLinkProvider/staleLinkedRows';
 import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 
@@ -16,42 +16,33 @@ export default class LinkedRowsCheck {
   _editor: any;
   _ran: boolean;
   _rows: { [ref: string]: LinkedRow };
-  _changed: LinkedPerson<any>[];
+  // People whose records answered: marked while refreshing them would change what they show.
+  _answered: LinkedPerson<any>[];
   _missing: LinkedPerson<any>[];
   _otherRecord: LinkedPerson<any>[];
   _notice: HTMLElement | null;
   _noticeContent: string;
   _markedNodes: any[];
   _updating: boolean;
-  // node -> whether refreshing them would change them, for the state and row it was worked out
-  // with. Dropped for a node whose properties change, and entirely on undo/redo/remove/load.
-  _wouldChangeCache: WeakMap<any, { state: string, row: any, changed: boolean }>;
 
   constructor(editor: any) {
     this._editor = editor;
     this._ran = false;
     this._rows = {};
-    this._changed = [];
+    this._answered = [];
     this._missing = [];
     this._otherRecord = [];
     this._notice = null;
     this._noticeContent = '';
     this._markedNodes = [];
     this._updating = false;
-    this._wouldChangeCache = new WeakMap();
-    var _this = this;
-    // Registered after the Controller's own listeners, so these run once the change is applied.
-    document.addEventListener('pedigree:node:setproperty', function(event: any) {
-      var view = _this._editor.getView && _this._editor.getView();
-      var node = view && event.detail && view.getNode(event.detail.nodeID);
-      node && _this._wouldChangeCache.delete(node);
-      _this.refreshMarks();
-    });
-    ['pedigree:node:remove', 'pedigree:undo', 'pedigree:redo', 'pedigree:graph:clear', 'pedigree:load:finish'].forEach(function(eventName) {
-      document.addEventListener(eventName, function() {
-        _this._wouldChangeCache = new WeakMap();
-        _this.refreshMarks();
-      });
+    var refresh = this.refreshMarks.bind(this);
+    // Anything that can change, re-link, remove or rebuild a person. Registered after the
+    // Controller's own listeners, so these run once the change is applied. Each refresh works out
+    // afresh who has changed: one property change can change other people too (e.g. twins).
+    ['pedigree:node:setproperty', 'pedigree:node:remove', 'pedigree:undo', 'pedigree:redo',
+      'pedigree:graph:clear', 'pedigree:load:finish'].forEach(function(eventName) {
+      document.addEventListener(eventName, refresh);
     });
   }
 
@@ -78,11 +69,9 @@ export default class LinkedRowsCheck {
       .then(function(rows: any) {
         var result = classifyLinkedRows(people, rows, function(node: any) {
           return _this._isInView(node) ? _this._stateOf(node) : null;
-        }, function(node: any, answers: any) {
-          return _this._editor._linkedRecordRefreshChanges(node, answers, false).valuesChanged;
         });
         _this._rows = rows || {};
-        _this._changed = result.changed;
+        _this._answered = result.answered;
         _this._missing = result.missing;
         _this._otherRecord = result.otherRecord;
         _this.refreshMarks();
@@ -121,8 +110,14 @@ export default class LinkedRowsCheck {
             return;
           }
           var row = rows && rows[entry.ref];
+          var person = { key: entry.node, ref: entry.ref, snapshot: _this._stateOf(entry.node).snapshot };
           if (row && Array.isArray(row.answers)) {
             _this._editor._dispatchLinkedRecordRefresh(entry.node.getID(), row.answers, entry.ref);
+          } else if (row && row.otherRecord) {
+            _this._otherRecord.push(person);
+          } else if (row && row.missing) {
+            // Deleted since the pedigree was opened.
+            _this._missing.push(person);
           }
         });
       })
@@ -131,13 +126,12 @@ export default class LinkedRowsCheck {
       })
       .then(function() {
         _this._updating = false;
-        _this._wouldChangeCache = new WeakMap();
         _this.refreshMarks();
       });
   }
 
   dismiss(): void {
-    this._changed = [];
+    this._answered = [];
     this._missing = [];
     this._otherRecord = [];
     this.refreshMarks();
@@ -148,7 +142,7 @@ export default class LinkedRowsCheck {
     if (this._updating) {
       return;
     }
-    var nothingFound = this._changed.length === 0 && this._missing.length === 0 && this._otherRecord.length === 0;
+    var nothingFound = this._answered.length === 0 && this._missing.length === 0 && this._otherRecord.length === 0;
     if (nothingFound && this._markedNodes.length === 0 && !this._notice) {
       return;
     }
@@ -165,17 +159,17 @@ export default class LinkedRowsCheck {
   }
 
   /**
-   * The people on the diagram now that match what the check found, each person once. A changed
-   * person is only counted while refreshing them would still change them (e.g. not once the
-   * diagram has been edited to match their record).
+   * The people on the diagram now that match what the check found, each person once. A person
+   * whose record answered counts as changed while refreshing them from it would change what they
+   * show - so not once the diagram has been edited to match it, and again if it's edited away.
    */
   _current(): { changed: any[], missing: any[], otherRecord: any[] } {
     var _this = this;
     var found: { [state: string]: string } = {};
     var add = function(kind: string) {
-      return function(person: LinkedPerson<any>) { found[person.ref + '\n' + person.snapshot] = kind; };
+      return function(person: LinkedPerson<any>) { found[stateKey(person.ref, person.snapshot)] = kind; };
     };
-    this._changed.forEach(add('changed'));
+    this._answered.forEach(add('changed'));
     this._missing.forEach(add('missing'));
     this._otherRecord.forEach(add('otherRecord'));
     var result: any = { changed: [], missing: [], otherRecord: [] };
@@ -195,16 +189,9 @@ export default class LinkedRowsCheck {
   }
 
   _wouldChange(node: any): boolean {
-    var state = this._stateKey(node);
     var row = this._rows[node.getLinkedRecordRef()];
-    var cached = this._wouldChangeCache.get(node);
-    if (cached && cached.state === state && cached.row === row) {
-      return cached.changed;
-    }
-    var changed = !!row && Array.isArray(row.answers)
+    return !!row && Array.isArray(row.answers)
       && this._editor._linkedRecordRefreshChanges(node, row.answers, false).valuesChanged;
-    this._wouldChangeCache.set(node, { state: state, row: row, changed: changed });
-    return changed;
   }
 
   // The provider, if it can fetch linked records in batches and is configured.
@@ -240,7 +227,7 @@ export default class LinkedRowsCheck {
 
   _stateKey(node: any): string {
     var state = this._stateOf(node);
-    return state.ref + '\n' + state.snapshot;
+    return stateKey(state.ref, state.snapshot);
   }
 
   _isInView(node: any): boolean {

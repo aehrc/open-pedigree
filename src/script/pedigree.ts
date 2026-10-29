@@ -171,7 +171,10 @@ export default class PedigreeEditor {
       document.removeEventListener('pedigree:load:finish', onFirstLoad);
       Promise.resolve()
         .then(function() { return _this._questionnaireSettled; })
-        .then(function() { return _this._linkedRowsCheck.run(); });
+        .then(function() { return _this._linkedRowsCheck.run(); })
+        .catch(function(err: any) {
+          console.warn('Checking linked records for changes failed - the pedigree is shown as saved', err);
+        });
     };
     document.addEventListener('pedigree:load:finish', onFirstLoad);
 
