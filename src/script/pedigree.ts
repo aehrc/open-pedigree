@@ -540,8 +540,11 @@ export default class PedigreeEditor {
         if (item.range) {
           descriptor.range = item.range;
         }
-        if (item.nullValue) {
-          descriptor.nullValue = item.nullValue;
+        // An answer-option choice can be left unanswered, so it gets a '-' choice to show that
+        // (not its first option, as if that were the answer). A mapped item keeps its property's
+        // own default (e.g. heredity's "None"), and `nullValue` asks for '-' on any other select.
+        if (item.nullValue || (item.fieldType === 'select' && item.answerOption && !item.repeats && !mapped)) {
+          descriptor.nullValue = true;
         }
         if (item.columns) {
           descriptor.columns = item.columns;

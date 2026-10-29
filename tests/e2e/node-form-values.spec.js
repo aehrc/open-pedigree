@@ -14,9 +14,9 @@ const QUESTIONNAIRE = {
     {
       linkId: 'custom_tab', type: 'group', text: 'Custom',
       item: [
-        // a choice that may be left unanswered (as REDCap's are) has a '-' choice for that
+        // an answer-option choice may be left unanswered, so has a '-' choice for that, whether or
+        // not it says nullValue
         { linkId: 'colour', type: 'choice', text: 'Colour', nullValue: true, answerOption: [option('red', 'Red'), option('green', 'Green')] },
-        // without one, no answer shows the first option, as a new form does
         { linkId: 'size', type: 'choice', text: 'Size', answerOption: [option('small', 'Small'), option('large', 'Large')] },
         {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
@@ -78,7 +78,7 @@ test('a person with no answers shows none, not the previous person\'s', async ({
 
   expect(await shown(page, first)).toEqual({ colour: 'red', size: 'large', shade: ['dark'], features: ['A'], notes: 'first person' });
   await page.evaluate(() => window.editor.getNodeMenu().hide());
-  expect(await shown(page, second)).toEqual({ colour: '', size: 'small', shade: [], features: [], notes: '' });
+  expect(await shown(page, second)).toEqual({ colour: '', size: '', shade: [], features: [], notes: '' });
 });
 
 test('a repeating choice shows every ticked option', async ({ page }) => {
@@ -175,4 +175,14 @@ test('a coded answer (e.g. from a linked record) shows as its code', async ({ pa
   const result = await shown(page, first);
   expect(result.colour).toBe('green');
   expect(result.features).toEqual(['1', '-1']);
+});
+
+test('a mapped drop-down with no value shows its property\'s default, e.g. heredity\'s "None"', async ({ page }) => {
+  const [first] = await loadFamily(page, null);
+  const heredity = await page.evaluate((id) => {
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
+    const select = document.querySelector('.menu-box select[name="childlessSelect"]');
+    return { value: select.value, options: [...select.options].map((o) => o.value) };
+  }, first);
+  expect(heredity).toEqual({ value: 'none', options: ['none', 'childless', 'infertile'] });
 });
