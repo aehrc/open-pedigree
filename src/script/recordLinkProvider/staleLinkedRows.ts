@@ -3,8 +3,15 @@ import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkPr
 /**
  * The check on opening a pedigree (pedigree-editor-stale-linked-rows): which linked people's
  * records have changed since the pedigree last took them in. Pure - the editor supplies the
- * people, the provider's answer and the refresh comparison (pedigree.ts's
- * _linkedRecordRefreshChanges); see linkedRowsCheck.ts for the marks and notice.
+ * people, the provider's answer and the refresh comparison; see linkedRowsCheck.ts for the marks
+ * and notice.
+ *
+ * A person's record has changed (design D1) when refreshing them from it - what Update and
+ * closing Edit in REDCap do - would change what they show. The refresh only applies what the
+ * record changed since the pedigree last took it in (the person's snapshot), so a value changed
+ * in the diagram isn't a change to the record; with nothing taken in yet (an empty snapshot), it's
+ * whatever differs from what the person shows. Fields the Questionnaire in effect doesn't have
+ * are left out, as the refresh leaves them out.
  */
 
 // A linked person as the check sees them: the ref and the snapshot they had when the rows were
@@ -30,35 +37,19 @@ export function snapshotKey(snapshot: any): string {
   return JSON.stringify(sorted);
 }
 
-var EMPTY_SNAPSHOT = snapshotKey({});
-
-/**
- * Whether a person's record has changed (design D1): the record differs from what the pedigree
- * last took in from it (the snapshot) - or, with nothing taken in yet (an empty snapshot: linked
- * before snapshots were kept, or to a record with nothing to bring in), from what the person
- * shows. A value changed in the diagram is not a change to the record.
- *
- * `valuesChanged` must mean "would change what the person shows" (linkedRowsCheck's
- * _changesFor), not the refresh's own valuesChanged, which is true for any value missing from the
- * snapshot - so for every non-empty record when the snapshot is empty.
- */
-export function isRowChanged(changes: { valuesChanged: boolean, snapshotChanged: boolean }, snapshot: string): boolean {
-  return snapshot === EMPTY_SNAPSHOT ? changes.valuesChanged : changes.snapshotChanged;
-}
-
 /**
  * Sorts the people asked about by the provider's answer. Left out: anyone whose ref or snapshot
  * has changed since they were asked about (re-linked, or refreshed by Edit in REDCap, before the
  * answer came - `current` says what they have now, or null if they're gone), anyone the answer
  * says nothing usable about, and anyone unchanged.
  *
- * @param changesFor The refresh comparison for a person and their record's answers.
+ * @param wouldChange Whether refreshing the person from these answers would change what they show.
  */
 export function classifyLinkedRows<K>(
   people: LinkedPerson<K>[],
   rows: { [ref: string]: LinkedRow } | null | undefined,
   current: (key: K) => { ref: string, snapshot: string } | null,
-  changesFor: (key: K, answers: {linkId: string, value: any}[]) => { valuesChanged: boolean, snapshotChanged: boolean }
+  wouldChange: (key: K, answers: {linkId: string, value: any}[]) => boolean
 ): LinkedRowsResult<K> {
   var result: LinkedRowsResult<K> = { changed: [], missing: [], otherRecord: [] };
   if (!rows || typeof rows !== 'object') {
@@ -77,7 +68,7 @@ export function classifyLinkedRows<K>(
       result.otherRecord.push(person);
     } else if (row.missing) {
       result.missing.push(person);
-    } else if (Array.isArray(row.answers) && isRowChanged(changesFor(person.key, row.answers), person.snapshot)) {
+    } else if (Array.isArray(row.answers) && wouldChange(person.key, row.answers)) {
       result.changed.push(person);
     }
   });

@@ -22,7 +22,7 @@ const LINKED = {
  * `diagramEdits` made in the diagram), and opens it in a new editor whose provider answers
  * fetchLinkedRows with `rows` (a value, 'reject', or omitted for a provider without the method).
  */
-async function openSavedPedigree(page, { rows, diagramEdits, extraLinks, configured = true } = {}) {
+async function openSavedPedigree(page, { rows, rowsLater, diagramEdits, extraLinks, configured = true } = {}) {
   page.on('dialog', (dialog) => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
@@ -49,7 +49,7 @@ async function openSavedPedigree(page, { rows, diagramEdits, extraLinks, configu
   }, { linked: LINKED, edits: diagramEdits || [], extra: extraLinks || [] });
 
   await retireAutoCreatedEditor(page);
-  await page.evaluate(({ json, rowsAnswer, hasMethod, isConfigured }) => {
+  await page.evaluate(({ json, rowsAnswer, laterAnswer, hasMethod, isConfigured }) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     // The page's own editor opened with nothing to load, so its template chooser is still up.
     document.querySelectorAll('.msdialog-modal-container').forEach((el) => el.remove());
@@ -65,7 +65,9 @@ async function openSavedPedigree(page, { rows, diagramEdits, extraLinks, configu
     if (hasMethod) {
       provider.fetchLinkedRows = (refs) => {
         window.__fetchCalls.push(refs);
-        return rowsAnswer === 'reject' ? Promise.reject(new Error('network down')) : Promise.resolve(rowsAnswer);
+        // The first call is the check on opening; later ones (Update) get `rowsLater` if given.
+        const answer = window.__fetchCalls.length > 1 && laterAnswer ? laterAnswer : rowsAnswer;
+        return answer === 'reject' ? Promise.reject(new Error('network down')) : Promise.resolve(answer);
       };
     }
     window.editor = window.OpenPedigree.initialiseEditor({
@@ -75,7 +77,7 @@ async function openSavedPedigree(page, { rows, diagramEdits, extraLinks, configu
         save: () => {},
       },
     });
-  }, { json: saved, rowsAnswer: rows === undefined ? null : rows, hasMethod: rows !== undefined, isConfigured: configured });
+  }, { json: saved, rowsAnswer: rows === undefined ? null : rows, laterAnswer: rowsLater || null, hasMethod: rows !== undefined, isConfigured: configured });
   await page.waitForTimeout(300);
 }
 
@@ -262,4 +264,62 @@ test('a person with nothing taken in yet, already showing the record\'s values, 
   });
   await expect(page.locator(NOTICE)).toHaveCount(0);
   await expect(page.locator(MARK)).toHaveCount(0);
+});
+
+test('Update fetches the records again and applies what they hold now', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+    rowsLater: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruth Ann' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fetchCalls)).toEqual([[RUTH, SAM], [RUTH]]);
+  expect(await firstNames(page)).toEqual(['', 'Ruth Ann', 'Sam']);
+});
+
+test('undoing Update puts the marks and the Update offer back', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+  await expect(page.locator(MARK)).toHaveCount(0);
+
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  await expect(page.locator(MARK)).toHaveCount(1);
+  await expect(page.locator(`${NOTICE} button`, { hasText: 'Update' })).toHaveCount(1);
+});
+
+test('a field the Questionnaire in effect no longer has is not counted as a change', async ({ page }) => {
+  // Ruth's snapshot still holds an item since removed from the Questionnaire; her record's value
+  // for it has changed, but the refresh leaves such fields out, so nothing she shows would change.
+  await openSavedPedigree(page, {
+    diagramEdits: [{ person: 1, properties: { setLinkedRecordSnapshot: { first_name: 'Ruth', last_name: 'Sample', removed_item: 'old' } } }],
+    rows: {
+      [RUTH]: { answers: [...LINKED[RUTH], { linkId: 'removed_item', value: 'new' }] },
+      [SAM]: { answers: LINKED[SAM] },
+    },
+  });
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+  await expect(page.locator(MARK)).toHaveCount(0);
+});
+
+test('pointing at the mark keeps the person\'s hover box working and shows the mark\'s tooltip', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } },
+  });
+  const box = await page.locator(MARK).boundingBox();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(5, 300);
+  await page.mouse.move(x, y, { steps: 10 });
+  await page.waitForTimeout(500);
+
+  const under = await page.evaluate(({ px, py }) => {
+    const el = document.elementFromPoint(px, py);
+    const title = el && el.querySelector('title');
+    return title ? title.textContent : null;
+  }, { px: x, py: y });
+  expect(under).toBe('This person\'s linked record has changed since this pedigree was saved');
+  const ruth = await personNamed(page, 'Ruth');
+  expect(await page.evaluate((id) => !window.editor.getView().getNode(id).getGraphics().getHoverBox()._hidden, ruth)).toBe(true);
 });

@@ -135,6 +135,10 @@ export default class PersonHoverbox extends AbstractHoverbox {
       genderShapedButton.attr(PedigreeEditorParameters.attributes.nodeShapeMenuOff);
     });
     genderShapedButton.attr('cursor', 'pointer');
+    // Over the node, so it carries the changed-linked-record mark's tooltip (see PersonVisuals).
+    var graphics = this.getNode().getGraphics();
+    var tooltip = graphics.getLinkedRecordChangedTooltip && graphics.getLinkedRecordChangedTooltip();
+    tooltip && genderShapedButton.attr('title', tooltip);
     this._currentButtons.push(genderShapedButton);
     this.disable();
     this.getFrontElements().push(genderShapedButton);

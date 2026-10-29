@@ -1,4 +1,4 @@
-import { classifyLinkedRows, isRowChanged, snapshotKey } from 'pedigree/recordLinkProvider/staleLinkedRows';
+import { classifyLinkedRows, snapshotKey } from 'pedigree/recordLinkProvider/staleLinkedRows';
 import type { LinkedPerson } from 'pedigree/recordLinkProvider/staleLinkedRows';
 import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 
@@ -7,9 +7,10 @@ import type { LinkedRow } from 'pedigree/recordLinkProvider/AbstractRecordLinkPr
  * provider for every linked person's record at once, marks the people whose records have changed
  * since the pedigree last took them in, and shows a notice offering to update them.
  *
- * Changed people are held by their ref and snapshot, not their node: node IDs shift as nodes are
- * removed, and a person re-linked or refreshed by Edit in REDCap no longer has the state that was
- * compared, so their mark goes (refreshMarks) and Update leaves them alone.
+ * What the check found is held by each person's ref and snapshot, not their node: node IDs shift
+ * as nodes are removed. The marks follow the people on the diagram - each refresh matches what was
+ * found against each person's current ref and snapshot, so a re-link, refresh or Update removes a
+ * person's mark, and an undo that puts them back puts it back.
  */
 export default class LinkedRowsCheck {
   _editor: any;
@@ -21,6 +22,10 @@ export default class LinkedRowsCheck {
   _notice: HTMLElement | null;
   _noticeContent: string;
   _markedNodes: any[];
+  _updating: boolean;
+  // node -> whether refreshing them would change them, for the state and row it was worked out
+  // with. Dropped for a node whose properties change, and entirely on undo/redo/remove/load.
+  _wouldChangeCache: WeakMap<any, { state: string, row: any, changed: boolean }>;
 
   constructor(editor: any) {
     this._editor = editor;
@@ -32,12 +37,21 @@ export default class LinkedRowsCheck {
     this._notice = null;
     this._noticeContent = '';
     this._markedNodes = [];
-    var refresh = this.refreshMarks.bind(this);
-    // Anything that can re-link, refresh, remove or rebuild a person. Registered after the
-    // Controller's own listeners, so these run once the change is applied.
-    ['pedigree:node:setproperty', 'pedigree:node:remove', 'pedigree:undo', 'pedigree:redo',
-      'pedigree:graph:clear', 'pedigree:load:finish'].forEach(function(eventName) {
-      document.addEventListener(eventName, refresh);
+    this._updating = false;
+    this._wouldChangeCache = new WeakMap();
+    var _this = this;
+    // Registered after the Controller's own listeners, so these run once the change is applied.
+    document.addEventListener('pedigree:node:setproperty', function(event: any) {
+      var view = _this._editor.getView && _this._editor.getView();
+      var node = view && event.detail && view.getNode(event.detail.nodeID);
+      node && _this._wouldChangeCache.delete(node);
+      _this.refreshMarks();
+    });
+    ['pedigree:node:remove', 'pedigree:undo', 'pedigree:redo', 'pedigree:graph:clear', 'pedigree:load:finish'].forEach(function(eventName) {
+      document.addEventListener(eventName, function() {
+        _this._wouldChangeCache = new WeakMap();
+        _this.refreshMarks();
+      });
     });
   }
 
@@ -50,30 +64,24 @@ export default class LinkedRowsCheck {
       return Promise.resolve();
     }
     this._ran = true;
-    var provider = this._editor.getRecordLinkProvider();
-    if (!provider || typeof provider.fetchLinkedRows !== 'function' || !provider.isConfigured()
-        || this._editor.isReadOnlyMode()) {
+    var provider = this._provider();
+    if (!provider || this._editor.isReadOnlyMode()) {
       return Promise.resolve();
     }
-    var people = this._linkedPeople().map(function(entry: any) {
-      return { key: entry.node, ref: entry.ref, snapshot: entry.snapshot };
-    });
+    var people = this._linkedPeople();
     if (people.length === 0) {
       return Promise.resolve();
     }
-    var refs = people.map(function(p: any) { return p.ref; }).filter(function(ref: string, i: number, all: string[]) {
-      return all.indexOf(ref) === i;
-    });
     var _this = this;
     return Promise.resolve()
-      .then(function() { return provider.fetchLinkedRows(refs); })
+      .then(function() { return provider.fetchLinkedRows(uniqueRefs(people)); })
       .then(function(rows: any) {
         var result = classifyLinkedRows(people, rows, function(node: any) {
           return _this._isInView(node) ? _this._stateOf(node) : null;
         }, function(node: any, answers: any) {
-          return _this._changesFor(node, answers);
+          return _this._editor._linkedRecordRefreshChanges(node, answers, false).valuesChanged;
         });
-        _this._rows = rows;
+        _this._rows = rows || {};
         _this._changed = result.changed;
         _this._missing = result.missing;
         _this._otherRecord = result.otherRecord;
@@ -85,21 +93,47 @@ export default class LinkedRowsCheck {
   }
 
   /**
-   * Brings each marked person's record in, as closing Edit in REDCap does (one undo step each).
-   * The marks and the count go; the lines about missing and other-record links stay until
-   * dismissed, as nothing was done about them. The pedigree is then unsaved, as after any edit.
+   * Brings each marked person's record in, as closing Edit in REDCap does (one undo step each),
+   * fetching the records again first so what's applied is current. The marks and the count go;
+   * the lines about missing and other-record links stay until dismissed, as nothing was done about
+   * them. The pedigree is then unsaved, as after any edit.
    */
-  update(): void {
-    var _this = this;
+  update(): Promise<void> {
+    var provider = this._provider();
     var marked = this._current().changed;
-    this._changed = [];
-    marked.forEach(function(entry: any) {
-      var row = _this._rows[entry.person.ref];
-      if (row && Array.isArray(row.answers)) {
-        _this._editor._dispatchLinkedRecordRefresh(entry.node.getID(), row.answers, entry.person.ref);
-      }
+    if (this._updating || !provider || marked.length === 0) {
+      return Promise.resolve();
+    }
+    // Also holds back refreshMarks until every person is updated: one refresh at the end.
+    this._updating = true;
+    this._renderNotice({ changed: marked, missing: [], otherRecord: [] });
+    var _this = this;
+    var asked = marked.map(function(node: any) {
+      return { node: node, ref: node.getLinkedRecordRef(), state: _this._stateKey(node) };
     });
-    this.refreshMarks();
+    return Promise.resolve()
+      .then(function() { return provider.fetchLinkedRows(uniqueRefs(asked)); })
+      .then(function(rows: any) {
+        Object.keys(rows || {}).forEach(function(ref) { _this._rows[ref] = rows[ref]; });
+        asked.forEach(function(entry: any) {
+          // Re-linked, refreshed or removed while the records were being fetched: leave them.
+          if (!_this._isInView(entry.node) || _this._stateKey(entry.node) !== entry.state) {
+            return;
+          }
+          var row = rows && rows[entry.ref];
+          if (row && Array.isArray(row.answers)) {
+            _this._editor._dispatchLinkedRecordRefresh(entry.node.getID(), row.answers, entry.ref);
+          }
+        });
+      })
+      .catch(function(err: any) {
+        console.warn('Fetching linked records to update them failed - nothing was changed', err);
+      })
+      .then(function() {
+        _this._updating = false;
+        _this._wouldChangeCache = new WeakMap();
+        _this.refreshMarks();
+      });
   }
 
   dismiss(): void {
@@ -109,19 +143,17 @@ export default class LinkedRowsCheck {
     this.refreshMarks();
   }
 
-  /**
-   * Re-applies the marks and notice to the people as they are now. What the check found is kept,
-   * and matched against each person's current ref and snapshot: someone re-linked or refreshed
-   * since no longer matches (and an undo that puts them back matches again), and someone removed
-   * isn't there to match.
-   */
+  /** Re-applies the marks and notice to the people as they are now. */
   refreshMarks(): void {
+    if (this._updating) {
+      return;
+    }
     var nothingFound = this._changed.length === 0 && this._missing.length === 0 && this._otherRecord.length === 0;
     if (nothingFound && this._markedNodes.length === 0 && !this._notice) {
       return;
     }
     var current = this._current();
-    var marked = current.changed.map(function(entry: any) { return entry.node; });
+    var marked = current.changed;
     this._markedNodes.concat(marked).forEach(function(node: any) {
       var graphics = node.getGraphics && node.getGraphics();
       if (graphics && typeof graphics.setLinkedRecordChangedMark === 'function') {
@@ -133,20 +165,20 @@ export default class LinkedRowsCheck {
   }
 
   /**
-   * The people on the diagram now that match what the check found, each person once. A person
-   * with nothing taken in from their record (an empty snapshot) is compared with what they show,
-   * so they're only counted while that still differs from the record.
+   * The people on the diagram now that match what the check found, each person once. A changed
+   * person is only counted while refreshing them would still change them (e.g. not once the
+   * diagram has been edited to match their record).
    */
-  _current(): { changed: { node: any, person: LinkedPerson<any> }[], missing: any[], otherRecord: any[] } {
+  _current(): { changed: any[], missing: any[], otherRecord: any[] } {
     var _this = this;
-    var found: { [key: string]: { kind: string, person: LinkedPerson<any> } } = {};
+    var found: { [state: string]: string } = {};
     var add = function(kind: string) {
-      return function(person: LinkedPerson<any>) { found[person.ref + '\n' + person.snapshot] = { kind: kind, person: person }; };
+      return function(person: LinkedPerson<any>) { found[person.ref + '\n' + person.snapshot] = kind; };
     };
     this._changed.forEach(add('changed'));
     this._missing.forEach(add('missing'));
     this._otherRecord.forEach(add('otherRecord'));
-    var result = { changed: [] as any[], missing: [] as any[], otherRecord: [] as any[] };
+    var result: any = { changed: [], missing: [], otherRecord: [] };
     if (Object.keys(found).length === 0) {
       return result;
     }
@@ -154,31 +186,31 @@ export default class LinkedRowsCheck {
       if (!node.getLinkedRecordRef()) {
         return;
       }
-      var state = _this._stateOf(node);
-      var match = found[state.ref + '\n' + state.snapshot];
-      if (!match) {
-        return;
-      }
-      if (match.kind === 'changed') {
-        var row = _this._rows[state.ref];
-        if (row && Array.isArray(row.answers) && isRowChanged(_this._changesFor(node, row.answers), state.snapshot)) {
-          result.changed.push({ node: node, person: match.person });
-        }
-      } else {
-        (result as any)[match.kind].push(node);
+      var kind = found[_this._stateKey(node)];
+      if (kind && (kind !== 'changed' || _this._wouldChange(node))) {
+        result[kind].push(node);
       }
     });
     return result;
   }
 
-  // The refresh comparison for a person (see isRowChanged): whether the record would change what
-  // they show, and whether it differs from their snapshot (regardless of key order).
-  _changesFor(node: any, answers: any): { valuesChanged: boolean, snapshotChanged: boolean } {
-    var changes = this._editor._linkedRecordRefreshChanges(node, answers, false);
-    return {
-      valuesChanged: this._editor._linkedRecordValuesDiffer(node, changes.properties),
-      snapshotChanged: snapshotKey(changes.snapshot) !== this._stateOf(node).snapshot
-    };
+  _wouldChange(node: any): boolean {
+    var state = this._stateKey(node);
+    var row = this._rows[node.getLinkedRecordRef()];
+    var cached = this._wouldChangeCache.get(node);
+    if (cached && cached.state === state && cached.row === row) {
+      return cached.changed;
+    }
+    var changed = !!row && Array.isArray(row.answers)
+      && this._editor._linkedRecordRefreshChanges(node, row.answers, false).valuesChanged;
+    this._wouldChangeCache.set(node, { state: state, row: row, changed: changed });
+    return changed;
+  }
+
+  // The provider, if it can fetch linked records in batches and is configured.
+  _provider(): any {
+    var provider = this._editor.getRecordLinkProvider();
+    return provider && typeof provider.fetchLinkedRows === 'function' && provider.isConfigured() ? provider : null;
   }
 
   _persons(): any[] {
@@ -192,18 +224,23 @@ export default class LinkedRowsCheck {
     });
   }
 
-  _linkedPeople(): { node: any, ref: string, snapshot: string }[] {
+  _linkedPeople(): LinkedPerson<any>[] {
     var _this = this;
     return this._persons().filter(function(node: any) {
       return !!node.getLinkedRecordRef();
     }).map(function(node: any) {
       var state = _this._stateOf(node);
-      return { node: node, ref: state.ref, snapshot: state.snapshot };
+      return { key: node, ref: state.ref, snapshot: state.snapshot };
     });
   }
 
   _stateOf(node: any): { ref: string, snapshot: string } {
     return { ref: node.getLinkedRecordRef() || '', snapshot: snapshotKey(node.getLinkedRecordSnapshot()) };
+  }
+
+  _stateKey(node: any): string {
+    var state = this._stateOf(node);
+    return state.ref + '\n' + state.snapshot;
   }
 
   _isInView(node: any): boolean {
@@ -220,10 +257,10 @@ export default class LinkedRowsCheck {
         : changed + ' people\'s linked records have changed since this pedigree was saved.');
     }
     if (current.missing.length > 0) {
-      lines.push('Linked to a record that no longer exists: ' + this._namesOf(current.missing) + '.');
+      lines.push('Linked to a record that no longer exists: ' + namesOf(current.missing) + '.');
     }
     if (current.otherRecord.length > 0) {
-      lines.push('Linked to another record\'s rows, so not checked - link them again: ' + this._namesOf(current.otherRecord) + '.');
+      lines.push('Linked to another record\'s rows, so not checked - link them again: ' + namesOf(current.otherRecord) + '.');
     }
 
     if (lines.length === 0) {
@@ -232,8 +269,8 @@ export default class LinkedRowsCheck {
       this._noticeContent = '';
       return;
     }
-    // Rebuilt only when what it says changes, so a focused button keeps its focus.
-    var content = JSON.stringify(lines);
+    // Rebuilt only when what it shows changes, so a focused button keeps its focus.
+    var content = JSON.stringify([lines, this._updating]);
     if (this._notice && content === this._noticeContent) {
       return;
     }
@@ -256,26 +293,32 @@ export default class LinkedRowsCheck {
     var actions = document.createElement('div');
     actions.className = 'linked-records-notice-actions';
     if (changed > 0) {
-      actions.appendChild(this._button('Update', 'linked-records-notice-update', this.update.bind(this)));
+      var update = button(this._updating ? 'Updating...' : 'Update', 'linked-records-notice-update', this.update.bind(this));
+      update.disabled = this._updating;
+      actions.appendChild(update);
     }
-    actions.appendChild(this._button('Dismiss', 'linked-records-notice-dismiss', this.dismiss.bind(this)));
+    actions.appendChild(button('Dismiss', 'linked-records-notice-dismiss', this.dismiss.bind(this)));
     notice.appendChild(actions);
   }
+}
 
-  _button(label: string, className: string, onClick: () => void): HTMLButtonElement {
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = className;
-    button.textContent = label;
-    button.addEventListener('click', onClick);
-    return button;
-  }
+function uniqueRefs(people: { ref: string }[]): string[] {
+  return Array.from(new Set(people.map(function(person) { return person.ref; })));
+}
 
-  _namesOf(nodes: any[]): string {
-    return nodes.map(function(node: any) {
-      var name = [node.getFirstName && node.getFirstName(), node.getLastName && node.getLastName()]
-        .filter(function(part: any) { return !!part; }).join(' ');
-      return name || 'an unnamed person';
-    }).join(', ');
-  }
+function button(label: string, className: string, onClick: () => void): HTMLButtonElement {
+  var element = document.createElement('button');
+  element.type = 'button';
+  element.className = className;
+  element.textContent = label;
+  element.addEventListener('click', onClick);
+  return element;
+}
+
+function namesOf(nodes: any[]): string {
+  return nodes.map(function(node: any) {
+    var name = [node.getFirstName && node.getFirstName(), node.getLastName && node.getLastName()]
+      .filter(function(part: any) { return !!part; }).join(' ');
+    return name || 'an unnamed person';
+  }).join(', ');
 }
