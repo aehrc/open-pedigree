@@ -629,6 +629,8 @@ export default class NodeMenu {
       var result = this._generateEmptyField(data);
       var select = document.createElement('select');
       select.name = data.name;
+      // a repeating choice (e.g. a REDCap checkbox field) can have several values
+      select.multiple = !!data.repeats;
       var selectSpan = document.createElement('span');
       selectSpan.appendChild(select);
       result.inputsContainer.appendChild(selectSpan);
@@ -649,6 +651,9 @@ export default class NodeMenu {
         }
       }
       (select as any)._getValue = function(this: any) {
+        if ((this as any).multiple) {
+          return [Array.from((this as any).selectedOptions).map(function(o: any) { return o.value; })];
+        }
         return [((this as any).selectedIndex >= 0) && (this as any).options[(this as any).selectedIndex].value || ''];
       }.bind(select);
       this._attachFieldEventListeners(select, ['change']);
@@ -873,11 +878,12 @@ export default class NodeMenu {
   }
 
   _setFieldValue: any = {
+    // The form's controls are reused for every person, so each setter clears what the previous
+    // person's form left before showing this person's value (or none).
     'radio' : function(container: any, value: any): any {
-      var target = container.querySelector('input[type=radio][value="' + value + '"]');
-      if (target) {
-        target.checked = true;
-      }
+      container.querySelectorAll('input[type=radio]').forEach(function(radio: any) {
+        radio.checked = (value !== null && value !== undefined && String(radio.value) === String(value));
+      });
     },
     'checkbox' : function(container: any, value: any): any {
       var checkbox = container.querySelector('input[type=checkbox]');
@@ -888,13 +894,13 @@ export default class NodeMenu {
     'text' : function(container: any, value: any): any {
       var target = container.querySelector('input[type=text]');
       if (target) {
-        target.value = value;
+        target.value = (value === null || value === undefined) ? '' : value;
       }
     },
     'textarea' : function(container: any, value: any): any {
       var target = container.querySelector('textarea');
       if (target) {
-        target.value = value;
+        target.value = (value === null || value === undefined) ? '' : value;
       }
     },
     'date-picker' : function(container: any, value: any): any {
@@ -972,9 +978,19 @@ export default class NodeMenu {
       }
     },
     'select' : function(container: any, value: any): any {
-      var target = container.querySelector('select option[value="' + value + '"]');
-      if (target) {
-        target.selected = 'selected';
+      var select = container.querySelector('select');
+      if (!select) {
+        return;
+      }
+      var values = (Array.isArray(value) ? value : [value])
+        .filter(function(v: any) { return v !== null && v !== undefined && v !== ''; })
+        .map(String);
+      Array.from(select.options).forEach(function(option: any) {
+        // with no value, the empty ('-') option if there is one, else nothing
+        option.selected = values.length ? values.indexOf(option.value) >= 0 : option.value === '';
+      });
+      if (!values.length && !select.multiple && select.value !== '') {
+        select.selectedIndex = -1;
       }
     },
     'hidden' : function(container: any, value: any): any {
