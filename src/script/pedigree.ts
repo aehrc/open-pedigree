@@ -32,6 +32,7 @@ import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLink
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
@@ -76,6 +77,8 @@ export default class PedigreeEditor {
   _controller: any;
   _patientProvider: any;
   _recordLinkProvider: any;
+  _linkedRowsCheck: any;
+  _questionnaireSettled: Promise<void>;
   _questionnaireConfig: any;
   _questionnaireTerminologies: any;
   _questionnaireLegends: any;
@@ -158,10 +161,26 @@ export default class PedigreeEditor {
     this._versionUpdater = new VersionUpdater();
     this._saveLoadEngine = new SaveLoadEngine(backend);
 
+    // The check for linked records changed since the pedigree was saved
+    // (pedigree-editor-stale-linked-rows) runs once, after the first load - which the backend may
+    // finish before this constructor does, hence registering first and deferring the run - and
+    // after any questionnaireUrl fetch settles, so it compares with the Questionnaire in effect.
+    this._questionnaireSettled = Promise.resolve();
+    var _this = this;
+    var onFirstLoad = function() {
+      document.removeEventListener('pedigree:load:finish', onFirstLoad);
+      Promise.resolve()
+        .then(function() { return _this._questionnaireSettled; })
+        .then(function() { return _this._linkedRowsCheck.run(); });
+    };
+    document.addEventListener('pedigree:load:finish', onFirstLoad);
+
     this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
     this._closing = false;
 
     this._controller = new Controller();
+    // After the Controller, so its listeners see each change applied first.
+    this._linkedRowsCheck = new LinkedRowsCheck(this);
 
     var undoButton = document.getElementById('action-undo');
     undoButton && undoButton.addEventListener('click', function(event: any) {
@@ -244,7 +263,7 @@ export default class PedigreeEditor {
     }
 
     if (options.questionnaireUrl && !options.questionnaireLocal) {
-      this._loadQuestionnaireFromUrl(options.questionnaireUrl, options);
+      this._questionnaireSettled = this._loadQuestionnaireFromUrl(options.questionnaireUrl, options);
     }
   }
 
@@ -309,9 +328,9 @@ export default class PedigreeEditor {
    * resolved get their per-item setters retroactively re-synthesized. On failure, the editor
    * keeps rendering the built-in default Questionnaire it started with.
    */
-  _loadQuestionnaireFromUrl(url: any, options: any): void {
+  _loadQuestionnaireFromUrl(url: any, options: any): Promise<void> {
     var _this = this;
-    fetch(url)
+    return fetch(url)
       .then(function(response: any) {
         if (!response.ok) {
           throw new Error('Unexpected response status ' + response.status);

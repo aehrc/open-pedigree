@@ -1,6 +1,11 @@
 // The node menu's record-link actions (the Linked Record tab's buttons).
 export type RecordLinkAction = 'linkRecord' | 'createNewRecord' | 'editRecord';
 
+// One linked record's current state, as fetchLinkedRows answers it: its answers (as openEditor's
+// onDone would pass them), or why there are none - the record no longer exists (`missing`), or
+// the ref names a record this host won't read from here (`otherRecord`).
+export type LinkedRow = { answers?: {linkId: string, value: any}[], missing?: boolean, otherRecord?: boolean };
+
 // All nodeId-taking methods deliberately stay nodeId-only (no separate recordRef parameter),
 // including openEditor - a node's linked recordRef (set via openPicker's onLinked, or by
 // createNew's caller) is retrievable by any method's implementation via
@@ -33,4 +38,11 @@ export default abstract class AbstractRecordLinkProvider {
     getActionLabel(_action: RecordLinkAction): string | undefined {
         return undefined;
     }
+
+    // Optional, absent by default: several linked records' current state at once, keyed by ref.
+    // When present (and isConfigured()), the editor calls it once after opening a pedigree with
+    // linked people, to tell the user whose records have changed since the pedigree last took
+    // them in (see staleLinkedRows.ts). A ref left out of the answer is unknown, and not reported.
+    // Without it, nothing is checked. Duck-typed like getActionLabel.
+    fetchLinkedRows?(refs: string[]): Promise<{ [ref: string]: LinkedRow }>;
 }

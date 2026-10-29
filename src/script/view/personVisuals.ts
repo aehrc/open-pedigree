@@ -32,6 +32,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   _isSelected: any;
   _carrierGraphic: any;
   _evalLabel: any;
+  _linkedRecordChangedMark: any;
 
   constructor(node: any, x: any, y: any) {
     //var timer = new Timer();
@@ -50,6 +51,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this._isSelected = false;
     this._carrierGraphic = null;
     this._evalLabel = null;
+    this._linkedRecordChangedMark = null;
     //console.log("person visuals end");
     //timer.printSinceLast("Person visuals time");
   }
@@ -518,6 +520,40 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   }
 
   /**
+   * Shows or removes the mark saying this person's linked record has changed since the pedigree
+   * last took it in (see recordLinkProvider/linkedRowsCheck.ts): a small badge at the top right of
+   * the node, with a tooltip.
+   *
+   * @method setLinkedRecordChangedMark
+   */
+  setLinkedRecordChangedMark(show: boolean): void {
+    if (!!this._linkedRecordChangedMark === show) {
+      return;
+    }
+    this._linkedRecordChangedMark && this._linkedRecordChangedMark.remove();
+    this._linkedRecordChangedMark = null;
+    if (!show) {
+      return;
+    }
+    var radius = this._radius;
+    var x = this.getX() + radius * 0.85;
+    var y = this.getY() - radius * 0.85;
+    var tooltip = 'This person\'s linked record has changed since this pedigree was saved';
+    var paper = editor.getPaper();
+    var badge = paper.circle(x, y, 9).attr({ fill: '#E69500', stroke: '#FFFFFF', 'stroke-width': 2 });
+    var text = paper.text(x, y, '!').attr({ fill: '#FFFFFF', 'font-size': 13, 'font-weight': 'bold' });
+    this._linkedRecordChangedMark = paper.set(badge, text).attr({ title: tooltip });
+    badge.node.setAttribute('class', 'linked-record-changed-mark');
+    if (!editor.isReadOnlyMode() && this.getHoverBox()) {
+      this._linkedRecordChangedMark.insertBefore(this.getHoverBox().getFrontElements());
+    }
+  }
+
+  getLinkedRecordChangedMark(): any {
+    return this._linkedRecordChangedMark;
+  }
+
+  /**
    * Returns this Person's disorder carrier graphics
    *
    * @method getCarrierGraphics
@@ -726,7 +762,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   getAllGraphics(): any {
     //console.log("Node " + this.getNode().getID() + " getAllGraphics");
-    return super.getAllGraphics().push(this.getHoverBox().getBackElements(), this.getLabels(), this.getCarrierGraphics(), this.getEvaluationGraphics(), this.getHoverBox().getFrontElements());
+    return super.getAllGraphics().push(this.getHoverBox().getBackElements(), this.getLabels(), this.getCarrierGraphics(), this.getEvaluationGraphics(), this.getLinkedRecordChangedMark(), this.getHoverBox().getFrontElements());
   }
 
   /**
