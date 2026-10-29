@@ -527,8 +527,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
 
   /**
    * Shows or removes the mark saying this person's linked record has changed since the pedigree
-   * last took it in (see recordLinkProvider/linkedRowsCheck.ts): a small badge at the top right of
-   * the node. The tooltip is on the node's hover area, which lies over the badge - the badge on
+   * last took it in (see recordLinkProvider/linkedRowsCheck.ts): a small badge at the top right
+   * corner of the node's shape. The tooltip is on the node's hover area, which lies over the badge - the badge on
    * top would take the pointer from the hover box.
    *
    * @method setLinkedRecordChangedMark
@@ -544,9 +544,12 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     if (!show) {
       return;
     }
-    var radius = this._radius;
-    var x = this.getX() + radius * 0.85;
-    var y = this.getY() - radius * 0.85;
+    // Near the top right corner of the shape as drawn (a circle, square, diamond or triangle, maybe
+    // scaled for a proband): on a circle's edge, just inside a square's corner - clear of what's
+    // drawn in the middle (carrier, unborn...).
+    var box = this.getGenderShape().getBBox();
+    var x = box.x2 - box.width * 0.15;
+    var y = box.y + box.height * 0.15;
     var paper = editor.getPaper();
     var badge = paper.circle(x, y, 9).attr({ fill: '#E69500', stroke: '#FFFFFF', 'stroke-width': 2 });
     var text = paper.text(x, y, '!').attr({ fill: '#FFFFFF', 'font-size': 13, 'font-weight': 'bold' });

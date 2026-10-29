@@ -66,7 +66,15 @@ async function openSavedPedigree(page, { rows, rowsLater, diagramEdits, extraLin
       provider.fetchLinkedRows = (refs) => {
         window.__fetchCalls.push(refs);
         // The first call is the check on opening; later ones (Update) get `rowsLater` if given.
-        const answer = window.__fetchCalls.length > 1 && laterAnswer ? laterAnswer : rowsAnswer;
+        let answer = window.__fetchCalls.length > 1 && laterAnswer ? laterAnswer : rowsAnswer;
+        // JSON text: parsed here, as a provider would, so keys like '__proto__' arrive as own keys.
+        if (typeof answer === 'string' && answer.startsWith('{')) {
+          answer = JSON.parse(answer);
+        }
+        if (answer && answer.hold) {
+          // Held until the test calls window.__release().
+          return new Promise((resolve) => { window.__release = () => resolve(answer.hold); });
+        }
         return answer === 'reject' ? Promise.reject(new Error('network down')) : Promise.resolve(answer);
       };
     }
@@ -365,4 +373,33 @@ test('the mark stays over the person\'s shape when the shape is redrawn', async 
     return !!(shape.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING);
   }, ruth);
   expect(markAboveShape).toBe(true);
+});
+
+test('while Update is fetching, the notice keeps its lines and Dismiss waits', async ({ page }) => {
+  await openSavedPedigree(page, {
+    rows: {
+      [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] },
+      [SAM]: { missing: true },
+    },
+    rowsLater: { hold: { [RUTH]: { answers: [{ linkId: 'first_name', value: 'Ruthie' }, { linkId: 'last_name', value: 'Sample' }] } } },
+  });
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+  await expect(page.locator(`${NOTICE} button`, { hasText: 'Updating...' })).toBeDisabled();
+  await expect(page.locator(`${NOTICE} button`, { hasText: 'Dismiss' })).toBeDisabled();
+  await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists: Sam Sample.');
+
+  await page.evaluate(() => window.__release());
+  await expect(page.locator(NOTICE)).not.toContainText('changed since');
+  await expect(page.locator(`${NOTICE} button`, { hasText: 'Dismiss' })).toBeEnabled();
+  expect(await firstNames(page)).toEqual(['', 'Ruthie', 'Sam']);
+});
+
+test('a ref named like an object property is answered like any other', async ({ page }) => {
+  await openSavedPedigree(page, {
+    extraLinks: [{ person: 0, ref: '__proto__', answers: null }, { person: 2, ref: 'constructor', answers: LINKED[SAM] }],
+    rows: JSON.stringify({ [RUTH]: { answers: LINKED[RUTH] } }).replace(/^\{/, '{"__proto__":{"missing":true},'),
+  });
+  // '__proto__' is reported as missing; 'constructor' wasn't answered, so it's left alone.
+  await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists');
+  await expect(page.locator(MARK)).toHaveCount(0);
 });

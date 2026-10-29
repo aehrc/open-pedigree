@@ -28,7 +28,7 @@ export default class LinkedRowsCheck {
   constructor(editor: any) {
     this._editor = editor;
     this._ran = false;
-    this._rows = {};
+    this._rows = Object.create(null);
     this._answered = [];
     this._missing = [];
     this._otherRecord = [];
@@ -70,7 +70,8 @@ export default class LinkedRowsCheck {
         var result = classifyLinkedRows(people, rows, function(node: any) {
           return _this._isInView(node) ? _this._stateOf(node) : null;
         });
-        _this._rows = rows || {};
+        _this._rows = Object.create(null);
+        _this._mergeRows(rows);
         _this._answered = result.answered;
         _this._missing = result.missing;
         _this._otherRecord = result.otherRecord;
@@ -95,7 +96,7 @@ export default class LinkedRowsCheck {
     }
     // Also holds back refreshMarks until every person is updated: one refresh at the end.
     this._updating = true;
-    this._renderNotice({ changed: marked, missing: [], otherRecord: [] });
+    this._renderNotice(this._current());
     var _this = this;
     var asked = marked.map(function(node: any) {
       return { node: node, ref: node.getLinkedRecordRef(), state: _this._stateKey(node) };
@@ -103,13 +104,13 @@ export default class LinkedRowsCheck {
     return Promise.resolve()
       .then(function() { return provider.fetchLinkedRows(uniqueRefs(asked)); })
       .then(function(rows: any) {
-        Object.keys(rows || {}).forEach(function(ref) { _this._rows[ref] = rows[ref]; });
+        _this._mergeRows(rows);
         asked.forEach(function(entry: any) {
           // Re-linked, refreshed or removed while the records were being fetched: leave them.
           if (!_this._isInView(entry.node) || _this._stateKey(entry.node) !== entry.state) {
             return;
           }
-          var row = rows && rows[entry.ref];
+          var row = _this._rows[entry.ref];
           var person = { key: entry.node, ref: entry.ref, snapshot: _this._stateOf(entry.node).snapshot };
           if (row && Array.isArray(row.answers)) {
             _this._editor._dispatchLinkedRecordRefresh(entry.node.getID(), row.answers, entry.ref);
@@ -135,6 +136,15 @@ export default class LinkedRowsCheck {
     this._missing = [];
     this._otherRecord = [];
     this.refreshMarks();
+  }
+
+  // The provider's answers, into _rows: own keys only, and _rows has no prototype, so a ref can't
+  // reach Object.prototype (e.g. '__proto__', 'constructor').
+  _mergeRows(rows: any): void {
+    var _this = this;
+    if (rows && typeof rows === 'object') {
+      Object.keys(rows).forEach(function(ref) { _this._rows[ref] = rows[ref]; });
+    }
   }
 
   /** Re-applies the marks and notice to the people as they are now. */
@@ -284,7 +294,10 @@ export default class LinkedRowsCheck {
       update.disabled = this._updating;
       actions.appendChild(update);
     }
-    actions.appendChild(button('Dismiss', 'linked-records-notice-dismiss', this.dismiss.bind(this)));
+    // Not while updating: the update's answer would bring back what was dismissed.
+    var dismiss = button('Dismiss', 'linked-records-notice-dismiss', this.dismiss.bind(this));
+    dismiss.disabled = this._updating;
+    actions.appendChild(dismiss);
     notice.appendChild(actions);
   }
 }
