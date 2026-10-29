@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.14...open-pedigree-v1.5.0) (2026-10-29)
+
+
+### Features
+
+* tell the user when linked records changed since the pedigree was saved ([#73](https://github.com/aehrc/open-pedigree/issues/73)) ([4c7fef2](https://github.com/aehrc/open-pedigree/commit/4c7fef22e376053e35790a5e49e841b8f1c3db4f))
+
 ## [1.4.14](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.13...open-pedigree-v1.4.14) (2026-10-29)
 
 
