@@ -253,15 +253,21 @@ function parseAnswerOptions(item: any): any {
   if (!item.answerOption) {
     return undefined;
   }
+  // `answer` is the option as a QuestionnaireResponse answer holds it (a coding, an integer or a
+  // string), so a choice made on the form exports as its type, not as text.
   return item.answerOption.map((opt: any) => {
     if (opt.hasOwnProperty('valueCoding')) {
-      return { value: opt.valueCoding.code, display: opt.valueCoding.display || opt.valueCoding.code };
+      const coding = opt.valueCoding;
+      return {
+        value: coding.code, display: coding.display || coding.code,
+        answer: { system: coding.system, code: coding.code, display: coding.display || coding.code }
+      };
     }
     if (opt.hasOwnProperty('valueString')) {
-      return { value: opt.valueString, display: opt.valueString };
+      return { value: opt.valueString, display: opt.valueString, answer: opt.valueString };
     }
     if (opt.hasOwnProperty('valueInteger')) {
-      return { value: opt.valueInteger, display: String(opt.valueInteger) };
+      return { value: opt.valueInteger, display: String(opt.valueInteger), answer: opt.valueInteger };
     }
     return { value: undefined, display: '' };
   });

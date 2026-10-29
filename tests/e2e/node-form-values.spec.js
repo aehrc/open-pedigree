@@ -4,7 +4,7 @@ import { retireAutoCreatedEditor } from './helpers/singleEditor';
 // The node form's controls are reused for every person: opening a person must show their own
 // answers, never what the previous person's form left behind.
 const ITEM_CONTROL = 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl';
-const option = (code, display) => ({ valueCoding: { code, display } });
+const option = (code, display) => ({ valueCoding: { system: 'http://example.org/cs', code, display } });
 
 const QUESTIONNAIRE = {
   resourceType: 'Questionnaire',
@@ -94,7 +94,11 @@ test('choosing several options of a repeating choice stores them all', async ({ 
   await page.evaluate(() => ['1', 'A'].forEach((v) => document.querySelector(`.menu-box .field-features input[value="${v}"]`).click()));
   await page.waitForTimeout(200);
   const answer = await page.evaluate((id) => window.editor.getView().getNode(id).getQuestionnaireAnswer('features'), first);
-  expect([].concat(answer).map(String).sort()).toEqual(['1', 'A']);
+  // each kept as its option's coding, so it exports as one (not as text)
+  expect(answer).toEqual([
+    { system: 'http://example.org/cs', code: '1', display: 'Vertigo' },
+    { system: 'http://example.org/cs', code: 'A', display: 'Tinnitus' },
+  ]);
 });
 
 test('a legend picker shows a term\'s current name, not the one it had when first shown', async ({ page }) => {

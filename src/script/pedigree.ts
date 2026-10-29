@@ -530,8 +530,11 @@ export default class PedigreeEditor {
 
       if (item.fieldType === 'select' || item.fieldType === 'radio') {
         if (item.answerOption) {
+          // A mapped item's setter takes the option's code (e.g. setChildlessStatus('none')); any
+          // other item stores the option's typed answer (see parseAnswerOptions).
+          var mapped = item.mapping && item.mapping.kind === 'field';
           descriptor.values = item.answerOption.map(function(opt: any) {
-            return { 'actual': opt.value, 'displayed': opt.display };
+            return { 'actual': opt.value, 'displayed': opt.display, 'answer': mapped ? undefined : opt.answer };
           });
         }
         if (item.range) {

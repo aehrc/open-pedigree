@@ -25,6 +25,7 @@
 import flatpickr from 'flatpickr';
 import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
+import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -58,6 +59,26 @@ function applySelectizeSwatches(container: any, legend: any): void {
     }
     colorBubble.style.background = legend.getObjectColor(value);
   });
+}
+
+/**
+ * Fills a legend picker with `legend`'s current terms and selects `ids`. The selection goes first:
+ * clearOptions keeps the options of selected values with the text they had (e.g. "loading..."
+ * while a term was being looked up). With no legend, the picker is just emptied.
+ */
+function refillLegendPicker(container: any, selectize: any, legend: any, ids: any[], swatches: boolean): void {
+  selectize.clear(true);
+  selectize.clearOptions(true);
+  if (legend) {
+    legend.getCurrentTerms().forEach(function(term: any) {
+      selectize.addOption({'text': term.getName(), 'value': term.getID()});
+    });
+    selectize.setValue(ids, true);
+  }
+  selectize.refreshOptions(false);
+  if (legend && swatches) {
+    applySelectizeSwatches(container, legend);
+  }
 }
 
 export default class NodeMenu {
@@ -435,7 +456,8 @@ export default class NodeMenu {
 
         var before = target.getSummary()[field.name].value;
         var after = _this.fieldMap[field.name].crtValue;
-        if (Array.isArray(before) || Array.isArray(after) ? JSON.stringify(before) === JSON.stringify(after) : before == after) {
+        var structured = (before && typeof before === 'object') || (after && typeof after === 'object');
+        if (structured ? JSON.stringify(before) === JSON.stringify(after) : before == after) {
           return;
         }
 
@@ -482,7 +504,7 @@ export default class NodeMenu {
         radioButton.value = v.actual;
         radioLabel.prepend(radioButton);
         (radioButton as any)._getValue = function(this: any) {
-          return [this.value];
+          return [v.answer !== undefined ? v.answer : this.value];
         }.bind(radioButton);
         values.appendChild(radioLabel);
         _this._attachFieldEventListeners(radioButton, ['click']);
@@ -642,6 +664,7 @@ export default class NodeMenu {
           box.type = 'checkbox';
           box.name = data.name;
           box.value = v.actual;
+          box._answer = v.answer !== undefined ? v.answer : v.actual;
           label.appendChild(box);
           label.appendChild(document.createTextNode(' ' + v.displayed));
           group.appendChild(label);
@@ -649,7 +672,7 @@ export default class NodeMenu {
         });
         boxes.forEach(function(box: any) {
           box._getValue = function() {
-            var ticked = boxes.filter(function(b: any) { return b.checked; }).map(function(b: any) { return b.value; });
+            var ticked = boxes.filter(function(b: any) { return b.checked; }).map(function(b: any) { return b._answer; });
             return [ticked.length ? ticked : ''];
           };
           _this._attachFieldEventListeners(box, ['click']);
@@ -663,9 +686,10 @@ export default class NodeMenu {
       selectSpan.appendChild(select);
       result.inputsContainer.appendChild(selectSpan);
       var _generateSelectOption = function(v: any) {
-        var option = document.createElement('option');
+        var option: any = document.createElement('option');
         option.value = v.actual;
         option.textContent = v.displayed;
+        option._answer = v.answer;
         select.appendChild(option);
       };
       if (data.nullValue) {
@@ -679,7 +703,11 @@ export default class NodeMenu {
         }
       }
       (select as any)._getValue = function(this: any) {
-        return [((this as any).selectedIndex >= 0) && (this as any).options[(this as any).selectedIndex].value || ''];
+        var option = (this as any).selectedIndex >= 0 ? (this as any).options[(this as any).selectedIndex] : null;
+        if (option && option.value !== '' && option._answer !== undefined) {
+          return [option._answer];
+        }
+        return [option && option.value || ''];
       }.bind(select);
       this._attachFieldEventListeners(select, ['change']);
       return result;
@@ -911,7 +939,8 @@ export default class NodeMenu {
     // person's form left before showing this person's value (or none).
     'radio' : function(container: any, value: any): any {
       container.querySelectorAll('input[type=radio]').forEach(function(radio: any) {
-        radio.checked = (value !== null && value !== undefined && String(radio.value) === String(value));
+        var code = currentAnswerValue(value);
+        radio.checked = (code !== null && code !== undefined && String(radio.value) === String(code));
       });
     },
     'checkbox' : function(container: any, value: any): any {
@@ -949,73 +978,30 @@ export default class NodeMenu {
     'disease-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-omim');
       if (target && target[0] && (target[0] as any).selectize) {
-        values = Array.isArray(values) ? values : []; // none, not the last person's
-        var ids: any[] = [];
-        // Diseases are an array of {id, value} objects
-        values.forEach(function (value: any) {
-          if (value && value.hasOwnProperty("id")) {
-            ids.push(value.id);
-          }
-        });
-        // clearOptions keeps the options of selected values (with the text they had - e.g.
-        // "loading..." while a term was looked up), so the selection goes first
-        (target[0] as any).selectize.clear(true);
-        (target[0] as any).selectize.clearOptions(true);
-        var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
-        for (var disorder of currentDisorders){
-          (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
-        }
-        (target[0] as any).selectize.setValue(ids, true);
-        (target[0] as any).selectize.refreshOptions(false);
-        applySelectizeSwatches(container, editor.getDisorderLegend());
+        // diseases are {id, value} objects; none (not the last person's) if not a list
+        var ids = (Array.isArray(values) ? values : []).filter(function(v: any) { return v && v.hasOwnProperty('id'); }).map(function(v: any) { return v.id; });
+        refillLegendPicker(container, (target[0] as any).selectize, editor.getDisorderLegend(), ids, true);
       }
     },
     'hpo-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-hpo');
       if (target && target[0] && (target[0] as any).selectize) {
-        values = Array.isArray(values) ? values : []; // none, not the last person's
-        var ids: any[] = [];
-        // HPO terms are an array of {id, value} objects
-        values.forEach(function (value: any) {
-          if (value && value.hasOwnProperty("id")) {
-            ids.push(value.id);
-          }
-        });
-        // clearOptions keeps the options of selected values (with the text they had - e.g.
-        // "loading..." while a term was looked up), so the selection goes first
-        (target[0] as any).selectize.clear(true);
-        (target[0] as any).selectize.clearOptions(true);
-        var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
-        for (var phenotype of currentPhenotypes){
-          (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
-        }
-        (target[0] as any).selectize.setValue(ids, true);
-        (target[0] as any).selectize.refreshOptions(false);
+        // HPO terms are {id, value} objects; none (not the last person's) if not a list
+        var ids = (Array.isArray(values) ? values : []).filter(function(v: any) { return v && v.hasOwnProperty('id'); }).map(function(v: any) { return v.id; });
+        refillLegendPicker(container, (target[0] as any).selectize, editor.getPhenotypeLegend(), ids, false);
       }
     },
     'gene-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-genes');
       if (target && target[0] && (target[0] as any).selectize) {
-        values = Array.isArray(values) ? values : []; // none, not the last person's
-        // Genes are just a straight array of strings
-        // clearOptions keeps the options of selected values (with the text they had - e.g.
-        // "loading..." while a term was looked up), so the selection goes first
-        (target[0] as any).selectize.clear(true);
-        (target[0] as any).selectize.clearOptions(true);
-        var currentGenes = editor.getGeneLegend().getCurrentTerms();
-        for (var gene of currentGenes){
-          console.log("Adding options " + gene.getID() + "=>" + gene.getName());
-          (target[0] as any).selectize.addOption({'text': gene.getName(), 'value': gene.getID()});
-        }
-        (target[0] as any).selectize.setValue(values, true);
-        (target[0] as any).selectize.refreshOptions(false);
-        applySelectizeSwatches(container, editor.getGeneLegend());
+        // genes are a list of IDs; none (not the last person's) if not a list
+        refillLegendPicker(container, (target[0] as any).selectize, editor.getGeneLegend(), Array.isArray(values) ? values : [], true);
       }
     },
     'select' : function(container: any, value: any): any {
       // a value may be a code, or a coding (e.g. from a linked record) whose code it is
       var values = (Array.isArray(value) ? value : [value])
-        .map(function(v: any) { return (v && typeof v === 'object' && v.hasOwnProperty('code')) ? v.code : v; })
+        .map(currentAnswerValue)
         .filter(function(v: any) { return v !== null && v !== undefined; })
         .map(String);
       var boxes = container.querySelectorAll('.field-checkbox-group input[type=checkbox]');
@@ -1075,26 +1061,9 @@ export default class NodeMenu {
       if (target && target[0] && (target[0] as any).selectize) {
         var linkId = (target[0] as any).dataset.linkid;
         var legend = editor.getQuestionnaireLegend && editor.getQuestionnaireLegend(linkId);
-        values = Array.isArray(values) ? values : []; // none, not the last person's
-        if (legend) {
-          var ids: any[] = [];
-          values.forEach(function(v: any) {
-            if (v && v.code) {
-              ids.push(v.code);
-            }
-          });
-          // clearOptions keeps the options of selected values (with the text they had - e.g.
-          // "loading..." while a term was looked up), so the selection goes first
-          (target[0] as any).selectize.clear(true);
-          (target[0] as any).selectize.clearOptions(true);
-          var currentTerms = legend.getCurrentTerms();
-          for (var term of currentTerms) {
-            (target[0] as any).selectize.addOption({'text': term.getName(), 'value': term.getID()});
-          }
-          (target[0] as any).selectize.setValue(ids, true);
-          (target[0] as any).selectize.refreshOptions(false);
-          applySelectizeSwatches(container, legend);
-        }
+        // codings; none (not the last person's) if not a list
+        var ids = (Array.isArray(values) ? values : []).filter(function(v: any) { return v && v.code; }).map(function(v: any) { return v.code; });
+        refillLegendPicker(container, (target[0] as any).selectize, legend, ids, true);
       }
     }
   };
@@ -1150,6 +1119,15 @@ export default class NodeMenu {
       this._toggleFieldVisibility(container, inactive);
     },
     'select' : function(this: any, container: any, inactive: any): any {
+      // a list of options to hide, on a repeating choice's checkboxes (as radios do)
+      var boxes = container.querySelectorAll('.field-checkbox-group input[type=checkbox]');
+      if (Array.isArray(inactive) && boxes.length) {
+        this._toggleFieldVisibility(container, false);
+        boxes.forEach(function(box: any) {
+          box.parentNode.classList.toggle('hidden', inactive.indexOf(box.value) >= 0);
+        });
+        return;
+      }
       this._toggleFieldVisibility(container, inactive);
     },
     'hidden' : function(this: any, container: any, inactive: any): any {
