@@ -453,6 +453,57 @@
   display: block;
   font-weight: bold;
 }
+/* A section heading (a Questionnaire group, e.g. a REDCap section header): set apart from the
+   field labels under it. */
+.menu-box .field-box.field-heading {
+  padding-top: 1em;
+}
+.menu-box .field-heading .field-name {
+  font-size: 115%;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: .2em;
+}
+/* A repeating choice's checkboxes (e.g. a REDCap checkbox field): one option per line, as on
+   REDCap's own form. */
+.menu-box .field-checkbox-group label {
+  display: block;
+  padding: .1em 0;
+}
+/* The pickers (selectize) in the same font as the other fields, not the page's. Selectize gives a
+   picker's dropdown its select's classes, which scopes these to the node form's pickers. */
+.menu-box .selectize-input,
+.menu-box .selectize-input input,
+.selectize-dropdown.suggest-omim,
+.selectize-dropdown.suggest-hpo,
+.selectize-dropdown.suggest-genes,
+.selectize-dropdown.suggest-questionnaire,
+.selectize-dropdown.suggest-questionnaire-legend {
+  font-family: Arial, Helvetica, sans-serif;
+}
+/* Read-only fields (e.g. a linked person's, edited in REDCap): one readable style for every kind
+   of field, rather than each browser's or selectize's own (which fade some far more than others). */
+.menu-box .field-box input:disabled,
+.menu-box .field-box select:disabled,
+.menu-box .field-box textarea:disabled {
+  color: #333;
+  -webkit-text-fill-color: #333;
+  opacity: 1;
+  background-color: #f2f2f2;
+  border: 1px solid #ddd;
+}
+.menu-box .field-box input[type=checkbox]:disabled,
+.menu-box .field-box input[type=radio]:disabled {
+  opacity: 1;
+  accent-color: #666;
+}
+.menu-box .selectize-control .selectize-input.disabled {
+  opacity: 1;
+  background-color: #f2f2f2;
+  border-color: #ddd;
+}
+.menu-box .selectize-control.multi .selectize-input.disabled [data-value] {
+  color: #333;
+}
 .menu-box .accepted-suggestions li {
   line-height: 1em;
   padding: .2em 1em .1em 0;

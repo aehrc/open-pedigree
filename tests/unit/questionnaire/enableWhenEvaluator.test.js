@@ -103,4 +103,25 @@ describe('evaluateEnableWhen', () => {
     expect(evaluateEnableWhen(enableWhen, 'all', {}, fetusTrue)).toBe(false);
     expect(evaluateEnableWhen(enableWhen, 'all', {}, adoptedTrue)).toBe(false);
   });
+
+  it('reads a repeating item\'s list of answers: exists if any, equal if any value is', () => {
+    const when = (operator, value) => [{ question: 'features', operator, ...(typeof value === 'boolean' ? { answerBoolean: value } : { answerCoding: { code: value } }) }];
+    expect(evaluateEnableWhen(when('=', '1'), 'all', { features: ['A', '1'] })).toBe(true);
+    expect(evaluateEnableWhen(when('=', '2'), 'all', { features: ['A', '1'] })).toBe(false);
+    expect(evaluateEnableWhen(when('!=', '2'), 'all', { features: ['A', '1'] })).toBe(true);
+    expect(evaluateEnableWhen(when('exists', true), 'all', { features: [] })).toBe(false);
+    expect(evaluateEnableWhen(when('exists', false), 'all', { features: [] })).toBe(true);
+    expect(evaluateEnableWhen(when('=', 'X1'), 'all', { features: [{ code: 'X1', display: 'X' }] })).toBe(true);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '=', answerInteger: 1 }], 'all', { n: ['1', '2'] })).toBe(true);
+    expect(evaluateEnableWhen(when('exists', true), 'all', { features: [null, ''] })).toBe(false);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '>', answerInteger: 3 }], 'all', { n: [1, 5] })).toBe(true);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '>', answerInteger: 3 }], 'all', { n: [1, 2] })).toBe(false);
+    expect(evaluateEnableWhen([{ question: 'd', operator: '=', answerDate: '2020-02-11' }], 'all', { d: ['2020-02-11'] })).toBe(true);
+  });
+
+  it('compares a single answer as text, so a drop-down\'s "1" is an answerInteger\'s 1', () => {
+    expect(evaluateEnableWhen([{ question: 'n', operator: '=', answerInteger: 1 }], 'all', { n: '1' })).toBe(true);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '!=', answerInteger: 1 }], 'all', { n: '1' })).toBe(false);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '!=', answerInteger: 1 }], 'all', {})).toBe(true);
+  });
 });

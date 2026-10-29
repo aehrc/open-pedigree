@@ -23,7 +23,8 @@ function extractAnswerValue(condition: any): any {
   return undefined;
 }
 
-function currentAnswerValue(answer: any): any {
+/** An answer's code: a coding's `code`, else the answer itself. */
+export function currentAnswerValue(answer: any): any {
   if (answer && typeof answer === 'object' && answer.hasOwnProperty('code')) {
     return answer.code;
   }
@@ -40,32 +41,44 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
     return condition.negate ? !result : result;
   }
 
-  let current = currentAnswerValue(answers[condition.question]);
   const expected = extractAnswerValue(condition);
-  if (condition.hasOwnProperty('answerDate') && current !== undefined && current !== null && current !== '') {
+  const isDate = condition.hasOwnProperty('answerDate');
+  const raw = answers[condition.question];
+  // A repeating item's answer is a list: it exists if it has any value, and satisfies a
+  // comparison if any of its values does.
+  const values = (Array.isArray(raw) ? raw : [raw])
+    .map(currentAnswerValue)
+    .filter((v: any) => v !== undefined && v !== null && v !== '')
     // Compared as 'YYYY-MM-DD' text, so an earlier version's timestamp or a Date is its day.
-    current = dateAnswer(current);
+    .map((v: any) => isDate ? dateAnswer(v) : v);
+  if (condition.operator === 'exists') {
+    return expected === false ? values.length === 0 : values.length > 0;
   }
+  if (condition.operator === '!=') {
+    return !values.some((v: any) => matches('=', v, expected));
+  }
+  return values.some((v: any) => matches(condition.operator, v, expected));
+}
 
-  switch (condition.operator) {
-  case 'exists':
-    return expected === false ? (current === undefined || current === null || current === '') : (current !== undefined && current !== null && current !== '');
+// One answer value against an expected one. '=' compares as text: the form gives codes as strings
+// (a drop-down's '1' is an answerInteger's 1).
+function matches(operator: string, current: any, expected: any): boolean {
+  switch (operator) {
   case '=':
-    return current === expected;
-  case '!=':
-    return current !== expected;
+    return String(current) === String(expected);
   case '>':
-    return current !== undefined && current !== null && current > expected;
+    return current > expected;
   case '<':
-    return current !== undefined && current !== null && current < expected;
+    return current < expected;
   case '>=':
-    return current !== undefined && current !== null && current >= expected;
+    return current >= expected;
   case '<=':
-    return current !== undefined && current !== null && current <= expected;
+    return current <= expected;
   default:
     return false;
   }
 }
+
 
 /**
  * Returns true if the item's conditions are satisfied (i.e. it should be shown).
