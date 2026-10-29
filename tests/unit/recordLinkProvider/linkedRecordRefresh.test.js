@@ -208,3 +208,30 @@ describe('an unparseable date on an ordinary refresh', () => {
     expect(later.properties).toEqual({ setBirthDate: '' });
   });
 });
+
+describe('valuesChanged', () => {
+  it('is false when the record\'s new values are what the node already shows', () => {
+    // Empty snapshot (nothing taken in yet), node already holding the record's value.
+    const r = refresh([{ linkId: 'first_name', value: 'Ruth' }], { current: { setFirstName: 'Ruth' } });
+    expect(r.valuesChanged).toBe(false);
+    expect(r.properties).toEqual({});
+    expect(r.snapshot).toEqual({ first_name: 'Ruth' });
+  });
+
+  it('is true when a new value differs from what the node shows', () => {
+    const r = refresh([{ linkId: 'first_name', value: 'Ruth' }], { current: { setFirstName: 'Rita' } });
+    expect(r.valuesChanged).toBe(true);
+    expect(r.properties).toEqual({ setFirstName: 'Ruth' });
+  });
+
+  it('is false for a record change the diagram already made', () => {
+    const r = refresh([{ linkId: 'first_name', value: 'Ruthie' }], { current: { setFirstName: 'Ruthie' }, snapshot: { first_name: 'Ruth' } });
+    expect(r.valuesChanged).toBe(false);
+    expect(r.snapshot).toEqual({ first_name: 'Ruthie' });
+  });
+
+  it('does not rewrite a value equal once normalised', () => {
+    const r = refresh([{ linkId: 'weeks', value: '20' }], { current: { setGestationAge: 20 }, snapshot: { weeks: '19' } });
+    expect(r.properties).toEqual({});
+  });
+});

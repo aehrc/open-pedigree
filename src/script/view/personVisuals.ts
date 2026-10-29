@@ -18,6 +18,8 @@ import getAge from 'pedigree/view/ageCalc';
  * @param {Number} y The y coordinate on the canvas
  */
 
+const LINKED_RECORD_CHANGED_TOOLTIP = 'This person\'s linked record has changed since this pedigree was saved';
+
 export default class PersonVisuals extends AbstractPersonVisuals {
   _nameLabel: any;
   _stillBirthLabel: any;
@@ -32,6 +34,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   _isSelected: any;
   _carrierGraphic: any;
   _evalLabel: any;
+  _linkedRecordChangedMark: any;
 
   constructor(node: any, x: any, y: any) {
     //var timer = new Timer();
@@ -50,6 +53,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this._isSelected = false;
     this._carrierGraphic = null;
     this._evalLabel = null;
+    this._linkedRecordChangedMark = null;
     //console.log("person visuals end");
     //timer.printSinceLast("Person visuals time");
   }
@@ -117,6 +121,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this.updateDisorderShapes();
     this.updateCarrierGraphic();
     this.updateEvaluationLabel();
+    // The redrawn shape went in where the mark was: put the mark back over it.
+    if (this._linkedRecordChangedMark && !editor.isReadOnlyMode() && this.getHoverBox()) {
+      this._linkedRecordChangedMark.insertBefore(this.getHoverBox().getFrontElements());
+    }
   }
 
   generateProbandArrow(): any {
@@ -518,6 +526,50 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   }
 
   /**
+   * Shows or removes the mark saying this person's linked record has changed since the pedigree
+   * last took it in (see recordLinkProvider/linkedRowsCheck.ts): a small badge at the top right
+   * corner of the node's shape. The tooltip is on the node's hover area, which lies over the badge - the badge on
+   * top would take the pointer from the hover box.
+   *
+   * @method setLinkedRecordChangedMark
+   */
+  setLinkedRecordChangedMark(show: boolean): void {
+    if (!!this._linkedRecordChangedMark === show) {
+      return;
+    }
+    var mask = this.getHoverBox() && this.getHoverBox().getHoverZoneMask();
+    mask && mask.attr({ title: show ? LINKED_RECORD_CHANGED_TOOLTIP : '' });
+    this._linkedRecordChangedMark && this._linkedRecordChangedMark.remove();
+    this._linkedRecordChangedMark = null;
+    if (!show) {
+      return;
+    }
+    // Near the top right corner of the shape as drawn (a circle, square, diamond or triangle, maybe
+    // scaled for a proband): on a circle's edge, just inside a square's corner - clear of what's
+    // drawn in the middle (carrier, unborn...).
+    var box = this.getGenderShape().getBBox();
+    var x = box.x2 - box.width * 0.15;
+    var y = box.y + box.height * 0.15;
+    var paper = editor.getPaper();
+    var badge = paper.circle(x, y, 9).attr({ fill: '#E69500', stroke: '#FFFFFF', 'stroke-width': 2 });
+    var text = paper.text(x, y, '!').attr({ fill: '#FFFFFF', 'font-size': 13, 'font-weight': 'bold' });
+    this._linkedRecordChangedMark = paper.set(badge, text);
+    badge.node.setAttribute('class', 'linked-record-changed-mark');
+    if (!editor.isReadOnlyMode() && this.getHoverBox()) {
+      this._linkedRecordChangedMark.insertBefore(this.getHoverBox().getFrontElements());
+    }
+  }
+
+  getLinkedRecordChangedMark(): any {
+    return this._linkedRecordChangedMark;
+  }
+
+  // The mark's tooltip while it's shown, for the hover box's own buttons over the node.
+  getLinkedRecordChangedTooltip(): string | null {
+    return this._linkedRecordChangedMark ? LINKED_RECORD_CHANGED_TOOLTIP : null;
+  }
+
+  /**
    * Returns this Person's disorder carrier graphics
    *
    * @method getCarrierGraphics
@@ -726,7 +778,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   getAllGraphics(): any {
     //console.log("Node " + this.getNode().getID() + " getAllGraphics");
-    return super.getAllGraphics().push(this.getHoverBox().getBackElements(), this.getLabels(), this.getCarrierGraphics(), this.getEvaluationGraphics(), this.getHoverBox().getFrontElements());
+    return super.getAllGraphics().push(this.getHoverBox().getBackElements(), this.getLabels(), this.getCarrierGraphics(), this.getEvaluationGraphics(), this.getLinkedRecordChangedMark(), this.getHoverBox().getFrontElements());
   }
 
   /**

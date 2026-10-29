@@ -42,6 +42,8 @@ export interface LinkedRecordRefreshResult {
   // Setter name -> new value, clears first.
   properties: Record<string, any>;
   snapshot: LinkedRecordSnapshot;
+  // Whether applying `properties` changes what the node shows: each one does, as a value the node
+  // already holds (e.g. entered in the diagram) isn't sent.
   valuesChanged: boolean;
 }
 
@@ -182,7 +184,9 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       continue;
     }
     snapshot[linkId] = answer.value;
-    if (!hadLast || !sameJson(last[linkId], answer.value)) {
+    // Only what the record changed since the snapshot, and only where the node doesn't already
+    // hold it - a value equal only once normalised (e.g. 20 and '20') isn't rewritten unseen.
+    if ((!hadLast || !sameJson(last[linkId], answer.value)) && !sameValue(setter, input.current(setter), answer.value)) {
       sets[setter] = answer.value;
     }
   }
