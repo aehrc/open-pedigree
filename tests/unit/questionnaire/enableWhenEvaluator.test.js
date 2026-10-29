@@ -112,5 +112,6 @@ describe('evaluateEnableWhen', () => {
     expect(evaluateEnableWhen(when('exists', true), 'all', { features: [] })).toBe(false);
     expect(evaluateEnableWhen(when('exists', false), 'all', { features: [] })).toBe(true);
     expect(evaluateEnableWhen(when('=', 'X1'), 'all', { features: [{ code: 'X1', display: 'X' }] })).toBe(true);
+    expect(evaluateEnableWhen([{ question: 'n', operator: '=', answerInteger: 1 }], 'all', { n: ['1', '2'] })).toBe(true);
   });
 });

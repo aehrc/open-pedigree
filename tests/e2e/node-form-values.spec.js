@@ -14,7 +14,10 @@ const QUESTIONNAIRE = {
     {
       linkId: 'custom_tab', type: 'group', text: 'Custom',
       item: [
-        { linkId: 'colour', type: 'choice', text: 'Colour', answerOption: [option('red', 'Red'), option('green', 'Green')] },
+        // a choice that may be left unanswered (as REDCap's are) has a '-' choice for that
+        { linkId: 'colour', type: 'choice', text: 'Colour', nullValue: true, answerOption: [option('red', 'Red'), option('green', 'Green')] },
+        // without one, no answer shows the first option, as a new form does
+        { linkId: 'size', type: 'choice', text: 'Size', answerOption: [option('small', 'Small'), option('large', 'Large')] },
         {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
           extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
@@ -53,12 +56,10 @@ function shown(page, personId) {
     window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
     const select = (name) => document.querySelector(`.menu-box select[name="${name}"]`);
     return {
-      // a single select's empty choice ('') is "no value"
-      colour: [...select('colour').selectedOptions].map((o) => o.value).filter((v) => v !== ''),
-      colourShowsBlank: select('colour').selectedOptions.length === 1 && select('colour').value === '',
+      colour: select('colour').value,
+      size: select('size').value,
       shade: [...document.querySelectorAll('.menu-box .field-shade input[type=radio]')].filter((r) => r.checked).map((r) => r.value),
-      features: [...select('features').selectedOptions].map((o) => o.value),
-      featuresMultiple: select('features').multiple,
+      features: [...document.querySelectorAll('.menu-box .field-features input[type=checkbox]')].filter((b) => b.checked).map((b) => b.value),
       notes: document.querySelector('.menu-box .field-notes input[type=text]').value,
     };
   }, personId);
@@ -69,14 +70,15 @@ test('a person with no answers shows none, not the previous person\'s', async ({
   await page.evaluate((id) => {
     const node = window.editor.getView().getNode(id);
     node.setQuestionnaireAnswer('colour', 'red');
+    node.setQuestionnaireAnswer('size', 'large');
     node.setQuestionnaireAnswer('shade', 'dark');
     node.setQuestionnaireAnswer('features', ['A']);
     node.setQuestionnaireAnswer('notes', 'first person');
   }, first);
 
-  expect(await shown(page, first)).toEqual({ colour: ['red'], colourShowsBlank: false, shade: ['dark'], features: ['A'], featuresMultiple: true, notes: 'first person' });
+  expect(await shown(page, first)).toEqual({ colour: 'red', size: 'large', shade: ['dark'], features: ['A'], notes: 'first person' });
   await page.evaluate(() => window.editor.getNodeMenu().hide());
-  expect(await shown(page, second)).toEqual({ colour: [], colourShowsBlank: true, shade: [], features: [], featuresMultiple: true, notes: '' });
+  expect(await shown(page, second)).toEqual({ colour: '', size: 'small', shade: [], features: [], notes: '' });
 });
 
 test('a repeating choice shows every ticked option', async ({ page }) => {
@@ -88,7 +90,8 @@ test('a repeating choice shows every ticked option', async ({ page }) => {
 test('choosing several options of a repeating choice stores them all', async ({ page }) => {
   const [first] = await loadFamily(page);
   await shown(page, first);
-  await page.locator('.menu-box select[name="features"]').selectOption(['1', 'A']);
+  // clicked in the page: the floating form never counts as "stable" for Playwright's check()
+  await page.evaluate(() => ['1', 'A'].forEach((v) => document.querySelector(`.menu-box .field-features input[value="${v}"]`).click()));
   await page.waitForTimeout(200);
   const answer = await page.evaluate((id) => window.editor.getView().getNode(id).getQuestionnaireAnswer('features'), first);
   expect([].concat(answer).map(String).sort()).toEqual(['1', 'A']);
@@ -122,16 +125,14 @@ test('opening one person straight after another, without closing the form, shows
   }, first);
   await shown(page, first);
   const result = await shown(page, second); // no hide() between
-  expect(result.colour).toEqual([]);
+  expect(result.colour).toBe('');
   expect(result.notes).toBe('');
 });
 
-test('an answer matching no option shows nothing, not the first option', async ({ page }) => {
+test('an answer matching no option shows the empty choice, not an option', async ({ page }) => {
   const [first] = await loadFamily(page);
   await page.evaluate((id) => window.editor.getView().getNode(id).setQuestionnaireAnswer('colour', 'blue'), first);
-  const result = await shown(page, first);
-  expect(result.colour).toEqual([]);
-  expect(result.colourShowsBlank).toBe(true);
+  expect((await shown(page, first)).colour).toBe('');
 });
 
 test('a legend picker shows no terms for a person with none, not the last person\'s', async ({ page }) => {
@@ -148,4 +149,26 @@ test('a legend picker shows no terms for a person with none, not the last person
     return [a, chips()];
   }, { first, second });
   expect(pickers).toEqual([['111111'], []]);
+});
+
+test('unticking every option of a repeating choice leaves no answer', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => window.editor.getView().getNode(id).setQuestionnaireAnswer('features', ['A']), first);
+  await shown(page, first);
+  await page.evaluate(() => document.querySelector('.menu-box .field-features input[value="A"]').click());
+  await page.waitForTimeout(200);
+  const answer = await page.evaluate((id) => window.editor.getView().getNode(id).getQuestionnaireAnswer('features'), first);
+  expect(answer === undefined || answer === null || answer === '').toBe(true);
+});
+
+test('a coded answer (e.g. from a linked record) shows as its code', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => {
+    const node = window.editor.getView().getNode(id);
+    node.setQuestionnaireAnswer('colour', { system: 'http://example.org', code: 'green', display: 'Green' });
+    node.setQuestionnaireAnswer('features', [{ code: '1' }, { code: '-1' }]);
+  }, first);
+  const result = await shown(page, first);
+  expect(result.colour).toBe('green');
+  expect(result.features).toEqual(['1', '-1']);
 });

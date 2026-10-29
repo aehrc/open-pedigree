@@ -433,7 +433,9 @@ export default class NodeMenu {
 
         var method = _this.fieldMap[field.name]['function'];
 
-        if (target.getSummary()[field.name].value == _this.fieldMap[field.name].crtValue) {
+        var before = target.getSummary()[field.name].value;
+        var after = _this.fieldMap[field.name].crtValue;
+        if (Array.isArray(before) || Array.isArray(after) ? JSON.stringify(before) === JSON.stringify(after) : before == after) {
           return;
         }
 
@@ -627,10 +629,36 @@ export default class NodeMenu {
     },
     'select' : function(this: any, data: any): any {
       var result = this._generateEmptyField(data);
+      // A repeating choice (e.g. a REDCap checkbox field) can have several values: a checkbox per
+      // option, like REDCap's own form (a multi-select would drop the others on a plain click).
+      if (data.repeats && data.values) {
+        var group = document.createElement('div');
+        group.className = 'field-checkbox-group';
+        var boxes: any[] = [];
+        var _this = this;
+        data.values.forEach(function(v: any) {
+          var label = document.createElement('label');
+          var box: any = document.createElement('input');
+          box.type = 'checkbox';
+          box.name = data.name;
+          box.value = v.actual;
+          label.appendChild(box);
+          label.appendChild(document.createTextNode(' ' + v.displayed));
+          group.appendChild(label);
+          boxes.push(box);
+        });
+        boxes.forEach(function(box: any) {
+          box._getValue = function() {
+            var ticked = boxes.filter(function(b: any) { return b.checked; }).map(function(b: any) { return b.value; });
+            return [ticked.length ? ticked : ''];
+          };
+          _this._attachFieldEventListeners(box, ['click']);
+        });
+        result.inputsContainer.appendChild(group);
+        return result;
+      }
       var select = document.createElement('select');
       select.name = data.name;
-      // a repeating choice (e.g. a REDCap checkbox field) can have several values
-      select.multiple = !!data.repeats;
       var selectSpan = document.createElement('span');
       selectSpan.appendChild(select);
       result.inputsContainer.appendChild(selectSpan);
@@ -639,14 +667,9 @@ export default class NodeMenu {
         option.value = v.actual;
         option.textContent = v.displayed;
         select.appendChild(option);
-        return option;
       };
-      // A single select always has an empty choice to show "no value": '-' where the item allows
-      // one, otherwise blank and not offered in the list. (Without it, a single select with
-      // nothing selected falls back to its first option - shown, and saved on a change.)
-      if (!select.multiple) {
-        var empty = _generateSelectOption({'actual' : '', displayed : data.nullValue ? '-' : ''});
-        empty.hidden = !data.nullValue;
+      if (data.nullValue) {
+        _generateSelectOption({'actual' : '', displayed : '-'});
       }
       if (data.values) {
         data.values.forEach(_generateSelectOption);
@@ -656,9 +679,6 @@ export default class NodeMenu {
         }
       }
       (select as any)._getValue = function(this: any) {
-        if ((this as any).multiple) {
-          return [Array.from((this as any).selectedOptions).map(function(o: any) { return o.value; })];
-        }
         return [((this as any).selectedIndex >= 0) && (this as any).options[(this as any).selectedIndex].value || ''];
       }.bind(select);
       this._attachFieldEventListeners(select, ['change']);
@@ -930,91 +950,93 @@ export default class NodeMenu {
       var target = jQuery(container).find('select.suggest-omim');
       if (target && target[0] && (target[0] as any).selectize) {
         values = Array.isArray(values) ? values : []; // none, not the last person's
-        {
-          var ids: any[] = [];
-          // Diseases are an array of {id, value} objects
-          values.forEach(function (value: any) {
-            if (value && value.hasOwnProperty("id")) {
-              ids.push(value.id);
-            }
-          });
-          // clearOptions keeps the options of selected values (with the text they had - e.g.
-          // "loading..." while a term was looked up), so the selection goes first
-          (target[0] as any).selectize.clear(true);
-          (target[0] as any).selectize.clearOptions(true);
-          var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
-          for (var disorder of currentDisorders){
-            (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
+        var ids: any[] = [];
+        // Diseases are an array of {id, value} objects
+        values.forEach(function (value: any) {
+          if (value && value.hasOwnProperty("id")) {
+            ids.push(value.id);
           }
-          (target[0] as any).selectize.setValue(ids, true);
-          (target[0] as any).selectize.refreshOptions(false);
-          applySelectizeSwatches(container, editor.getDisorderLegend());
+        });
+        // clearOptions keeps the options of selected values (with the text they had - e.g.
+        // "loading..." while a term was looked up), so the selection goes first
+        (target[0] as any).selectize.clear(true);
+        (target[0] as any).selectize.clearOptions(true);
+        var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
+        for (var disorder of currentDisorders){
+          (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
         }
+        (target[0] as any).selectize.setValue(ids, true);
+        (target[0] as any).selectize.refreshOptions(false);
+        applySelectizeSwatches(container, editor.getDisorderLegend());
       }
     },
     'hpo-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-hpo');
       if (target && target[0] && (target[0] as any).selectize) {
         values = Array.isArray(values) ? values : []; // none, not the last person's
-        {
-          var ids: any[] = [];
-          // HPO terms are an array of {id, value} objects
-          values.forEach(function (value: any) {
-            if (value && value.hasOwnProperty("id")) {
-              ids.push(value.id);
-            }
-          });
-          // clearOptions keeps the options of selected values (with the text they had - e.g.
-          // "loading..." while a term was looked up), so the selection goes first
-          (target[0] as any).selectize.clear(true);
-          (target[0] as any).selectize.clearOptions(true);
-          var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
-          for (var phenotype of currentPhenotypes){
-            (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
+        var ids: any[] = [];
+        // HPO terms are an array of {id, value} objects
+        values.forEach(function (value: any) {
+          if (value && value.hasOwnProperty("id")) {
+            ids.push(value.id);
           }
-          (target[0] as any).selectize.setValue(ids, true);
-          (target[0] as any).selectize.refreshOptions(false);
+        });
+        // clearOptions keeps the options of selected values (with the text they had - e.g.
+        // "loading..." while a term was looked up), so the selection goes first
+        (target[0] as any).selectize.clear(true);
+        (target[0] as any).selectize.clearOptions(true);
+        var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
+        for (var phenotype of currentPhenotypes){
+          (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
         }
+        (target[0] as any).selectize.setValue(ids, true);
+        (target[0] as any).selectize.refreshOptions(false);
       }
     },
     'gene-picker' : function(container: any, values: any): any {
       var target = jQuery(container).find('select.suggest-genes');
       if (target && target[0] && (target[0] as any).selectize) {
         values = Array.isArray(values) ? values : []; // none, not the last person's
-        {
-          // Genes are just a straight array of strings
-          // clearOptions keeps the options of selected values (with the text they had - e.g.
-          // "loading..." while a term was looked up), so the selection goes first
-          (target[0] as any).selectize.clear(true);
-          (target[0] as any).selectize.clearOptions(true);
-          var currentGenes = editor.getGeneLegend().getCurrentTerms();
-          for (var gene of currentGenes){
-            console.log("Adding options " + gene.getID() + "=>" + gene.getName());
-            (target[0] as any).selectize.addOption({'text': gene.getName(), 'value': gene.getID()});
-          }
-          (target[0] as any).selectize.setValue(values, true);
-          (target[0] as any).selectize.refreshOptions(false);
-          applySelectizeSwatches(container, editor.getGeneLegend());
+        // Genes are just a straight array of strings
+        // clearOptions keeps the options of selected values (with the text they had - e.g.
+        // "loading..." while a term was looked up), so the selection goes first
+        (target[0] as any).selectize.clear(true);
+        (target[0] as any).selectize.clearOptions(true);
+        var currentGenes = editor.getGeneLegend().getCurrentTerms();
+        for (var gene of currentGenes){
+          console.log("Adding options " + gene.getID() + "=>" + gene.getName());
+          (target[0] as any).selectize.addOption({'text': gene.getName(), 'value': gene.getID()});
         }
+        (target[0] as any).selectize.setValue(values, true);
+        (target[0] as any).selectize.refreshOptions(false);
+        applySelectizeSwatches(container, editor.getGeneLegend());
       }
     },
     'select' : function(container: any, value: any): any {
+      // a value may be a code, or a coding (e.g. from a linked record) whose code it is
+      var values = (Array.isArray(value) ? value : [value])
+        .map(function(v: any) { return (v && typeof v === 'object' && v.hasOwnProperty('code')) ? v.code : v; })
+        .filter(function(v: any) { return v !== null && v !== undefined; })
+        .map(String);
+      var boxes = container.querySelectorAll('.field-checkbox-group input[type=checkbox]');
+      if (boxes.length) {
+        boxes.forEach(function(box: any) { box.checked = values.indexOf(box.value) >= 0; });
+        return;
+      }
       var select = container.querySelector('select');
       if (!select) {
         return;
       }
-      var values = (Array.isArray(value) ? value : [value])
-        .filter(function(v: any) { return v !== null && v !== undefined && v !== ''; })
-        .map(String);
-      var matched = false;
-      Array.from(select.options).forEach(function(option: any) {
-        option.selected = values.indexOf(option.value) >= 0;
-        matched = matched || option.selected;
-      });
-      // no value (or one matching no option): a single select's empty choice
-      if (!select.multiple && !matched) {
-        select.value = '';
+      // Set once: a single select reselects its first option whenever none is selected, so
+      // deselecting option by option would misreport. With no value (or none matching), the empty
+      // '-' choice if the item has one, else the first option - what a new form shows (some items
+      // rely on it, e.g. heredity's "None").
+      var options = Array.from(select.options);
+      var index = options.findIndex(function(o: any) { return values.indexOf(o.value) >= 0; });
+      if (index < 0) {
+        index = Math.max(0, options.findIndex(function(o: any) { return o.value === ''; }));
       }
+      select.selectedIndex = index;
     },
     'hidden' : function(container: any, value: any): any {
       var target = container.querySelector('input[type=hidden]');
@@ -1195,6 +1217,13 @@ export default class NodeMenu {
       // FIXME: Not implemented
     },
     'select' : function(container: any, disabled: any): any {
+      var boxes = container.querySelectorAll('.field-checkbox-group input[type=checkbox]');
+      if (boxes.length) {
+        boxes.forEach(function(box: any) {
+          box.disabled = Array.isArray(disabled) ? disabled.indexOf(box.value) >= 0 : !!disabled;
+        });
+        return;
+      }
       var target = container.querySelector('select');
       if (!target) {
         return;

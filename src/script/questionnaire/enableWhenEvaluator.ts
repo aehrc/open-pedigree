@@ -44,14 +44,15 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
   // A repeating item's answer is a list: it exists if it has any value, and equals an expected
   // value if any of its values does.
   if (Array.isArray(answers[condition.question])) {
-    const values = answers[condition.question].map(currentAnswerValue);
+    // compared as text: a form's checkboxes give codes as strings, whatever the answer type
+    const values = answers[condition.question].map(currentAnswerValue).map(String);
     switch (condition.operator) {
     case 'exists':
       return expected === false ? values.length === 0 : values.length > 0;
     case '=':
-      return values.indexOf(expected) >= 0;
+      return values.indexOf(String(expected)) >= 0;
     case '!=':
-      return values.indexOf(expected) < 0;
+      return values.indexOf(String(expected)) < 0;
     default:
       return false;
     }
