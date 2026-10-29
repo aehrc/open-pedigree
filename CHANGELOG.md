@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.13](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.12...open-pedigree-v1.4.13) (2026-10-29)
+
+
+### Bug Fixes
+
+* show each person's own answers on the node form, checkboxes for repeating choices, and readable read-only fields ([#69](https://github.com/aehrc/open-pedigree/issues/69)) ([8bd8404](https://github.com/aehrc/open-pedigree/commit/8bd8404b814a881d68dfac9d931e9b8f3a90b712))
+
 ## [1.4.12](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.11...open-pedigree-v1.4.12) (2026-10-28)
 
 
