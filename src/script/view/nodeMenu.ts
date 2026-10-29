@@ -44,6 +44,20 @@ function tabLabel(tab: any): any {
 // the swatch it adds would be wiped out the next time the field re-renders. `container` is
 // expected to be the field's own field-box element, so a plain descendant query is already
 // correctly scoped to this one field (no risk of matching another field's chips).
+/**
+ * Adds a picker option, or updates its text if the picker already has one for that value:
+ * clearOptions() keeps the options of selected values, and addOption() ignores a value that
+ * already has one, so a selected term would otherwise keep the name it had when first shown
+ * (e.g. "loading..." while its lookup was pending).
+ */
+function putSelectizeOption(selectize: any, option: any): void {
+  if (selectize.options.hasOwnProperty(option.value)) {
+    selectize.updateOption(option.value, option);
+  } else {
+    selectize.addOption(option);
+  }
+}
+
 function applySelectizeSwatches(container: any, legend: any): void {
   if (!legend) {
     return;
@@ -931,7 +945,7 @@ export default class NodeMenu {
           (target[0] as any).selectize.clearOptions(true);
           var currentDisorders = editor.getDisorderLegend().getCurrentTerms();
           for (var disorder of currentDisorders){
-            (target[0] as any).selectize.addOption({'text': disorder.getName(), 'value': disorder.getID()});
+            putSelectizeOption((target[0] as any).selectize, {'text': disorder.getName(), 'value': disorder.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -953,7 +967,7 @@ export default class NodeMenu {
           (target[0] as any).selectize.clearOptions(true);
           var currentPhenotypes = editor.getPhenotypeLegend().getCurrentTerms();
           for (var phenotype of currentPhenotypes){
-            (target[0] as any).selectize.addOption({'text': phenotype.getName(), 'value': phenotype.getID()});
+            putSelectizeOption((target[0] as any).selectize, {'text': phenotype.getName(), 'value': phenotype.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -969,7 +983,7 @@ export default class NodeMenu {
           var currentGenes = editor.getGeneLegend().getCurrentTerms();
           for (var gene of currentGenes){
             console.log("Adding options " + gene.getID() + "=>" + gene.getName());
-            (target[0] as any).selectize.addOption({'text': gene.getName(), 'value': gene.getID()});
+            putSelectizeOption((target[0] as any).selectize, {'text': gene.getName(), 'value': gene.getID()});
           }
           (target[0] as any).selectize.setValue(values, true);
           (target[0] as any).selectize.refreshOptions(false);
@@ -1016,7 +1030,7 @@ export default class NodeMenu {
         selectizeInstance.clearOptions(true);
         answers.forEach(function(answer: any) {
           if (answer && answer.code) {
-            selectizeInstance.addOption({ text: answer.display || answer.code, value: answer.code, system: answer.system });
+            putSelectizeOption(selectizeInstance, { text: answer.display || answer.code, value: answer.code, system: answer.system });
           }
         });
         selectizeInstance.setValue(answers.map(function(a: any) { return a.code; }), true);
@@ -1039,7 +1053,7 @@ export default class NodeMenu {
           (target[0] as any).selectize.clearOptions(true);
           var currentTerms = legend.getCurrentTerms();
           for (var term of currentTerms) {
-            (target[0] as any).selectize.addOption({'text': term.getName(), 'value': term.getID()});
+            putSelectizeOption((target[0] as any).selectize, {'text': term.getName(), 'value': term.getID()});
           }
           (target[0] as any).selectize.setValue(ids, true);
           (target[0] as any).selectize.refreshOptions(false);

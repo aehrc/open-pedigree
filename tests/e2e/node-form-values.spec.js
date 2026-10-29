@@ -29,16 +29,17 @@ const QUESTIONNAIRE = {
   ],
 };
 
-async function loadFamily(page) {
+// Three people (a child and their parents); with no questionnaire, the editor's default one.
+async function loadFamily(page, questionnaire = QUESTIONNAIRE) {
   page.on('dialog', (dialog) => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
   await retireAutoCreatedEditor(page);
   await page.evaluate((q) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
-    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: q });
+    window.editor = window.OpenPedigree.initialiseEditor(q ? { questionnaireLocal: q } : {});
     window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 2 3 1 1\nfam1 2 0 0 1 1\nfam1 3 0 0 2 1', 'ped', {}, true, true);
-  }, QUESTIONNAIRE);
+  }, questionnaire);
   await page.waitForTimeout(300);
   return page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
@@ -89,4 +90,23 @@ test('choosing several options of a repeating choice stores them all', async ({ 
   await page.waitForTimeout(200);
   const answer = await page.evaluate((id) => window.editor.getView().getNode(id).getQuestionnaireAnswer('features'), first);
   expect([].concat(answer).map(String).sort()).toEqual(['1', 'A']);
+});
+
+test('a legend picker shows a term\'s current name, not the one it had when first shown', async ({ page }) => {
+  const [id] = await loadFamily(page, null);
+  const pickerText = await page.evaluate(async (id) => {
+    const node = window.editor.getView().getNode(id);
+    node.setDisorders(['111111']);
+    const menu = window.editor.getNodeMenu();
+    menu.show(node, 100, 100);
+    // as if the term was still being looked up when the form first showed it
+    const selectize = document.querySelector('.menu-box select.suggest-omim').selectize;
+    selectize.updateOption('111111', { text: 'loading...', value: '111111' });
+    menu.hide();
+    window.editor.getDisorderLegend().addToCache('111111', 'Example disorder');
+    window.editor.getDisorderLegend().seedTermName('111111', 'Example disorder');
+    menu.show(node, 100, 100);
+    return [...document.querySelectorAll('.menu-box .field-disorders .selectize-input [data-value]')].map((e) => e.textContent.replace(/×$/, '').trim());
+  }, id);
+  expect(pickerText).toEqual(['Example disorder']);
 });
