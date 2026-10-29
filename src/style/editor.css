@@ -463,6 +463,12 @@
   border-bottom: 1px solid #ccc;
   padding-bottom: .2em;
 }
+/* A repeating choice's checkboxes (e.g. a REDCap checkbox field): one option per line, as on
+   REDCap's own form. */
+.menu-box .field-checkbox-group label {
+  display: block;
+  padding: .1em 0;
+}
 /* The pickers (selectize) in the same font as the other fields, not the page's. Selectize gives a
    picker's dropdown its select's classes, which scopes these to the node form's pickers. */
 .menu-box .selectize-input,

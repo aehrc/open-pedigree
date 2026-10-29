@@ -45,7 +45,9 @@ function evaluateCondition(condition: any, answers: any, context: any): boolean 
   // value if any of its values does.
   if (Array.isArray(answers[condition.question])) {
     // compared as text: a form's checkboxes give codes as strings, whatever the answer type
-    const values = answers[condition.question].map(currentAnswerValue).map(String);
+    const values = answers[condition.question].map(currentAnswerValue)
+      .filter((v: any) => v !== undefined && v !== null && v !== '')
+      .map(String);
     switch (condition.operator) {
     case 'exists':
       return expected === false ? values.length === 0 : values.length > 0;
