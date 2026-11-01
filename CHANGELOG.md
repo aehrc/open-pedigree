@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.0...open-pedigree-v1.5.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* keep a term's codes when the terminology changes between saves ([#75](https://github.com/aehrc/open-pedigree/issues/75)) ([11e2667](https://github.com/aehrc/open-pedigree/commit/11e26676952a45c5016792407bcac833470479c0))
+
 ## [1.5.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.4.14...open-pedigree-v1.5.0) (2026-10-29)
 
 
