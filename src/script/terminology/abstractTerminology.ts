@@ -44,7 +44,7 @@ export default class AbstractTerminology {
     let temp = id;
     temp = temp.replace(/[:]/g, '_C_');
     temp = temp.replace(/[([]/g, '_L_');
-    temp = temp.replace(/[)]]/g, '_J_');
+    temp = temp.replace(/[)\]]/g, '_J_');
     temp = temp.replace(/[.]/g, '_D_');
     temp = temp.replace(/\//g, '_S_');
     temp = temp.replace(/[^a-zA-Z0-9,;_\-*]/g, '__');
