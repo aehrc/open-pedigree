@@ -69,6 +69,7 @@ export default class Person extends AbstractPerson {
   _linkedRecordRef: any;
   _linkedRecordSnapshot: any;
   _unrenderedQuestionnaireResponses: any;
+  _termCodings: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -265,6 +266,7 @@ export default class Person extends AbstractPerson {
     this._linkedRecordRef = '';
     this._linkedRecordSnapshot = {};
     this._unrenderedQuestionnaireResponses = [];
+    this._termCodings = {};
     this._questionnaireAnswers = {};
   }
 
@@ -1211,6 +1213,20 @@ export default class Person extends AbstractPerson {
     if (this._unrenderedQuestionnaireResponses.length > 0) {
       info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
     }
+    // The codings of terms read from systems the editor doesn't use, kept to write them back with
+    // (see GA4GHFHIRConverter._keepTermCoding) - those of the terms the person has now.
+    const termCodings = {};
+    for (const key of ['disorders', 'hpoTerms', 'candidateGenes']) {
+      const kept = this._termCodings[key] || {};
+      for (const term of info[key] || []) {
+        if (Object.prototype.hasOwnProperty.call(kept, term)) {
+          (termCodings[key] = termCodings[key] || {})[term] = kept[term];
+        }
+      }
+    }
+    if (Object.keys(termCodings).length > 0) {
+      info['termCodings'] = termCodings;
+    }
     return info;
   }
 
@@ -1295,6 +1311,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('unrenderedQuestionnaireResponses')) {
         this._unrenderedQuestionnaireResponses = info.unrenderedQuestionnaireResponses || [];
+      }
+      if (info.hasOwnProperty('termCodings')) {
+        this._termCodings = info.termCodings || {};
       }
       return true;
     }

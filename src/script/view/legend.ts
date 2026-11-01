@@ -333,6 +333,13 @@ export default class Legend {
     return item;
   }
 
+  sanitizeID(id: any): any {
+    if (this._terminology){
+      return this._terminology.sanitizeID(id);
+    }
+    return id;
+  }
+
   desanitizeID(id: any): any {
     if (this._terminology){
       return this._terminology.desanitizeID(id);

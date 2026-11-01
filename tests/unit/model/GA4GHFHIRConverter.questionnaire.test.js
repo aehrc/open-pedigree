@@ -3,6 +3,7 @@ import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
 import { parseQuestionnaire } from 'pedigree/questionnaire/questionnaireParser';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
+import DefaultFhirTerminologyHelper from 'pedigree/DefaultFhirTerminologyHelper';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
 const DIABETES_CODE = { coding: [{ system: 'http://snomed.info/sct', code: '73211009', display: 'Diabetes mellitus' }] };
@@ -603,5 +604,311 @@ describe('a pedigree saved, loaded and saved again', () => {
     expect(linkOf('urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
     expect(linkOf('0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
     expect(linkOf('abc123')).toBe('Patient/abc123');
+  });
+});
+
+describe('changing the terminology between saves (terminology-change-keeps-codes)', () => {
+  const SNOMED = 'http://snomed.info/sct';
+  const HGNC = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
+  const SNOMEDCT = [SNOMED, SNOMED, HGNC];
+  const HPO_OMIM = ['http://www.omim.org', 'http://purl.obolibrary.org/obo/hp.owl', HGNC];
+  const OLD_GENE_SYSTEM = 'http://www.genenames.org';
+  // What the terminologies confirm: anything else is unknown to them.
+  const NAMES = { '233873004': 'Hypertrophic cardiomyopathy', '271807003': 'Eruption of skin', '7551': 'MYBPC3', 'HP:0001279': 'Syncope' };
+  const legend = { getTerm: (id) => ({ isUnknown: () => !(id in NAMES), getName: () => NAMES[id] || id }) };
+
+  // An editor whose Default Terminology gives these code systems; reading and writing a pedigree
+  // in one editor session is one helper.
+  const TUMOUR_SITE = { linkId: 'tumour_site', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendObservation' } };
+  let config;
+
+  function useTerminology([disorderCS, phenotypeCS, geneCS], items = parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items) {
+    const helper = new DefaultFhirTerminologyHelper(disorderCS, phenotypeCS, geneCS);
+    config = { ...parseQuestionnaire(DEFAULT_QUESTIONNAIRE), items };
+    vi.stubGlobal('editor', {
+      getFhirTerminologyHelper: () => helper,
+      getQuestionnaireConfig: () => config,
+      getDisorderLegend: () => legend,
+      getPhenotypeLegend: () => legend,
+      getGeneLegend: () => legend,
+    });
+  }
+
+  function savedUnderSnomed(items, extra = {}) {
+    useTerminology(SNOMEDCT, items);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { disorders: ['233873004'], hpoTerms: ['271807003'], candidateGenes: ['7551'] }, extra);
+    return GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+  }
+
+  function openAndSave(saved, terminology, items) {
+    useTerminology(terminology, items);
+    const graph = GA4GHFHIRConverter.initFromFHIR(saved);
+    const john = Object.values(graph.properties).find((p) => p.fName === 'John');
+    return { john, saved: GA4GHFHIRConverter.exportAsFHIR({ GG: graph }, 'all', null, null) };
+  }
+
+  function johnsResources(saved) {
+    const resources = JSON.parse(saved).entry.map((e) => e.resource);
+    const john = resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
+    return resources.filter((r) => r.subject && r.subject.reference === john.id);
+  }
+
+  function codings(saved) {
+    const mine = johnsResources(saved);
+    return {
+      conditions: mine.filter((r) => r.resourceType === 'Condition').map((r) => r.code),
+      observations: mine.filter((r) => r.resourceType === 'Observation').map((r) => r.valueCodeableConcept || r.valueString),
+    };
+  }
+
+  it('keeps the old codes through opening and saving under another terminology', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(before, HPO_OMIM);
+    // shown by name: neither is a term of the HPO + omim terminologies
+    expect(john.disorders).toEqual(['Hypertrophic cardiomyopathy']);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(john.candidateGenes).toEqual(['7551']);
+    expect(codings(saved)).toEqual(codings(before));
+    expect(codings(saved).conditions).toEqual([{ coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }]);
+  });
+
+  it('the linked-instrument summary carries the old codes too', () => {
+    const { saved } = openAndSave(savedUnderSnomed(), HPO_OMIM);
+    const qr = johnsResources(saved).find((r) => r.resourceType === 'QuestionnaireResponse');
+    const answer = (linkId) => qr.item.find((i) => i.linkId === linkId).answer;
+    expect(answer('disorders')).toEqual([{ valueCoding: { system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' } }]);
+    expect(answer('hpo_positive')).toEqual([{ valueCoding: { system: SNOMED, code: '271807003', display: 'Eruption of skin' } }]);
+  });
+
+  it('is as before once the terminology is changed back', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(openAndSave(before, HPO_OMIM).saved, SNOMEDCT);
+    expect(john.disorders).toEqual(['233873004']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+    expect(codings(saved)).toEqual(codings(before));
+  });
+
+  it('keeps a gene coded in a gene system that has since changed, as a gene', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(before, [SNOMED, SNOMED, OLD_GENE_SYSTEM]);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+    expect(codings(saved)).toEqual(codings(before));
+  });
+
+  it('keeps a gene from another system with a Questionnaire that has genes but no phenotypes', () => {
+    const items = parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items.filter((i) => i.linkId !== 'hpo_positive');
+    const { john, saved } = openAndSave(savedUnderSnomed(items), [SNOMED, SNOMED, OLD_GENE_SYSTEM], items);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(codings(saved).observations).toContainEqual({ coding: [{ system: HGNC, code: '7551', display: 'MYBPC3' }] });
+  });
+
+  it('reads one from a pedigree saved without QuestionnaireResponses as a phenotype', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    before.entry = before.entry.filter((e) => e.resource.resourceType !== 'QuestionnaireResponse');
+    const { john, saved } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(codings(saved).observations).toContainEqual({ coding: [{ system: SNOMED, code: '271807003', display: 'Eruption of skin' }] });
+  });
+
+  it('leaves a custom legend item\'s answer to its own item, not the phenotypes', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };
+    const before = savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [lung] } });
+    const { john, saved } = openAndSave(before, HPO_OMIM, items);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(john.questionnaireAnswers.tumour_site).toEqual([lung]);
+    expect(codings(saved)).toEqual(codings(before));
+  });
+
+  it('reads a concept with only text without failing', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const observation = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Observation' && r.valueCodeableConcept
+      && r.valueCodeableConcept.coding[0].code === '271807003');
+    observation.valueCodeableConcept = { text: 'Eruption of skin' };
+    expect(() => openAndSave(JSON.stringify(before), HPO_OMIM)).not.toThrow();
+  });
+
+  it('keeps each person\'s own coding for a term with the same name', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const resources = before.entry.map((e) => e.resource);
+    const jane = resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'Jane');
+    const icd = { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: 'I42.1', display: 'Hypertrophic cardiomyopathy' }] };
+    before.entry.push({ resource: { resourceType: 'Condition', id: 'jane-hcm', subject: { reference: jane.id }, code: icd } });
+    const { saved } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    const out = JSON.parse(saved).entry.map((e) => e.resource);
+    const janeAfter = out.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'Jane');
+    expect(out.filter((r) => r.resourceType === 'Condition' && r.subject.reference === janeAfter.id).map((r) => r.code)).toEqual([icd]);
+    expect(codings(saved).conditions).toEqual([{ coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }]);
+  });
+
+  it('keeps the first coding when one person has two with the same name', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const resources = before.entry.map((e) => e.resource);
+    const condition = resources.find((r) => r.resourceType === 'Condition');
+    const icd = { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: 'I42.1', display: 'Hypertrophic cardiomyopathy' }] };
+    before.entry.push({ resource: { resourceType: 'Condition', id: 'second', subject: condition.subject, code: icd } });
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
+  });
+
+  it('someone else in the pedigree given an old term (e.g. from the legend) is given its coding; another pedigree isn\'t', () => {
+    const { john } = openAndSave(savedUnderSnomed(), HPO_OMIM);
+    expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
+    const stored = savedUnderSnomed();
+    useTerminology(HPO_OMIM);
+    const reread = GA4GHFHIRConverter.initFromFHIR(stored);
+    const jane = Object.values(reread.properties).find((p) => p.fName === 'Jane');
+    jane.disorders = ['Hypertrophic cardiomyopathy'];
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: reread }, 'all', null, null));
+    const conditions = saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition');
+    expect(conditions.map((c) => c.code.coding[0].code)).toEqual(['233873004', '233873004']);
+
+    const other = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    other.properties[1].disorders = ['Hypertrophic cardiomyopathy'];
+    const elsewhere = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: other }, 'all', null, null));
+    expect(elsewhere.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition').map((c) => c.code))
+      .toEqual([{ text: 'Hypertrophic cardiomyopathy' }]);
+  });
+
+  it('a custom legend item\'s answer stays its own for a person with no phenotypes or genes', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };
+    for (const terminology of [SNOMEDCT, HPO_OMIM]) {
+      const before = savedUnderSnomed(items, { hpoTerms: [], candidateGenes: [], questionnaireAnswers: { tumour_site: [lung] } });
+      const { john } = openAndSave(before, terminology, items);
+      expect(john.hpoTerms).toBeUndefined();
+      expect(john.questionnaireAnswers.tumour_site).toEqual([lung]);
+    }
+  });
+
+  it('a custom legend item\'s Condition isn\'t read as a disorder too', () => {
+    const FAMILY_CANCER = { linkId: 'family_cancer', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } };
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, FAMILY_CANCER];
+    const breast = { system: SNOMED, code: '254837009', display: 'Breast cancer' };
+    for (const terminology of [SNOMEDCT, HPO_OMIM]) {
+      const before = savedUnderSnomed(items, { questionnaireAnswers: { family_cancer: [breast] } });
+      const { john, saved } = openAndSave(before, terminology, items);
+      expect(john.disorders).toEqual([terminology === SNOMEDCT ? '233873004' : 'Hypertrophic cardiomyopathy']);
+      expect(john.questionnaireAnswers.family_cancer).toEqual([breast]);
+      expect(codings(saved).conditions).toEqual(codings(before).conditions);
+    }
+  });
+
+  it('a term the terminology in use codes is coded by it, not with another person\'s kept coding', () => {
+    useTerminology(SNOMEDCT);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    const old = { coding: [{ system: OLD_GENE_SYSTEM, code: 'HGNC:7551', display: 'MYBPC3' }] };
+    Object.assign(baseGraph.properties[0], { candidateGenes: ['7551'], termCodings: { candidateGenes: { 7551: old } } });
+    baseGraph.properties[1].candidateGenes = ['7551'];
+    const genes = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null)).entry
+      .map((e) => e.resource).filter((r) => r.resourceType === 'Observation' && r.valueCodeableConcept).map((r) => r.valueCodeableConcept);
+    expect(genes).toEqual(expect.arrayContaining([old, { coding: [{ system: HGNC, code: '7551', display: 'MYBPC3' }] }]));
+  });
+
+  it('a QuestionnaireResponse for another Questionnaire doesn\'t decide what the resources are', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };
+    const before = JSON.parse(savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [lung] } }));
+    for (const r of before.entry.map((e) => e.resource).filter((x) => x.resourceType === 'QuestionnaireResponse')) {
+      r.questionnaire = 'http://example.org/Questionnaire/another|1.0';
+    }
+    // (as main: kept aside, and its items' resources read as generic terms - its answers aren't
+    // restored, so skipping them would lose them)
+    expect(openAndSave(JSON.stringify(before), SNOMEDCT, items).john.hpoTerms).toEqual(['271807003', '39607008']);
+  });
+
+  it('a carrier status whose coding is also a custom legend item\'s answer is still read', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const carrier = { system: SNOMED, code: '24800002', display: 'Carrier state, disease not expressed' };
+    const before = savedUnderSnomed(items, { carrierStatus: 'presymptomatic', questionnaireAnswers: { tumour_site: [carrier] } });
+    expect(openAndSave(before, HPO_OMIM, items).john.carrierStatus).toBe('presymptomatic');
+  });
+
+  it('a phenotype or disorder that\'s also a custom legend item\'s answer is read once', () => {
+    const FAMILY_CANCER = { linkId: 'family_cancer', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } };
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE, FAMILY_CANCER];
+    const rash = { system: SNOMED, code: '271807003', display: 'Eruption of skin' };
+    const hcm = { system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' };
+    const mybpc3 = { system: HGNC, code: '7551', display: 'MYBPC3' };
+    const before = savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [rash, mybpc3], family_cancer: [hcm] } });
+    const { john } = openAndSave(before, SNOMEDCT, items);
+    expect(john.hpoTerms).toEqual(['271807003']);
+    expect(john.candidateGenes).toEqual(['7551']);
+    expect(john.disorders).toEqual(['233873004']);
+  });
+
+  it('one listed nowhere, for a person whose QuestionnaireResponse lists their phenotypes, is left alone', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const john = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
+    before.entry.push({ resource: { resourceType: 'Observation', id: 'unlisted', status: 'preliminary', subject: { reference: john.id },
+      valueCodeableConcept: { coding: [{ system: 'http://example.org/other', code: '1', display: 'Something else' }] } } });
+    expect(openAndSave(JSON.stringify(before), HPO_OMIM).john.hpoTerms).toEqual(['Eruption of skin']);
+  });
+
+  it('a carrier status listed under a field item of the QuestionnaireResponse is still read', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items,
+      { linkId: 'carrier_code', itemType: 'choice', fieldType: 'select', repeats: false, mapping: null }];
+    const before = JSON.parse(savedUnderSnomed(items, { carrierStatus: 'presymptomatic' }));
+    const resources = before.entry.map((e) => e.resource);
+    const john = resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
+    const qr = resources.find((r) => r.resourceType === 'QuestionnaireResponse' && r.subject.reference === john.id);
+    qr.item.push({ linkId: 'carrier_code', answer: [{ valueCoding: { system: SNOMED, code: '24800002' } }] });
+    expect(openAndSave(JSON.stringify(before), HPO_OMIM, items).john.carrierStatus).toBe('presymptomatic');
+  });
+
+  it('an Observation with nothing to read leaves the person\'s phenotypes as they were', () => {
+    const before = JSON.parse(savedUnderSnomed(undefined, { hpoTerms: [] }));
+    before.entry = before.entry.filter((e) => e.resource.resourceType !== 'QuestionnaireResponse');
+    const john = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
+    before.entry.push({ resource: { resourceType: 'Observation', id: 'nothing', status: 'preliminary', subject: { reference: john.id }, valueCodeableConcept: { coding: [{ system: SNOMED }] } } });
+    expect(openAndSave(JSON.stringify(before), HPO_OMIM).john.hpoTerms).toBeUndefined();
+  });
+
+  it('the pedigree\'s codings are used only while it\'s exported', () => {
+    openAndSave(savedUnderSnomed(), HPO_OMIM);
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { disorders: ['Hypertrophic cardiomyopathy'] });
+    expect(qr.item.find((i) => i.linkId === 'disorders').answer)
+      .toEqual([{ valueCoding: { code: 'Hypertrophic cardiomyopathy', display: 'Hypertrophic cardiomyopathy' } }]);
+  });
+
+  it('a kept phenotype whose first coding has no code is still a phenotype after two saves', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const observation = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Observation' && r.valueCodeableConcept
+      && r.valueCodeableConcept.coding[0].code === '271807003');
+    const twoCodings = { coding: [{ system: 'http://example.org/no-code', display: 'Eruption of skin' }, observation.valueCodeableConcept.coding[0]] };
+    observation.valueCodeableConcept = twoCodings;
+    const once = openAndSave(JSON.stringify(before), HPO_OMIM);
+    const twice = openAndSave(once.saved, HPO_OMIM);
+    expect(twice.john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(codings(twice.saved).observations).toContainEqual(twoCodings);
+  });
+
+  it('a person whose QuestionnaireResponse has neither legend item reads one as a phenotype, as with none', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    for (const r of before.entry.map((e) => e.resource).filter((x) => x.resourceType === 'QuestionnaireResponse')) {
+      r.item = r.item.filter((item) => item.linkId !== 'hpo_positive' && item.linkId !== 'candidate_genes');
+    }
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+  });
+
+  it('a coding also listed under a custom legend item is read as a phenotype once', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const rash = { system: SNOMED, code: '271807003', display: 'Eruption of skin' };
+    const { john } = openAndSave(savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [rash] } }), HPO_OMIM, items);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(john.questionnaireAnswers.tumour_site).toEqual([rash]);
+  });
+
+
+  it('leaves an Observation with a code it doesn\'t know alone, as before', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const observation = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Observation' && r.valueCodeableConcept
+      && r.valueCodeableConcept.coding[0].code === '271807003');
+    observation.code = { coding: [{ system: 'http://loinc.org', code: '00000-0' }] };
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.hpoTerms).toBeUndefined();
   });
 });

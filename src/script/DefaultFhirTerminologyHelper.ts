@@ -81,6 +81,14 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     if (!foundCode && codeableConcept.text) {
       code = codeableConcept.text;
     }
+    // another system's coding with no display (and no text): shown by its code and system, so the
+    // legend's terminology doesn't take it for one of its own codes - the person keeps the coding
+    // itself (see codingToKeep), to write it back with
+    if (!foundCode && code === undefined && codeableConcept.coding) {
+      const coded = codeableConcept.coding.find((c: any) => c.code);
+      // (not in brackets: the legend's IDs don't keep a ')')
+      code = coded && (coded.system ? coded.code + ' - ' + coded.system : coded.code);
+    }
     if (!foundCode && returnNullOnNoMatch) {
       return null;
     }
@@ -98,6 +106,22 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
 
   getPhenotypeSystem(): any {
     return this._phenotypeCS;
+  }
+
+  codingToKeep(legend: 'disorder' | 'phenotype' | 'gene', codeableConcept: any): any {
+    const system = { disorder: this._disorderCS, phenotype: this._phenotypeCS, gene: this._geneCS }[legend];
+    const codings = (codeableConcept && codeableConcept.coding) || [];
+    if (!codings.some((c: any) => c.code) || codings.some((c: any) => system && c.system === system)) {
+      return null;
+    }
+    const copy = JSON.parse(JSON.stringify(codeableConcept));
+    // an older editor's placeholder for a name it was still looking up isn't a name to keep
+    for (const coding of copy.coding) {
+      if (isLoadingName(coding.display)) {
+        delete coding.display;
+      }
+    }
+    return copy;
   }
 
   getGeneSystem(): any {
