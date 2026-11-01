@@ -753,14 +753,51 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
   });
 
-  it('a term with an old term\'s name on someone else, or in another pedigree, isn\'t given its coding', () => {
+  it('someone else in the pedigree given an old term (e.g. from the legend) is given its coding; another pedigree isn\'t', () => {
     const { john } = openAndSave(savedUnderSnomed(), HPO_OMIM);
     expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
-    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
-    baseGraph.properties[1].disorders = ['Hypertrophic cardiomyopathy'];
-    const saved = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
-    const conditions = JSON.parse(saved).entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition');
-    expect(conditions.map((c) => c.code)).toEqual([{ text: 'Hypertrophic cardiomyopathy' }]);
+    const stored = savedUnderSnomed();
+    useTerminology(HPO_OMIM);
+    const reread = GA4GHFHIRConverter.initFromFHIR(stored);
+    const jane = Object.values(reread.properties).find((p) => p.fName === 'Jane');
+    jane.disorders = ['Hypertrophic cardiomyopathy'];
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: reread }, 'all', null, null));
+    const conditions = saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition');
+    expect(conditions.map((c) => c.code.coding[0].code)).toEqual(['233873004', '233873004']);
+
+    const other = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    other.properties[1].disorders = ['Hypertrophic cardiomyopathy'];
+    const elsewhere = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: other }, 'all', null, null));
+    expect(elsewhere.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition').map((c) => c.code))
+      .toEqual([{ text: 'Hypertrophic cardiomyopathy' }]);
+  });
+
+  it('the pedigree\'s codings are used only while it\'s exported', () => {
+    openAndSave(savedUnderSnomed(), HPO_OMIM);
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { disorders: ['Hypertrophic cardiomyopathy'] });
+    expect(qr.item.find((i) => i.linkId === 'disorders').answer)
+      .toEqual([{ valueCoding: { code: 'Hypertrophic cardiomyopathy', display: 'Hypertrophic cardiomyopathy' } }]);
+  });
+
+  it('a kept phenotype whose first coding has no code is still a phenotype after two saves', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const observation = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Observation' && r.valueCodeableConcept
+      && r.valueCodeableConcept.coding[0].code === '271807003');
+    const twoCodings = { coding: [{ system: 'http://example.org/no-code', display: 'Eruption of skin' }, observation.valueCodeableConcept.coding[0]] };
+    observation.valueCodeableConcept = twoCodings;
+    const once = openAndSave(JSON.stringify(before), HPO_OMIM);
+    const twice = openAndSave(once.saved, HPO_OMIM);
+    expect(twice.john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(codings(twice.saved).observations).toContainEqual(twoCodings);
+  });
+
+  it('a person whose QuestionnaireResponse has neither legend item reads one as a phenotype, as with none', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    for (const r of before.entry.map((e) => e.resource).filter((x) => x.resourceType === 'QuestionnaireResponse')) {
+      r.item = r.item.filter((item) => item.linkId !== 'hpo_positive' && item.linkId !== 'candidate_genes');
+    }
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
   });
 
   it('a coding also listed under a custom legend item is read as a phenotype once', () => {

@@ -8,7 +8,8 @@ import path from 'path';
 // event's memo, which CustomEvents don't have). localEditor.html's terminology is OMIM disorders and HPO phenotypes.
 const LEGACY = fs.readFileSync(path.join(__dirname, '..', 'unit', 'fixtures', 'legacy-fhir-v1-pedigree.json'), 'utf8');
 const SNOMED = 'http://snomed.info/sct';
-const ADA2 = { system: SNOMED, code: '1234567', display: 'ADA2 deficiency' };
+// (a name the editor's term ids don't keep as it is: it gives it back as "ADA2 deficiency, Sneddon s type")
+const ADA2 = { system: SNOMED, code: '1234567', display: 'ADA2 deficiency, Sneddon\'s type' };
 const SEIZURE = { system: SNOMED, code: '91175000', display: 'Seizure' };
 
 async function openWith(page, value) {
@@ -84,8 +85,13 @@ test('terms from another terminology are shown by name and saved with their code
     const [id, p] = Object.entries(window.editor.getGraph().DG.GG.properties).find(([, q]) => q.fName === 'Maya');
     return { id: Number(id), disorders: p.disorders, hpoTerms: p.hpoTerms };
   });
-  expect(maya.disorders).toContain('ADA2 deficiency');
+  expect(maya.disorders).toContain('ADA2 deficiency, Sneddon\'s type');
   expect(maya.hpoTerms).toEqual(['Seizure']);
+
+  // saved as opened
+  const opened = codings(mayaOf(await save(page)));
+  expect(opened.disorders).toContainEqual({ coding: [ADA2] });
+  expect(opened.observations).toContainEqual({ coding: [SEIZURE] });
 
   await page.evaluate((id) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
     { detail: { nodeID: id, properties: { setFirstName: 'May' } } })), maya.id);

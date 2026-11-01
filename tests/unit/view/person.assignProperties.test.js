@@ -97,13 +97,24 @@ describe('Person.assignProperties', () => {
   });
 
   it('keeps the codings of terms from another terminology through its properties', () => {
-    const termCodings = { disorders: { 'Hypertrophic cardiomyopathy': { coding: [{ system: 'http://snomed.info/sct', code: '233873004' }] } } };
-    const person = new Person(0, 0, 1, { ...properties, termCodings });
+    const hcm = { coding: [{ system: 'http://snomed.info/sct', code: '233873004' }] };
+    const termCodings = { disorders: { 'Hypertrophic cardiomyopathy': hcm } };
+    const withHcm = { ...properties, disorders: ['Hypertrophic cardiomyopathy'], termCodings };
+    const person = new Person(0, 0, 1, withHcm);
     expect(person.getProperties().termCodings).toEqual(termCodings);
     const other = new Person(0, 0, 2, properties);
     expect(other.getProperties().termCodings).toBeUndefined();
-    other.assignProperties({ ...properties, termCodings });
+    other.assignProperties(withHcm);
     expect(other.getProperties().termCodings).toEqual(termCodings);
+  });
+
+  it('drops the coding of a term the person no longer has, so it isn\'t given back if the term is typed in again', () => {
+    const termCodings = { disorders: { 'Hypertrophic cardiomyopathy': { coding: [{ system: 'http://snomed.info/sct', code: '233873004' }] } } };
+    const person = new Person(0, 0, 1, { ...properties, disorders: ['Hypertrophic cardiomyopathy'], termCodings });
+    person.setDisorders([]);
+    expect(person.getProperties().termCodings).toBeUndefined();
+    person.setDisorders(['Hypertrophic cardiomyopathy']);
+    expect(person.getProperties().termCodings).toBeUndefined();
   });
 
   it('counts each value once for a newly constructed person', () => {

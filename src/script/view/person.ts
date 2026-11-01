@@ -1214,9 +1214,20 @@ export default class Person extends AbstractPerson {
       info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
     }
     // The codings of terms read from systems the editor doesn't use, kept to write them back with
-    // (see GA4GHFHIRConverter._keepTermCoding).
-    if (Object.keys(this._termCodings).length > 0) {
-      info['termCodings'] = this._termCodings;
+    // (see GA4GHFHIRConverter._keepTermCoding) - for the terms the person still has, so one taken
+    // away and typed in again later isn't given its old code.
+    const termCodings = {};
+    for (const key of ['disorders', 'hpoTerms', 'candidateGenes']) {
+      const kept = this._termCodings[key] || {};
+      for (const term of info[key] || []) {
+        if (Object.prototype.hasOwnProperty.call(kept, term)) {
+          (termCodings[key] = termCodings[key] || {})[term] = kept[term];
+        }
+      }
+    }
+    this._termCodings = termCodings;
+    if (Object.keys(termCodings).length > 0) {
+      info['termCodings'] = termCodings;
     }
     return info;
   }

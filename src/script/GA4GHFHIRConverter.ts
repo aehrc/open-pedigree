@@ -744,7 +744,8 @@ function codingKey(coding) {
 GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
   const inUse = ['hpo_positive', 'candidate_genes'].filter((linkId) => this._hasReservedLegendItem(linkId, 'legendObservation'));
   const answers = nodeData.legendAnswers;
-  if (!answers) {
+  // (a QuestionnaireResponse with neither item, e.g. only one for another Questionnaire, says nothing)
+  if (!answers || (!answers.hpo_positive && !answers.candidate_genes)) {
     return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
   }
   const keys = (codeableConcept.coding || []).map(codingKey);
@@ -786,17 +787,33 @@ GA4GHFHIRConverter._keepTermCoding = function (nodeData, propertyBagKey, term, c
   }
   const kept = nodeData.properties.termCodings = nodeData.properties.termCodings || {};
   const forProperty = kept[propertyBagKey] = kept[propertyBagKey] || {};
-  if (!Object.prototype.hasOwnProperty.call(forProperty, term)) {
-    forProperty[term] = codeableConcept;
+  const id = this._exportedTermId(propertyBagKey, term);
+  if (!Object.prototype.hasOwnProperty.call(forProperty, id)) {
+    forProperty[id] = codeableConcept;
   }
 };
 
-// A term's CodeableConcept to write: the coding the person kept for it, if any (_keepTermCoding),
-// else the terminology helper's.
+// A term as the person will give it back for export: the legend's ID for it, desanitized - which
+// isn't always the term (e.g. "Alzheimer's disease" comes back as "Alzheimer s disease").
+GA4GHFHIRConverter._exportedTermId = function (propertyBagKey, term) {
+  const getter = { disorders: 'getDisorderLegend', hpoTerms: 'getPhenotypeLegend', candidateGenes: 'getGeneLegend' }[propertyBagKey];
+  const legend = getter && typeof editor[getter] === 'function' ? editor[getter]() : null;
+  if (!legend || typeof legend.sanitizeID !== 'function' || typeof legend.desanitizeID !== 'function') {
+    return term;
+  }
+  return legend.desanitizeID(legend.sanitizeID(term));
+};
+
+// A term's CodeableConcept to write: the coding the person kept for it (_keepTermCoding), else one
+// someone else in the pedigree being exported keeps for it, else the terminology helper's.
 GA4GHFHIRConverter._termCodeableConcept = function (nodeProperties, propertyBagKey, term, ccMethod) {
-  const kept = nodeProperties.termCodings && nodeProperties.termCodings[propertyBagKey];
-  if (kept && Object.prototype.hasOwnProperty.call(kept, term)) {
-    return kept[term];
+  // (by the legend's form of the term, as it's kept: the person may not have given it back yet)
+  const id = this._exportedTermId(propertyBagKey, term);
+  for (const kept of [nodeProperties.termCodings, this._pedigreeTermCodings]) {
+    const forProperty = kept && kept[propertyBagKey];
+    if (forProperty && Object.prototype.hasOwnProperty.call(forProperty, id)) {
+      return forProperty[id];
+    }
   }
   return editor.getFhirTerminologyHelper()[ccMethod](term);
 };
@@ -988,6 +1005,28 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
  */
 
 GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
+  // The codings people keep for their terms (_keepTermCoding), for anyone else in the pedigree
+  // given the same term, e.g. by dragging it from the legend: one legend entry, one coding.
+  this._pedigreeTermCodings = this._collectTermCodings(pedigree);
+  try {
+    return this._exportAsFHIR(pedigree, privacySetting, knownFhirPatienReference, pedigreeImage);
+  } finally {
+    this._pedigreeTermCodings = null;
+  }
+};
+
+GA4GHFHIRConverter._collectTermCodings = function (pedigree) {
+  const collected = {};
+  for (let i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
+    const kept = pedigree.GG.isPerson(i) && pedigree.GG.properties[i] && pedigree.GG.properties[i].termCodings;
+    for (const [propertyBagKey, byTerm] of Object.entries(kept || {})) {
+      collected[propertyBagKey] = { ...(byTerm as any), ...(collected[propertyBagKey] || {}) };
+    }
+  }
+  return collected;
+};
+
+GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
   // let exportObj = [];
   let today = new Date();
   let time = ((today.getHours() < 10) ? '0' : '') + today.getHours() + ':' + ((today.getMinutes() < 10) ? '0' : '') + today.getMinutes() + ':'
@@ -1898,12 +1937,13 @@ GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
 // item already produces, via the SAME CodeableConcepts (_termCodeableConcept)
 // addConditions/addObservations use for the "real" resource - so the single-valueCoding
 // QuestionnaireResponse entry is a faithful (if necessarily single-coding) summary of it.
-GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, rawIds, nodeProperties) {
+GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, nodeProperties) {
   var target = RESERVED_LEGEND_TARGETS[linkId];
   var self = this;
-  return (rawIds || []).map(function (id) {
-    var cc = self._termCodeableConcept(nodeProperties || {}, target.propertyBagKey, id, target.ccMethod);
-    var coding = cc && cc.coding && cc.coding[0];
+  return (nodeProperties[target.propertyBagKey] || []).map(function (id) {
+    var cc = self._termCodeableConcept(nodeProperties, target.propertyBagKey, id, target.ccMethod);
+    // (the first coding with a code: what tells a phenotype from a gene on the way back in)
+    var coding = cc && cc.coding && (cc.coding.find(function (c) { return c.code; }) || cc.coding[0]);
     return coding ? { system: coding.system, code: coding.code, display: coding.display } : { code: id, display: id };
   });
 };
@@ -1923,7 +1963,7 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     if (item.mapping && item.mapping.kind === 'field') {
       value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
     } else if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') && RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
-      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey], nodeProperties);
+      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties);
     } else {
       value = storedAnswers[item.linkId];
     }
