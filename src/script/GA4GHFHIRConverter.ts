@@ -562,8 +562,7 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
 
   // Another legend item's answer, restored from the QuestionnaireResponse itself.
-  const listedUnder = this._itemsListing(conditionResource.code, nodeData);
-  if (listedUnder.length > 0 && !listedUnder.includes('disorders')) {
+  if (this._isAnotherItemsAnswer(conditionResource.code, nodeData, ['disorders'])) {
     return;
   }
 
@@ -572,10 +571,11 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
     this._keepTermCoding(nodeData, 'disorders', conditionToAdd, this._codingToKeep('disorder', conditionResource.code));
 
     if (conditionToAdd){
-      if ('disorders' in nodeData.properties){
-        nodeData.properties.disorders.push(conditionToAdd);
-      } else {
+      // (once: the same coding can also be a custom legend item's answer)
+      if (!('disorders' in nodeData.properties)) {
         nodeData.properties.disorders = [conditionToAdd];
+      } else if (!nodeData.properties.disorders.includes(conditionToAdd)) {
+        nodeData.properties.disorders.push(conditionToAdd);
       }
     } else {
       console.log('No disorder found in ', conditionResource.code);
@@ -604,14 +604,6 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     return;
   }
 
-  // Another legend item's answer, restored from the QuestionnaireResponse itself.
-  if (!observationResource.code && observationResource.valueCodeableConcept) {
-    const listedUnder = this._itemsListing(observationResource.valueCodeableConcept, nodeData);
-    if (listedUnder.length > 0 && !listedUnder.includes('hpo_positive') && !listedUnder.includes('candidate_genes')) {
-      return;
-    }
-  }
-
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
 
   let foundCode = false;
@@ -628,14 +620,20 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
         break;
       }
     }
+    // Another legend item's answer, restored from the QuestionnaireResponse itself.
+    if (!foundCode && !observationResource.code
+      && this._isAnotherItemsAnswer(observationResource.valueCodeableConcept, nodeData, ['hpo_positive', 'candidate_genes'])) {
+      return;
+    }
     if (!foundCode && this._hasReservedLegendItem('hpo_positive', 'legendObservation')) {
       let phenotype = fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, true);
       if (phenotype) {
         foundCode = true;
-        if ('hpoTerms' in nodeData.properties) {
-          nodeData.properties.hpoTerms.push(phenotype);
-        } else {
+        // (once: the same coding can also be a custom legend item's answer)
+        if (!('hpoTerms' in nodeData.properties)) {
           nodeData.properties.hpoTerms = [phenotype];
+        } else if (!nodeData.properties.hpoTerms.includes(phenotype)) {
+          nodeData.properties.hpoTerms.push(phenotype);
         }
       }
     }
@@ -643,10 +641,10 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
       let gene = fhirTerminologyHelper.getGeneFromCodeableConcept(observationResource.valueCodeableConcept, true);
       if (gene) {
         foundCode = true;
-        if ('candidateGenes' in nodeData.properties){
-          nodeData.properties.candidateGenes.push(gene);
-        } else {
+        if (!('candidateGenes' in nodeData.properties)) {
           nodeData.properties.candidateGenes = [gene];
+        } else if (!nodeData.properties.candidateGenes.includes(gene)) {
+          nodeData.properties.candidateGenes.push(gene);
         }
       }
     }
@@ -768,6 +766,13 @@ GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, no
   return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
 };
 
+// Whether a CodeableConcept is listed in the person's QuestionnaireResponse only under items other
+// than the given ones: another legend item's answer.
+GA4GHFHIRConverter._isAnotherItemsAnswer = function (codeableConcept, nodeData, ownItems) {
+  const listedUnder = this._itemsListing(codeableConcept, nodeData);
+  return listedUnder.length > 0 && !listedUnder.some((linkId) => ownItems.includes(linkId));
+};
+
 // The items of the person's QuestionnaireResponse that list any of a CodeableConcept's codings.
 GA4GHFHIRConverter._itemsListing = function (codeableConcept, nodeData) {
   const answers = nodeData.legendAnswers || {};
@@ -787,7 +792,12 @@ GA4GHFHIRConverter.indexLegendAnswers = function (questionnaireResponseResource,
     return;
   }
   const config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
-  const legendItems = new Set(((config && config.items) || [])
+  // (only one for the Questionnaire in effect: another's is kept aside, its answers not restored -
+  // see answersFromQuestionnaireResponse)
+  if (!config || questionnaireResponseResource.questionnaire !== config.canonicalUrl) {
+    return;
+  }
+  const legendItems = new Set((config.items || [])
     .filter((i) => i.mapping && (i.mapping.kind === 'legendCondition' || i.mapping.kind === 'legendObservation'))
     .map((i) => i.linkId));
   const answers = nodeData.legendAnswers = nodeData.legendAnswers || {};

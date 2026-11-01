@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 // abstractTerminology first: it and the term classes import each other, and this order lets the
 // term classes see AbstractTerm defined.
-import 'pedigree/terminology/abstractTerminology';
+import AbstractTerminology from 'pedigree/terminology/abstractTerminology';
 import DisorderTerm from 'pedigree/terminology/disorderTerm';
 import DefaultFhirTerminologyHelper from 'pedigree/DefaultFhirTerminologyHelper';
 
@@ -134,8 +134,14 @@ describe('DefaultFhirTerminologyHelper, a coding from another terminology', () =
 
   it('with no display or text, is shown by its code and system, so it isn\'t taken for a code of the legend\'s own', () => {
     const h = helper();
-    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004' }] }, false)).toBe('233873004 (' + SNOMED + ')');
+    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004' }] }, false)).toBe('233873004 - ' + SNOMED);
     expect(h.getDisorderFromCodeableConcept({ coding: [{ code: '233873004' }] }, false)).toBe('233873004');
+  });
+
+  it('a code shown with its system comes back from the legend\'s IDs as it was', () => {
+    const terminology = new AbstractTerminology();
+    const id = helper().getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '91175000' }] }, false);
+    expect(terminology.desanitizeID(terminology.sanitizeID(id))).toBe(id);
   });
 
   it('a concept with only text is read by it, as before', () => {

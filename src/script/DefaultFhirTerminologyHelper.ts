@@ -86,7 +86,8 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     // itself (see codingToKeep), to write it back with
     if (!foundCode && code === undefined && codeableConcept.coding) {
       const coded = codeableConcept.coding.find((c: any) => c.code);
-      code = coded && (coded.system ? coded.code + ' (' + coded.system + ')' : coded.code);
+      // (not in brackets: the legend's IDs don't keep a ')')
+      code = coded && (coded.system ? coded.code + ' - ' + coded.system : coded.code);
     }
     if (!foundCode && returnNullOnNoMatch) {
       return null;

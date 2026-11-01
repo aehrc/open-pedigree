@@ -807,6 +807,38 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(genes).toEqual(expect.arrayContaining([old, { coding: [{ system: HGNC, code: '7551', display: 'MYBPC3' }] }]));
   });
 
+  it('a QuestionnaireResponse for another Questionnaire doesn\'t decide what the resources are', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };
+    const before = JSON.parse(savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [lung] } }));
+    for (const r of before.entry.map((e) => e.resource).filter((x) => x.resourceType === 'QuestionnaireResponse')) {
+      r.questionnaire = 'http://example.org/Questionnaire/another|1.0';
+    }
+    // (as main: kept aside, and its items' resources read as generic terms - its answers aren't
+    // restored, so skipping them would lose them)
+    expect(openAndSave(JSON.stringify(before), SNOMEDCT, items).john.hpoTerms).toEqual(['271807003', '39607008']);
+  });
+
+  it('a carrier status whose coding is also a custom legend item\'s answer is still read', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const carrier = { system: SNOMED, code: '24800002', display: 'Carrier state, disease not expressed' };
+    const before = savedUnderSnomed(items, { carrierStatus: 'presymptomatic', questionnaireAnswers: { tumour_site: [carrier] } });
+    expect(openAndSave(before, HPO_OMIM, items).john.carrierStatus).toBe('presymptomatic');
+  });
+
+  it('a phenotype or disorder that\'s also a custom legend item\'s answer is read once', () => {
+    const FAMILY_CANCER = { linkId: 'family_cancer', itemType: 'choice', fieldType: 'questionnaire-legend-picker', repeats: true, mapping: { kind: 'legendCondition' } };
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE, FAMILY_CANCER];
+    const rash = { system: SNOMED, code: '271807003', display: 'Eruption of skin' };
+    const hcm = { system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' };
+    const mybpc3 = { system: HGNC, code: '7551', display: 'MYBPC3' };
+    const before = savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [rash, mybpc3], family_cancer: [hcm] } });
+    const { john } = openAndSave(before, SNOMEDCT, items);
+    expect(john.hpoTerms).toEqual(['271807003']);
+    expect(john.candidateGenes).toEqual(['7551']);
+    expect(john.disorders).toEqual(['233873004']);
+  });
+
   it('one listed nowhere, for a person whose QuestionnaireResponse lists their phenotypes, is left alone', () => {
     const before = JSON.parse(savedUnderSnomed());
     const john = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
