@@ -10,10 +10,10 @@ function editorLegend(getter: 'getDisorderLegend' | 'getPhenotypeLegend' | 'getG
 
 type LegendKind = 'disorder' | 'phenotype' | 'gene';
 
-// The codings a CodeableConcept carries, as a comparable key: which concept it is, whatever its
+// The system|code of each coding a CodeableConcept carries: which concept it is, whatever its
 // display or text says.
-function codingsKey(codeableConcept: any): string {
-  return (codeableConcept.coding || []).map((c: any) => c.system + '|' + c.code).sort().join('\n');
+function codingKeys(codeableConcept: any): string[] {
+  return (codeableConcept.coding || []).map((c: any) => c.system + '|' + c.code);
 }
 
 export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper {
@@ -37,11 +37,13 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
   }
 
   _getCodeableConceptFromLegend(code: any, legend: any, codeSystem: any, kind?: LegendKind): any {
+    const cachedTerm = legend.getTerm(code);
+    // A term read from another system's coding goes back as it was read - unless the legend's own
+    // terminology knows the id too, when it's coded in that, as any other of its terms is.
     const foreign = kind ? this._foreignCodings[kind].get(code) : undefined;
-    if (foreign) {
+    if (foreign && !(codeSystem && !cachedTerm.isUnknown())) {
       return JSON.parse(JSON.stringify(foreign));
     }
-    const cachedTerm = legend.getTerm(code);
     // With no code system configured for the legend (e.g. genes by default) there's no valid
     // coding to make, so the code is written as text.
     if (!codeSystem) {
@@ -70,12 +72,28 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     return this._getCodeableConceptFromLegend(gene, editor.getGeneLegend(), this._geneCS, 'gene');
   }
 
+  /** Forgets the codings remembered from a pedigree read before: called as another is read. */
+  forgetForeignCodings(): void {
+    for (const known of Object.values(this._foreignCodings)) {
+      known.clear();
+    }
+  }
+
   // Remembers a coding read in another code system under the id it's shown by (see _foreignCodings).
+  // Read again under that id it's the same concept if any of its codings is; a different concept
+  // makes the id ambiguous.
   _rememberForeignCoding(kind: LegendKind, id: string, codeableConcept: any): void {
     const known = this._foreignCodings[kind];
     if (!known.has(id)) {
-      known.set(id, JSON.parse(JSON.stringify(codeableConcept)));
-    } else if (known.get(id) !== null && codingsKey(known.get(id)) !== codingsKey(codeableConcept)) {
+      const copy = JSON.parse(JSON.stringify(codeableConcept));
+      // an older editor's placeholder for a name it was still looking up isn't a name to keep
+      for (const coding of copy.coding || []) {
+        if (isLoadingName(coding.display)) {
+          delete coding.display;
+        }
+      }
+      known.set(id, copy);
+    } else if (known.get(id) !== null && !codingKeys(codeableConcept).some((k) => codingKeys(known.get(id)).includes(k))) {
       console.warn('Two different codings are shown as "' + id + '"; writing it as text', known.get(id), codeableConcept);
       known.set(id, null);
     }
@@ -116,7 +134,7 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     if (!foundCode && returnNullOnNoMatch) {
       return null;
     }
-    if (!foundCode && code !== undefined && kind && codingsKey(codeableConcept) !== '') {
+    if (!foundCode && code !== undefined && kind && codingKeys(codeableConcept).length > 0) {
       this._rememberForeignCoding(kind, code, codeableConcept);
     }
     return code;

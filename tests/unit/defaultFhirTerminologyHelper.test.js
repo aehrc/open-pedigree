@@ -136,6 +136,36 @@ describe('DefaultFhirTerminologyHelper, a coding from another terminology', () =
     expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
   });
 
+  it('the same concept read with another coding as well is still kept', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const h = helper();
+    h.getDisorderFromCodeableConcept(HCM, false);
+    h.getDisorderFromCodeableConcept({ coding: [...HCM.coding, { system: 'http://example.org/other', code: '1', display: 'Hypertrophic cardiomyopathy' }] }, false);
+    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
+  });
+
+  it('is coded in the legend\'s own terminology when that knows the id too', () => {
+    const h = helper();
+    const bare = { coding: [{ system: SNOMED, code: '615688' }] };
+    h.getDisorderFromCodeableConcept(bare, false);
+    const known = { isUnknown: () => false, getName: () => 'ADA2 deficiency' };
+    vi.stubGlobal('editor', { getDisorderLegend: () => ({ getTerm: () => known }) });
+    expect(h.getCodeableConceptFromDisorder('615688')).toEqual({ coding: [{ system: OMIM, code: '615688', display: 'ADA2 deficiency' }] });
+  });
+
+  it('doesn\'t keep an older editor\'s "loading..." display', () => {
+    const h = helper();
+    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004', display: 'loading...' }] }, false)).toBe('233873004');
+    expect(h.getCodeableConceptFromDisorder('233873004')).toEqual({ coding: [{ system: SNOMED, code: '233873004' }] });
+  });
+
+  it('forgets what it read when asked to', () => {
+    const h = helper();
+    h.getDisorderFromCodeableConcept(HCM, false);
+    h.forgetForeignCodings();
+    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
+  });
+
   it('two different codings shown by the same name are written as text', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const h = helper();

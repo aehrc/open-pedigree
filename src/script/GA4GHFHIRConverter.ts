@@ -93,6 +93,11 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     throw 'Unable to import pedigree: input is not a valid JSON string '
     + err;
   }
+  // The codings remembered from the pedigree loaded before this one don't belong to this one.
+  const terminologyHelper = editor.getFhirTerminologyHelper();
+  if (terminologyHelper && typeof terminologyHelper.forgetForeignCodings === 'function') {
+    terminologyHelper.forgetForeignCodings();
+  }
   if (LegacyFHIRConverter.isLegacyResource(inputResource)) {
     // saved in the Legacy FHIR format (fhir_v1)
     return LegacyFHIRConverter.initFromFHIR(inputText);
@@ -177,6 +182,10 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
   for (const conditionResource of conditionResources){
     this.extractDataFromCondition(conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker);
+  }
+
+  for (const questionnaireResponseResource of questionnaireResponseResources){
+    this.indexLegendAnswers(questionnaireResponseResource, nodeDataLookup);
   }
 
   for (const observationResource of observationResources){
@@ -598,7 +607,7 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
   let foundCode = false;
   
   if (observationResource.valueCodeableConcept) {
-    for (const coding of observationResource.valueCodeableConcept.coding) {
+    for (const coding of observationResource.valueCodeableConcept.coding || []) {
       if (coding.system === 'http://snomed.info/sct' && coding.code === '87955000') {
         nodeData.properties['carrierStatus'] = 'carrier';
         foundCode = true;
@@ -705,17 +714,52 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     }
   }
   // A phenotype or gene coded only in a code system the editor doesn't use (e.g. saved under an
-  // earlier Default Terminology) is claimed by nothing above: read it as a phenotype, by its name,
-  // as a disorder is, rather than leave it out - the terminology helper writes it back with its own
-  // coding. Only an Observation without a code, the shape phenotypes and genes are saved in.
-  if (!foundCode && observationResource.valueCodeableConcept && !observationResource.code
-    && this._hasReservedLegendItem('hpo_positive', 'legendObservation')) {
-    let phenotype = fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, false);
-    if (phenotype) {
-      if ('hpoTerms' in nodeData.properties) {
-        nodeData.properties.hpoTerms.push(phenotype);
-      } else {
-        nodeData.properties.hpoTerms = [phenotype];
+  // earlier Default Terminology) is claimed by nothing above: read it by its name, as a disorder
+  // is, rather than leave it out - the terminology helper writes it back with its own coding.
+  if (!foundCode && observationResource.valueCodeableConcept && !observationResource.code) {
+    const linkId = this._legendOfUnclaimedObservation(observationResource.valueCodeableConcept, nodeData);
+    const target = linkId && RESERVED_LEGEND_TARGETS[linkId];
+    if (target && this._hasReservedLegendItem(linkId, 'legendObservation')) {
+      const read = linkId === 'hpo_positive'
+        ? fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, false)
+        : fhirTerminologyHelper.getGeneFromCodeableConcept(observationResource.valueCodeableConcept, false);
+      if (read) {
+        (nodeData.properties[target.propertyBagKey] = nodeData.properties[target.propertyBagKey] || []).push(read);
+      }
+    }
+  }
+};
+
+// Which legend a code-less Observation with a valueCodeableConcept that matched none of the
+// editor's code systems belongs to. Phenotypes, genes and custom legend items are all saved in
+// that shape; the person's QuestionnaireResponse lists each one's coding under its item
+// (indexLegendAnswers), so it says which. 'hpo_positive', 'candidate_genes', or null for another
+// item's (restored from the QuestionnaireResponse itself) or one it doesn't list. A person with no
+// QuestionnaireResponse was saved before custom legends existed: a phenotype, the likelier.
+GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
+  const answers = nodeData.legendAnswers;
+  if (!answers) {
+    return 'hpo_positive';
+  }
+  const keys = (codeableConcept.coding || []).map((c) => c.system + '|' + c.code);
+  return ['hpo_positive', 'candidate_genes'].find((linkId) => answers[linkId] && keys.some((k) => answers[linkId].has(k))) || null;
+};
+
+// Notes, on the person's node data (not their properties, so it isn't kept), the coding of each
+// answer in their QuestionnaireResponse, by item: see _legendOfUnclaimedObservation.
+GA4GHFHIRConverter.indexLegendAnswers = function (questionnaireResponseResource, nodeDataLookup) {
+  if (!questionnaireResponseResource.subject) {
+    return;
+  }
+  const nodeData = this.resolveNodeRef(questionnaireResponseResource.subject.reference, nodeDataLookup);
+  if (!nodeData) {
+    return;
+  }
+  const answers = nodeData.legendAnswers = nodeData.legendAnswers || {};
+  for (const item of questionnaireResponseResource.item || []) {
+    for (const answer of item.answer || []) {
+      if (answer.valueCoding && answer.valueCoding.code) {
+        (answers[item.linkId] = answers[item.linkId] || new Set()).add(answer.valueCoding.system + '|' + answer.valueCoding.code);
       }
     }
   }
