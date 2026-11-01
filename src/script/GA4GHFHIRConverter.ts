@@ -704,6 +704,21 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
       }
     }
   }
+  // A phenotype or gene coded only in a code system the editor doesn't use (e.g. saved under an
+  // earlier Default Terminology) is claimed by nothing above: read it as a phenotype, by its name,
+  // as a disorder is, rather than leave it out - the terminology helper writes it back with its own
+  // coding. Only an Observation without a code, the shape phenotypes and genes are saved in.
+  if (!foundCode && observationResource.valueCodeableConcept && !observationResource.code
+    && this._hasReservedLegendItem('hpo_positive', 'legendObservation')) {
+    let phenotype = fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, false);
+    if (phenotype) {
+      if ('hpoTerms' in nodeData.properties) {
+        nodeData.properties.hpoTerms.push(phenotype);
+      } else {
+        nodeData.properties.hpoTerms = [phenotype];
+      }
+    }
+  }
 };
 
 

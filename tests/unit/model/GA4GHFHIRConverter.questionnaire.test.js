@@ -3,6 +3,7 @@ import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
 import { parseQuestionnaire } from 'pedigree/questionnaire/questionnaireParser';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
+import DefaultFhirTerminologyHelper from 'pedigree/DefaultFhirTerminologyHelper';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
 const DIABETES_CODE = { coding: [{ system: 'http://snomed.info/sct', code: '73211009', display: 'Diabetes mellitus' }] };
@@ -603,5 +604,101 @@ describe('a pedigree saved, loaded and saved again', () => {
     expect(linkOf('urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
     expect(linkOf('0f8fad5b-d9cb-469f-a165-70867728950e')).toBeUndefined();
     expect(linkOf('abc123')).toBe('Patient/abc123');
+  });
+});
+
+describe('changing the terminology between saves (terminology-change-keeps-codes)', () => {
+  const SNOMED = 'http://snomed.info/sct';
+  const HGNC = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
+  const SNOMEDCT = [SNOMED, SNOMED, HGNC];
+  const HPO_OMIM = ['http://www.omim.org', 'http://purl.obolibrary.org/obo/hp.owl', HGNC];
+  const OLD_GENE_SYSTEM = 'http://www.genenames.org';
+  // What the terminologies confirm: anything else is unknown to them.
+  const NAMES = { '233873004': 'Hypertrophic cardiomyopathy', '271807003': 'Eruption of skin', '7551': 'MYBPC3', 'HP:0001279': 'Syncope' };
+  const legend = { getTerm: (id) => ({ isUnknown: () => !(id in NAMES), getName: () => NAMES[id] || id }) };
+
+  // An editor whose Default Terminology gives these code systems; reading and writing a pedigree
+  // in one editor session is one helper.
+  function useTerminology([disorderCS, phenotypeCS, geneCS]) {
+    const helper = new DefaultFhirTerminologyHelper(disorderCS, phenotypeCS, geneCS);
+    vi.stubGlobal('editor', {
+      getFhirTerminologyHelper: () => helper,
+      getQuestionnaireConfig: () => parseQuestionnaire(DEFAULT_QUESTIONNAIRE),
+      getDisorderLegend: () => legend,
+      getPhenotypeLegend: () => legend,
+      getGeneLegend: () => legend,
+    });
+  }
+
+  function savedUnderSnomed() {
+    useTerminology(SNOMEDCT);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { disorders: ['233873004'], hpoTerms: ['271807003'], candidateGenes: ['7551'] });
+    return GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+  }
+
+  function openAndSave(saved, terminology) {
+    useTerminology(terminology);
+    const graph = GA4GHFHIRConverter.initFromFHIR(saved);
+    const john = Object.values(graph.properties).find((p) => p.fName === 'John');
+    return { john, saved: GA4GHFHIRConverter.exportAsFHIR({ GG: graph }, 'all', null, null) };
+  }
+
+  function johnsResources(saved) {
+    const resources = JSON.parse(saved).entry.map((e) => e.resource);
+    const john = resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'John');
+    return resources.filter((r) => r.subject && r.subject.reference === john.id);
+  }
+
+  function codings(saved) {
+    const mine = johnsResources(saved);
+    return {
+      conditions: mine.filter((r) => r.resourceType === 'Condition').map((r) => r.code),
+      observations: mine.filter((r) => r.resourceType === 'Observation').map((r) => r.valueCodeableConcept || r.valueString),
+    };
+  }
+
+  it('keeps the old codes through opening and saving under another terminology', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(before, HPO_OMIM);
+    // shown by name: neither is a term of the HPO + omim terminologies
+    expect(john.disorders).toEqual(['Hypertrophic cardiomyopathy']);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(john.candidateGenes).toEqual(['7551']);
+    expect(codings(saved)).toEqual(codings(before));
+    expect(codings(saved).conditions).toEqual([{ coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }]);
+  });
+
+  it('the linked-instrument summary carries the old codes too', () => {
+    const { saved } = openAndSave(savedUnderSnomed(), HPO_OMIM);
+    const qr = johnsResources(saved).find((r) => r.resourceType === 'QuestionnaireResponse');
+    const answer = (linkId) => qr.item.find((i) => i.linkId === linkId).answer;
+    expect(answer('disorders')).toEqual([{ valueCoding: { system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' } }]);
+    expect(answer('hpo_positive')).toEqual([{ valueCoding: { system: SNOMED, code: '271807003', display: 'Eruption of skin' } }]);
+  });
+
+  it('is as before once the terminology is changed back', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(openAndSave(before, HPO_OMIM).saved, SNOMEDCT);
+    expect(john.disorders).toEqual(['233873004']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+    expect(codings(saved)).toEqual(codings(before));
+  });
+
+  it('keeps a gene coded in a gene system that has since changed (read as a phenotype)', () => {
+    const before = savedUnderSnomed();
+    const { john, saved } = openAndSave(before, [SNOMED, SNOMED, OLD_GENE_SYSTEM]);
+    expect(john.candidateGenes).toBeUndefined();
+    expect(john.hpoTerms).toEqual(['271807003', 'MYBPC3']);
+    expect(codings(saved).observations).toEqual(expect.arrayContaining(codings(before).observations));
+  });
+
+  it('leaves an Observation with a code it doesn\'t know alone, as before', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const observation = before.entry.map((e) => e.resource).find((r) => r.resourceType === 'Observation' && r.valueCodeableConcept
+      && r.valueCodeableConcept.coding[0].code === '271807003');
+    observation.code = { coding: [{ system: 'http://loinc.org', code: '00000-0' }] };
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.hpoTerms).toBeUndefined();
   });
 });
