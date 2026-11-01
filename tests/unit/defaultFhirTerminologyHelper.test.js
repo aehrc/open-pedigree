@@ -89,110 +89,54 @@ describe('DefaultFhirTerminologyHelper, a coding from another terminology', () =
   const HPO = 'http://purl.obolibrary.org/obo/hp.owl';
   const OMIM = 'http://www.omim.org';
   const HCM = { coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] };
-  const unknownTerm = { isUnknown: () => true, getName: (id) => id };
-  const legends = { getTerm: () => unknownTerm };
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   function helper() {
-    vi.stubGlobal('editor', { getDisorderLegend: () => legends, getPhenotypeLegend: () => legends, getGeneLegend: () => legends });
+    vi.stubGlobal('editor', {});
     return new DefaultFhirTerminologyHelper(OMIM, HPO, null);
   }
 
-  it('is shown by its name and written back with its own coding', () => {
+  it('is shown by its name, and is a coding to keep', () => {
     const h = helper();
     expect(h.getDisorderFromCodeableConcept(HCM, false)).toBe('Hypertrophic cardiomyopathy');
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
+    expect(h.codingToKeep('disorder', HCM)).toEqual(HCM);
   });
 
-  it('is kept per legend: a phenotype with the same name is not given the disorder\'s coding', () => {
-    const h = helper();
-    h.getDisorderFromCodeableConcept(HCM, false);
-    expect(h.getCodeableConceptFromPhenotype('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
-  });
-
-  it('writes a copy, so changing what was written doesn\'t change what\'s kept', () => {
-    const h = helper();
+  it('is kept as a copy', () => {
     const read = structuredClone(HCM);
-    h.getDisorderFromCodeableConcept(read, false);
+    const kept = helper().codingToKeep('disorder', read);
     read.coding[0].code = 'changed';
-    h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy').coding[0].code = 'changed too';
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
+    expect(kept).toEqual(HCM);
   });
 
-  it('keeps nothing when it is only tried and not taken (returnNullOnNoMatch)', () => {
+  it('isn\'t kept when it has a coding in the legend\'s own system, or no code at all', () => {
     const h = helper();
-    expect(h.getPhenotypeFromCodeableConcept(HCM, true)).toBeNull();
-    expect(h.getGeneFromCodeableConcept(HCM, true)).toBeNull();
-    expect(h.getCodeableConceptFromPhenotype('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
+    expect(h.codingToKeep('disorder', { coding: [...HCM.coding, { system: OMIM, code: '615688' }] })).toBeNull();
+    expect(h.codingToKeep('phenotype', { coding: [{ system: HPO, code: 'HP:0001279' }] })).toBeNull();
+    expect(h.codingToKeep('disorder', { text: 'Something' })).toBeNull();
+    expect(h.codingToKeep('disorder', { coding: [{ display: 'No code' }] })).toBeNull();
   });
 
-  it('the same coding read twice is still kept', () => {
-    const h = helper();
-    h.getDisorderFromCodeableConcept(HCM, false);
-    h.getDisorderFromCodeableConcept({ ...structuredClone(HCM), text: 'HCM' }, false);
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
-  });
-
-  it('the same concept read with another coding as well is still kept', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const h = helper();
-    h.getDisorderFromCodeableConcept(HCM, false);
-    h.getDisorderFromCodeableConcept({ coding: [...HCM.coding, { system: 'http://example.org/other', code: '1', display: 'Hypertrophic cardiomyopathy' }] }, false);
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual(HCM);
-  });
-
-  it('is coded in the legend\'s own terminology when that knows the id too', () => {
-    const h = helper();
-    const bare = { coding: [{ system: SNOMED, code: '615688' }] };
-    h.getDisorderFromCodeableConcept(bare, false);
-    const known = { isUnknown: () => false, getName: () => 'ADA2 deficiency' };
-    vi.stubGlobal('editor', { getDisorderLegend: () => ({ getTerm: () => known }) });
-    expect(h.getCodeableConceptFromDisorder('615688')).toEqual({ coding: [{ system: OMIM, code: '615688', display: 'ADA2 deficiency' }] });
+  it('is kept for a legend with no code system (genes by default)', () => {
+    const gene = { coding: [{ system: 'http://www.genenames.org', code: '7551', display: 'MYBPC3' }] };
+    expect(helper().codingToKeep('gene', gene)).toEqual(gene);
   });
 
   it('doesn\'t keep an older editor\'s "loading..." display', () => {
     const h = helper();
-    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004', display: 'loading...' }] }, false)).toBe('233873004');
-    expect(h.getCodeableConceptFromDisorder('233873004')).toEqual({ coding: [{ system: SNOMED, code: '233873004' }] });
+    const placeholder = { coding: [{ system: SNOMED, code: '233873004', display: 'loading...' }] };
+    expect(h.getDisorderFromCodeableConcept(placeholder, false)).toBe('233873004');
+    expect(h.codingToKeep('disorder', placeholder)).toEqual({ coding: [{ system: SNOMED, code: '233873004' }] });
   });
 
-  it('forgets what it read when asked to', () => {
-    const h = helper();
-    h.getDisorderFromCodeableConcept(HCM, false);
-    h.forgetForeignCodings();
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
+  it('with no display or text, is shown by its code', () => {
+    expect(helper().getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004' }] }, false)).toBe('233873004');
   });
 
-  it('two different codings shown by the same name are written as text', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const h = helper();
-    h.getDisorderFromCodeableConcept(HCM, false);
-    h.getDisorderFromCodeableConcept({ coding: [{ system: 'http://example.org/other', code: '1', display: 'Hypertrophic cardiomyopathy' }] }, false);
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
-    // and stays so, whichever is read next
-    h.getDisorderFromCodeableConcept(HCM, false);
-    expect(h.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
-  });
-
-  it('with no display or text, is shown by its code and written back under its own system', () => {
-    const h = helper();
-    const bare = { coding: [{ system: SNOMED, code: '233873004' }] };
-    expect(h.getDisorderFromCodeableConcept(bare, false)).toBe('233873004');
-    expect(h.getCodeableConceptFromDisorder('233873004')).toEqual(bare);
-  });
-
-  it('a concept with only text is written as text, as before', () => {
-    const h = helper();
-    expect(h.getDisorderFromCodeableConcept({ text: 'Something' }, false)).toBe('Something');
-    expect(h.getCodeableConceptFromDisorder('Something')).toEqual({ text: 'Something' });
-  });
-
-  it('a coding in the legend\'s own system is coded as before, not kept', () => {
-    const h = helper();
-    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: OMIM, code: '615688', display: 'ADA2 deficiency' }] }, false)).toBe('615688');
-    expect(h._foreignCodings.disorder.size).toBe(0);
+  it('a concept with only text is read by it, as before', () => {
+    expect(helper().getDisorderFromCodeableConcept({ text: 'Something' }, false)).toBe('Something');
   });
 });

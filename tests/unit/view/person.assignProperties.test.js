@@ -44,6 +44,7 @@ function makeLegend() {
     getDisorder: (id) => ({ getID: () => id, getName: () => `name ${id}` }),
     getTerm: (id) => ({ getID: () => id, getName: () => `name ${id}` }),
     getObjectColor: () => '#ffffff',
+    desanitizeID: (id) => id,
   };
 }
 
@@ -93,6 +94,16 @@ describe('Person.assignProperties', () => {
     expect(legends.disorders._affectedNodes).toEqual({});
     expect(legends.phenotypes._affectedNodes).toEqual({});
     expect(legends.genes._affectedNodes).toEqual({});
+  });
+
+  it('keeps the codings of terms from another terminology through its properties', () => {
+    const termCodings = { disorders: { 'Hypertrophic cardiomyopathy': { coding: [{ system: 'http://snomed.info/sct', code: '233873004' }] } } };
+    const person = new Person(0, 0, 1, { ...properties, termCodings });
+    expect(person.getProperties().termCodings).toEqual(termCodings);
+    const other = new Person(0, 0, 2, properties);
+    expect(other.getProperties().termCodings).toBeUndefined();
+    other.assignProperties({ ...properties, termCodings });
+    expect(other.getProperties().termCodings).toEqual(termCodings);
   });
 
   it('counts each value once for a newly constructed person', () => {

@@ -730,17 +730,47 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(() => openAndSave(JSON.stringify(before), HPO_OMIM)).not.toThrow();
   });
 
-  it('forgets the codings of a pedigree read before', () => {
-    const first = savedUnderSnomed();
-    const other = JSON.parse(first);
-    other.entry = other.entry.filter((e) => e.resource.resourceType !== 'Condition');
-    useTerminology(HPO_OMIM);
-    const helper = editor.getFhirTerminologyHelper();
-    GA4GHFHIRConverter.initFromFHIR(first);
-    expect(helper.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy').coding[0].code).toBe('233873004');
-    GA4GHFHIRConverter.initFromFHIR(JSON.stringify(other));
-    expect(helper.getCodeableConceptFromDisorder('Hypertrophic cardiomyopathy')).toEqual({ text: 'Hypertrophic cardiomyopathy' });
+  it('keeps each person\'s own coding for a term with the same name', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const resources = before.entry.map((e) => e.resource);
+    const jane = resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'Jane');
+    const icd = { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: 'I42.1', display: 'Hypertrophic cardiomyopathy' }] };
+    before.entry.push({ resource: { resourceType: 'Condition', id: 'jane-hcm', subject: { reference: jane.id }, code: icd } });
+    const { saved } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    const out = JSON.parse(saved).entry.map((e) => e.resource);
+    const janeAfter = out.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given && r.name[0].given[0] === 'Jane');
+    expect(out.filter((r) => r.resourceType === 'Condition' && r.subject.reference === janeAfter.id).map((r) => r.code)).toEqual([icd]);
+    expect(codings(saved).conditions).toEqual([{ coding: [{ system: SNOMED, code: '233873004', display: 'Hypertrophic cardiomyopathy' }] }]);
   });
+
+  it('keeps the first coding when one person has two with the same name', () => {
+    const before = JSON.parse(savedUnderSnomed());
+    const resources = before.entry.map((e) => e.resource);
+    const condition = resources.find((r) => r.resourceType === 'Condition');
+    const icd = { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: 'I42.1', display: 'Hypertrophic cardiomyopathy' }] };
+    before.entry.push({ resource: { resourceType: 'Condition', id: 'second', subject: condition.subject, code: icd } });
+    const { john } = openAndSave(JSON.stringify(before), HPO_OMIM);
+    expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
+  });
+
+  it('a term with an old term\'s name on someone else, or in another pedigree, isn\'t given its coding', () => {
+    const { john } = openAndSave(savedUnderSnomed(), HPO_OMIM);
+    expect(john.termCodings.disorders['Hypertrophic cardiomyopathy'].coding[0].code).toBe('233873004');
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    baseGraph.properties[1].disorders = ['Hypertrophic cardiomyopathy'];
+    const saved = GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null);
+    const conditions = JSON.parse(saved).entry.map((e) => e.resource).filter((r) => r.resourceType === 'Condition');
+    expect(conditions.map((c) => c.code)).toEqual([{ text: 'Hypertrophic cardiomyopathy' }]);
+  });
+
+  it('a coding also listed under a custom legend item is read as a phenotype once', () => {
+    const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
+    const rash = { system: SNOMED, code: '271807003', display: 'Eruption of skin' };
+    const { john } = openAndSave(savedUnderSnomed(items, { questionnaireAnswers: { tumour_site: [rash] } }), HPO_OMIM, items);
+    expect(john.hpoTerms).toEqual(['Eruption of skin']);
+    expect(john.questionnaireAnswers.tumour_site).toEqual([rash]);
+  });
+
 
   it('leaves an Observation with a code it doesn\'t know alone, as before', () => {
     const before = JSON.parse(savedUnderSnomed());

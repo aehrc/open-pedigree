@@ -8,22 +8,10 @@ function editorLegend(getter: 'getDisorderLegend' | 'getPhenotypeLegend' | 'getG
   return host && typeof host[getter] === 'function' ? host[getter]() : null;
 }
 
-type LegendKind = 'disorder' | 'phenotype' | 'gene';
-
-// The system|code of each coding a CodeableConcept carries: which concept it is, whatever its
-// display or text says.
-function codingKeys(codeableConcept: any): string[] {
-  return (codeableConcept.coding || []).map((c: any) => c.system + '|' + c.code);
-}
-
 export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper {
   _disorderCS: any;
   _phenotypeCS: any;
   _geneCS: any;
-  // Codings read in a code system other than their legend's (e.g. saved under an earlier Default
-  // Terminology), by legend and the id the term is shown by, so they're written back as read rather
-  // than as text. null marks an id two different codings were read under: written as text.
-  _foreignCodings: Record<LegendKind, Map<string, any>> = { disorder: new Map(), phenotype: new Map(), gene: new Map() };
 
   constructor(
     disorderCS: any = 'http://www.omim.org',
@@ -36,14 +24,8 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     this._geneCS = geneCS;
   }
 
-  _getCodeableConceptFromLegend(code: any, legend: any, codeSystem: any, kind?: LegendKind): any {
+  _getCodeableConceptFromLegend(code: any, legend: any, codeSystem: any): any {
     const cachedTerm = legend.getTerm(code);
-    // A term read from another system's coding goes back as it was read - unless the legend's own
-    // terminology knows the id too, when it's coded in that, as any other of its terms is.
-    const foreign = kind ? this._foreignCodings[kind].get(code) : undefined;
-    if (foreign && !(codeSystem && !cachedTerm.isUnknown())) {
-      return JSON.parse(JSON.stringify(foreign));
-    }
     // With no code system configured for the legend (e.g. genes by default) there's no valid
     // coding to make, so the code is written as text.
     if (!codeSystem) {
@@ -61,45 +43,18 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
   }
 
   getCodeableConceptFromDisorder(disorder: any): any {
-    return this._getCodeableConceptFromLegend(disorder, editor.getDisorderLegend(), this._disorderCS, 'disorder');
+    return this._getCodeableConceptFromLegend(disorder, editor.getDisorderLegend(), this._disorderCS);
   }
 
   getCodeableConceptFromPhenotype(phenotype: any): any {
-    return this._getCodeableConceptFromLegend(phenotype, editor.getPhenotypeLegend(), this._phenotypeCS, 'phenotype');
+    return this._getCodeableConceptFromLegend(phenotype, editor.getPhenotypeLegend(), this._phenotypeCS);
   }
 
   getCodeableConceptFromGene(gene: any): any {
-    return this._getCodeableConceptFromLegend(gene, editor.getGeneLegend(), this._geneCS, 'gene');
+    return this._getCodeableConceptFromLegend(gene, editor.getGeneLegend(), this._geneCS);
   }
 
-  /** Forgets the codings remembered from a pedigree read before: called as another is read. */
-  forgetForeignCodings(): void {
-    for (const known of Object.values(this._foreignCodings)) {
-      known.clear();
-    }
-  }
-
-  // Remembers a coding read in another code system under the id it's shown by (see _foreignCodings).
-  // Read again under that id it's the same concept if any of its codings is; a different concept
-  // makes the id ambiguous.
-  _rememberForeignCoding(kind: LegendKind, id: string, codeableConcept: any): void {
-    const known = this._foreignCodings[kind];
-    if (!known.has(id)) {
-      const copy = JSON.parse(JSON.stringify(codeableConcept));
-      // an older editor's placeholder for a name it was still looking up isn't a name to keep
-      for (const coding of copy.coding || []) {
-        if (isLoadingName(coding.display)) {
-          delete coding.display;
-        }
-      }
-      known.set(id, copy);
-    } else if (known.get(id) !== null && !codingKeys(codeableConcept).some((k) => codingKeys(known.get(id)).includes(k))) {
-      console.warn('Two different codings are shown as "' + id + '"; writing it as text', known.get(id), codeableConcept);
-      known.set(id, null);
-    }
-  }
-
-  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any, getLegend?: () => any, kind?: LegendKind): any {
+  _getCodeFromCodeableConcept(codeSystem: any, codeableConcept: any, returnNullOnNoMatch: any, getLegend?: () => any): any {
     let foundCode = false;
     let code = undefined;
 
@@ -126,31 +81,44 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     if (!foundCode && codeableConcept.text) {
       code = codeableConcept.text;
     }
-    // another system's coding with no display (and no text): shown by its code, which is kept with
-    // its own system (below), so it isn't written back under the legend's
+    // another system's coding with no display (and no text): shown by its code - the person keeps
+    // the coding itself (see codingToKeep), so it isn't written back under the legend's system
     if (!foundCode && code === undefined && codeableConcept.coding) {
       code = codeableConcept.coding.find((c: any) => c.code)?.code;
     }
     if (!foundCode && returnNullOnNoMatch) {
       return null;
     }
-    if (!foundCode && code !== undefined && kind && codingKeys(codeableConcept).length > 0) {
-      this._rememberForeignCoding(kind, code, codeableConcept);
-    }
     return code;
   }
 
 
   getDisorderFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getDisorderLegend'), 'disorder');
+    return this._getCodeFromCodeableConcept(this._disorderCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getDisorderLegend'));
   }
 
   getPhenotypeFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getPhenotypeLegend'), 'phenotype');
+    return this._getCodeFromCodeableConcept(this._phenotypeCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getPhenotypeLegend'));
   }
 
   getPhenotypeSystem(): any {
     return this._phenotypeCS;
+  }
+
+  codingToKeep(legend: 'disorder' | 'phenotype' | 'gene', codeableConcept: any): any {
+    const system = { disorder: this._disorderCS, phenotype: this._phenotypeCS, gene: this._geneCS }[legend];
+    const codings = (codeableConcept && codeableConcept.coding) || [];
+    if (!codings.some((c: any) => c.code) || codings.some((c: any) => system && c.system === system)) {
+      return null;
+    }
+    const copy = JSON.parse(JSON.stringify(codeableConcept));
+    // an older editor's placeholder for a name it was still looking up isn't a name to keep
+    for (const coding of copy.coding) {
+      if (isLoadingName(coding.display)) {
+        delete coding.display;
+      }
+    }
+    return copy;
   }
 
   getGeneSystem(): any {
@@ -158,6 +126,6 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
   }
 
   getGeneFromCodeableConcept(codeableConcept: any, returnNullOnNoMatch: any): any {
-    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getGeneLegend'), 'gene');
+    return this._getCodeFromCodeableConcept(this._geneCS, codeableConcept, returnNullOnNoMatch, () => editorLegend('getGeneLegend'));
   }
 }

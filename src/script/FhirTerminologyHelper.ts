@@ -25,6 +25,15 @@ export default class FhirTerminologyHelper {
     return null;
   }
 
+  /**
+   * A copy of a CodeableConcept read for a disorder, phenotype or gene, if it's coded only in
+   * systems other than that legend's (e.g. saved under an earlier Default Terminology): the person
+   * keeps it, and the term is written back with it rather than as text. Otherwise null.
+   */
+  codingToKeep(legend: 'disorder' | 'phenotype' | 'gene', codeableConcept: any): any {
+    return null;
+  }
+
   /** The code system phenotypes are coded in, or null if none. */
   getPhenotypeSystem(): any {
     return null;

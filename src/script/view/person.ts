@@ -69,6 +69,7 @@ export default class Person extends AbstractPerson {
   _linkedRecordRef: any;
   _linkedRecordSnapshot: any;
   _unrenderedQuestionnaireResponses: any;
+  _termCodings: any;
   _questionnaireAnswers: any;
 
   constructor(x: any, y: any, id: any, properties: any) {
@@ -265,6 +266,7 @@ export default class Person extends AbstractPerson {
     this._linkedRecordRef = '';
     this._linkedRecordSnapshot = {};
     this._unrenderedQuestionnaireResponses = [];
+    this._termCodings = {};
     this._questionnaireAnswers = {};
   }
 
@@ -1211,6 +1213,11 @@ export default class Person extends AbstractPerson {
     if (this._unrenderedQuestionnaireResponses.length > 0) {
       info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
     }
+    // The codings of terms read from systems the editor doesn't use, kept to write them back with
+    // (see GA4GHFHIRConverter._keepTermCoding).
+    if (Object.keys(this._termCodings).length > 0) {
+      info['termCodings'] = this._termCodings;
+    }
     return info;
   }
 
@@ -1295,6 +1302,9 @@ export default class Person extends AbstractPerson {
       }
       if (info.hasOwnProperty('unrenderedQuestionnaireResponses')) {
         this._unrenderedQuestionnaireResponses = info.unrenderedQuestionnaireResponses || [];
+      }
+      if (info.hasOwnProperty('termCodings')) {
+        this._termCodings = info.termCodings || {};
       }
       return true;
     }

@@ -93,11 +93,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     throw 'Unable to import pedigree: input is not a valid JSON string '
     + err;
   }
-  // The codings remembered from the pedigree loaded before this one don't belong to this one.
-  const terminologyHelper = editor.getFhirTerminologyHelper();
-  if (terminologyHelper && typeof terminologyHelper.forgetForeignCodings === 'function') {
-    terminologyHelper.forgetForeignCodings();
-  }
   if (LegacyFHIRConverter.isLegacyResource(inputResource)) {
     // saved in the Legacy FHIR format (fhir_v1)
     return LegacyFHIRConverter.initFromFHIR(inputText);
@@ -568,6 +563,7 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
 
   if (conditionResource.code && this._hasReservedLegendItem('disorders', 'legendCondition')){
     let conditionToAdd = fhirTerminologyHelper.getDisorderFromCodeableConcept(conditionResource.code, false);
+    this._keepTermCoding(nodeData, 'disorders', conditionToAdd, this._codingToKeep('disorder', conditionResource.code));
 
     if (conditionToAdd){
       if ('disorders' in nodeData.properties){
@@ -715,34 +711,44 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
   }
   // A phenotype or gene coded only in a code system the editor doesn't use (e.g. saved under an
   // earlier Default Terminology) is claimed by nothing above: read it by its name, as a disorder
-  // is, rather than leave it out - the terminology helper writes it back with its own coding.
+  // is, rather than leave it out; the person keeps its coding, to write it back with.
   if (!foundCode && observationResource.valueCodeableConcept && !observationResource.code) {
     const linkId = this._legendOfUnclaimedObservation(observationResource.valueCodeableConcept, nodeData);
-    const target = linkId && RESERVED_LEGEND_TARGETS[linkId];
-    if (target && this._hasReservedLegendItem(linkId, 'legendObservation')) {
-      const read = linkId === 'hpo_positive'
-        ? fhirTerminologyHelper.getPhenotypeFromCodeableConcept(observationResource.valueCodeableConcept, false)
-        : fhirTerminologyHelper.getGeneFromCodeableConcept(observationResource.valueCodeableConcept, false);
-      if (read) {
-        (nodeData.properties[target.propertyBagKey] = nodeData.properties[target.propertyBagKey] || []).push(read);
+    if (linkId) {
+      const cc = observationResource.valueCodeableConcept;
+      const isPhenotype = linkId === 'hpo_positive';
+      const read = isPhenotype ? fhirTerminologyHelper.getPhenotypeFromCodeableConcept(cc, false) : fhirTerminologyHelper.getGeneFromCodeableConcept(cc, false);
+      const key = RESERVED_LEGEND_TARGETS[linkId].propertyBagKey;
+      const terms = nodeData.properties[key] = nodeData.properties[key] || [];
+      // (once: the same coding can also be a custom legend item's answer, restored by that item)
+      if (read && !terms.includes(read)) {
+        terms.push(read);
+        this._keepTermCoding(nodeData, key, read, this._codingToKeep(isPhenotype ? 'phenotype' : 'gene', cc));
       }
     }
   }
 };
 
-// Which legend a code-less Observation with a valueCodeableConcept that matched none of the
-// editor's code systems belongs to. Phenotypes, genes and custom legend items are all saved in
-// that shape; the person's QuestionnaireResponse lists each one's coding under its item
-// (indexLegendAnswers), so it says which. 'hpo_positive', 'candidate_genes', or null for another
-// item's (restored from the QuestionnaireResponse itself) or one it doesn't list. A person with no
-// QuestionnaireResponse was saved before custom legends existed: a phenotype, the likelier.
+// A coding's system|code: how a QuestionnaireResponse answer is matched to an Observation.
+function codingKey(coding) {
+  return coding.system + '|' + coding.code;
+}
+
+// Which reserved legend ('hpo_positive' or 'candidate_genes', if the Questionnaire has it) a
+// code-less Observation with a valueCodeableConcept that matched none of the editor's code systems
+// belongs to, or null. Phenotypes, genes and custom legend items are all saved in that shape; the
+// person's QuestionnaireResponse lists each one's coding under its item (indexLegendAnswers), so it
+// says which - another item's is restored from the QuestionnaireResponse itself. A person with no
+// QuestionnaireResponse was saved before custom legends existed: a phenotype, the likelier (left
+// out, as every phenotype is, if the Questionnaire has none).
 GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
+  const inUse = ['hpo_positive', 'candidate_genes'].filter((linkId) => this._hasReservedLegendItem(linkId, 'legendObservation'));
   const answers = nodeData.legendAnswers;
   if (!answers) {
-    return 'hpo_positive';
+    return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
   }
-  const keys = (codeableConcept.coding || []).map((c) => c.system + '|' + c.code);
-  return ['hpo_positive', 'candidate_genes'].find((linkId) => answers[linkId] && keys.some((k) => answers[linkId].has(k))) || null;
+  const keys = (codeableConcept.coding || []).map(codingKey);
+  return inUse.find((linkId) => answers[linkId] && keys.some((k) => answers[linkId].has(k))) || null;
 };
 
 // Notes, on the person's node data (not their properties, so it isn't kept), the coding of each
@@ -759,10 +765,40 @@ GA4GHFHIRConverter.indexLegendAnswers = function (questionnaireResponseResource,
   for (const item of questionnaireResponseResource.item || []) {
     for (const answer of item.answer || []) {
       if (answer.valueCoding && answer.valueCoding.code) {
-        (answers[item.linkId] = answers[item.linkId] || new Set()).add(answer.valueCoding.system + '|' + answer.valueCoding.code);
+        (answers[item.linkId] = answers[item.linkId] || new Set()).add(codingKey(answer.valueCoding));
       }
     }
   }
+};
+
+// The terminology helper's codingToKeep - which a host-supplied helper may not have.
+GA4GHFHIRConverter._codingToKeep = function (legend, codeableConcept) {
+  const helper = editor.getFhirTerminologyHelper();
+  return helper && typeof helper.codingToKeep === 'function' ? helper.codingToKeep(legend, codeableConcept) : null;
+};
+
+// A disorder, phenotype or gene read from a coding in a system the editor doesn't use is shown by
+// its name (or code); the person keeps the coding (termCodings, by property and term), so it's
+// written back as it was (_termCodeableConcept). The first coding read under a term is kept.
+GA4GHFHIRConverter._keepTermCoding = function (nodeData, propertyBagKey, term, codeableConcept) {
+  if (!codeableConcept || term === undefined || term === null) {
+    return;
+  }
+  const kept = nodeData.properties.termCodings = nodeData.properties.termCodings || {};
+  const forProperty = kept[propertyBagKey] = kept[propertyBagKey] || {};
+  if (!Object.prototype.hasOwnProperty.call(forProperty, term)) {
+    forProperty[term] = codeableConcept;
+  }
+};
+
+// A term's CodeableConcept to write: the coding the person kept for it, if any (_keepTermCoding),
+// else the terminology helper's.
+GA4GHFHIRConverter._termCodeableConcept = function (nodeProperties, propertyBagKey, term, ccMethod) {
+  const kept = nodeProperties.termCodings && nodeProperties.termCodings[propertyBagKey];
+  if (kept && Object.prototype.hasOwnProperty.call(kept, term)) {
+    return kept[term];
+  }
+  return editor.getFhirTerminologyHelper()[ccMethod](term);
 };
 
 
@@ -1582,7 +1618,6 @@ GA4GHFHIRConverter.buildPedigreeRelation = function (ref, relRef, relationship) 
 
 GA4GHFHIRConverter.addConditions = function (nodeProperties, ref, condtions) {
   let conditionsForRef = [];
-  let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
   if (nodeProperties['disorders']) {
     let disorders = nodeProperties['disorders'];
     let disorderLegend = editor.getDisorderLegend();
@@ -1594,7 +1629,7 @@ GA4GHFHIRConverter.addConditions = function (nodeProperties, ref, condtions) {
         'subject': {
           'reference': this.patRefAsRef(ref)
         },
-        code: fhirTerminologyHelper.getCodeableConceptFromDisorder(disorders[i])
+        code: this._termCodeableConcept(nodeProperties, 'disorders', disorders[i], 'getCodeableConceptFromDisorder')
       };
 
       conditionsForRef.push(fhirCondition);
@@ -1605,7 +1640,6 @@ GA4GHFHIRConverter.addConditions = function (nodeProperties, ref, condtions) {
 
 GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations) {
   let observationsForRef = [];
-  let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
   const phenotypePrefix = 'phenotype: ';
   const genePrefix = 'gene: ';
 
@@ -1619,7 +1653,7 @@ GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations
         'status': 'preliminary',
         'subject': { 'reference': this.patRefAsRef(ref) }
       };
-      let cc = fhirTerminologyHelper.getCodeableConceptFromPhenotype(hpoTerms[j]);
+      let cc = this._termCodeableConcept(nodeProperties, 'hpoTerms', hpoTerms[j], 'getCodeableConceptFromPhenotype');
       if (cc.coding){
         fhirObservation['valueCodeableConcept'] = cc;
       } else {
@@ -1639,7 +1673,7 @@ GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations
         'status': 'preliminary',
         'subject': { 'reference': this.patRefAsRef(ref)}
       };
-      let cc = fhirTerminologyHelper.getCodeableConceptFromGene(candidateGenes[j]);
+      let cc = this._termCodeableConcept(nodeProperties, 'candidateGenes', candidateGenes[j], 'getCodeableConceptFromGene');
       if (cc.coding){
         fhirObservation['valueCodeableConcept'] = cc;
       } else {
@@ -1861,14 +1895,14 @@ GA4GHFHIRConverter.fhirValueToAnswer = function (itemType, answerEntry) {
 
 // Converts a reserved-legend item's raw ID array (nodeProperties.disorders/candidateGenes/
 // hpoTerms - plain strings, not {system,code,display}) into the answer shape every other
-// item already produces, via the SAME terminology-helper CodeableConcept methods
+// item already produces, via the SAME CodeableConcepts (_termCodeableConcept)
 // addConditions/addObservations use for the "real" resource - so the single-valueCoding
 // QuestionnaireResponse entry is a faithful (if necessarily single-coding) summary of it.
-GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, rawIds) {
+GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, rawIds, nodeProperties) {
   var target = RESERVED_LEGEND_TARGETS[linkId];
-  var fhirTerminologyHelper = editor.getFhirTerminologyHelper();
+  var self = this;
   return (rawIds || []).map(function (id) {
-    var cc = fhirTerminologyHelper[target.ccMethod](id);
+    var cc = self._termCodeableConcept(nodeProperties || {}, target.propertyBagKey, id, target.ccMethod);
     var coding = cc && cc.coding && cc.coding[0];
     return coding ? { system: coding.system, code: coding.code, display: coding.display } : { code: id, display: id };
   });
@@ -1889,7 +1923,7 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     if (item.mapping && item.mapping.kind === 'field') {
       value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
     } else if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') && RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
-      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey]);
+      value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties[RESERVED_LEGEND_TARGETS[item.linkId].propertyBagKey], nodeProperties);
     } else {
       value = storedAnswers[item.linkId];
     }
