@@ -132,8 +132,10 @@ describe('DefaultFhirTerminologyHelper, a coding from another terminology', () =
     expect(h.codingToKeep('disorder', placeholder)).toEqual({ coding: [{ system: SNOMED, code: '233873004' }] });
   });
 
-  it('with no display or text, is shown by its code', () => {
-    expect(helper().getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004' }] }, false)).toBe('233873004');
+  it('with no display or text, is shown by its code and system, so it isn\'t taken for a code of the legend\'s own', () => {
+    const h = helper();
+    expect(h.getDisorderFromCodeableConcept({ coding: [{ system: SNOMED, code: '233873004' }] }, false)).toBe('233873004 (' + SNOMED + ')');
+    expect(h.getDisorderFromCodeableConcept({ coding: [{ code: '233873004' }] }, false)).toBe('233873004');
   });
 
   it('a concept with only text is read by it, as before', () => {

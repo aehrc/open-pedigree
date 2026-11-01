@@ -108,13 +108,14 @@ describe('Person.assignProperties', () => {
     expect(other.getProperties().termCodings).toEqual(termCodings);
   });
 
-  it('drops the coding of a term the person no longer has, so it isn\'t given back if the term is typed in again', () => {
+  it('gives the codings of the terms the person has now', () => {
     const termCodings = { disorders: { 'Hypertrophic cardiomyopathy': { coding: [{ system: 'http://snomed.info/sct', code: '233873004' }] } } };
     const person = new Person(0, 0, 1, { ...properties, disorders: ['Hypertrophic cardiomyopathy'], termCodings });
     person.setDisorders([]);
     expect(person.getProperties().termCodings).toBeUndefined();
+    // the same legend entry back again: the same code, as anyone else given it gets
     person.setDisorders(['Hypertrophic cardiomyopathy']);
-    expect(person.getProperties().termCodings).toBeUndefined();
+    expect(person.getProperties().termCodings).toEqual(termCodings);
   });
 
   it('counts each value once for a newly constructed person', () => {

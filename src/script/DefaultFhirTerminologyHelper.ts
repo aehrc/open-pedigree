@@ -81,10 +81,12 @@ export default class DefaultFhirTerminologyHelper extends FhirTerminologyHelper 
     if (!foundCode && codeableConcept.text) {
       code = codeableConcept.text;
     }
-    // another system's coding with no display (and no text): shown by its code - the person keeps
-    // the coding itself (see codingToKeep), so it isn't written back under the legend's system
+    // another system's coding with no display (and no text): shown by its code and system, so the
+    // legend's terminology doesn't take it for one of its own codes - the person keeps the coding
+    // itself (see codingToKeep), to write it back with
     if (!foundCode && code === undefined && codeableConcept.coding) {
-      code = codeableConcept.coding.find((c: any) => c.code)?.code;
+      const coded = codeableConcept.coding.find((c: any) => c.code);
+      code = coded && (coded.system ? coded.code + ' (' + coded.system + ')' : coded.code);
     }
     if (!foundCode && returnNullOnNoMatch) {
       return null;

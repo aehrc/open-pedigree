@@ -1214,8 +1214,7 @@ export default class Person extends AbstractPerson {
       info['unrenderedQuestionnaireResponses'] = this._unrenderedQuestionnaireResponses;
     }
     // The codings of terms read from systems the editor doesn't use, kept to write them back with
-    // (see GA4GHFHIRConverter._keepTermCoding) - for the terms the person still has, so one taken
-    // away and typed in again later isn't given its old code.
+    // (see GA4GHFHIRConverter._keepTermCoding) - those of the terms the person has now.
     const termCodings = {};
     for (const key of ['disorders', 'hpoTerms', 'candidateGenes']) {
       const kept = this._termCodings[key] || {};
@@ -1225,7 +1224,6 @@ export default class Person extends AbstractPerson {
         }
       }
     }
-    this._termCodings = termCodings;
     if (Object.keys(termCodings).length > 0) {
       info['termCodings'] = termCodings;
     }

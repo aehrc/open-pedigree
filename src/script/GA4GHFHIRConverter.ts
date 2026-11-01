@@ -175,12 +175,12 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     this.extractDataFromFMH(fmhResource, nodeDataLookup, containedResourcesLookup, twinTracker);
   }
 
-  for (const conditionResource of conditionResources){
-    this.extractDataFromCondition(conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker);
-  }
-
   for (const questionnaireResponseResource of questionnaireResponseResources){
     this.indexLegendAnswers(questionnaireResponseResource, nodeDataLookup);
+  }
+
+  for (const conditionResource of conditionResources){
+    this.extractDataFromCondition(conditionResource, nodeDataLookup, containedResourcesLookup, twinTracker);
   }
 
   for (const observationResource of observationResources){
@@ -561,6 +561,12 @@ GA4GHFHIRConverter.extractDataFromCondition = function (conditionResource, nodeD
 
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
 
+  // Another legend item's answer, restored from the QuestionnaireResponse itself.
+  const listedUnder = this._itemsListing(conditionResource.code, nodeData);
+  if (listedUnder.length > 0 && !listedUnder.includes('disorders')) {
+    return;
+  }
+
   if (conditionResource.code && this._hasReservedLegendItem('disorders', 'legendCondition')){
     let conditionToAdd = fhirTerminologyHelper.getDisorderFromCodeableConcept(conditionResource.code, false);
     this._keepTermCoding(nodeData, 'disorders', conditionToAdd, this._codingToKeep('disorder', conditionResource.code));
@@ -596,6 +602,14 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     }
     nodeData.properties.questionnaireAnswers[mappedItem.linkId] = this.observationValueToAnswer(mappedItem.itemType, observationResource);
     return;
+  }
+
+  // Another legend item's answer, restored from the QuestionnaireResponse itself.
+  if (!observationResource.code && observationResource.valueCodeableConcept) {
+    const listedUnder = this._itemsListing(observationResource.valueCodeableConcept, nodeData);
+    if (listedUnder.length > 0 && !listedUnder.includes('hpo_positive') && !listedUnder.includes('candidate_genes')) {
+      return;
+    }
   }
 
   let fhirTerminologyHelper = editor.getFhirTerminologyHelper();
@@ -719,10 +733,9 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
       const isPhenotype = linkId === 'hpo_positive';
       const read = isPhenotype ? fhirTerminologyHelper.getPhenotypeFromCodeableConcept(cc, false) : fhirTerminologyHelper.getGeneFromCodeableConcept(cc, false);
       const key = RESERVED_LEGEND_TARGETS[linkId].propertyBagKey;
-      const terms = nodeData.properties[key] = nodeData.properties[key] || [];
       // (once: the same coding can also be a custom legend item's answer, restored by that item)
-      if (read && !terms.includes(read)) {
-        terms.push(read);
+      if (read && !(nodeData.properties[key] || []).includes(read)) {
+        (nodeData.properties[key] = nodeData.properties[key] || []).push(read);
         this._keepTermCoding(nodeData, key, read, this._codingToKeep(isPhenotype ? 'phenotype' : 'gene', cc));
       }
     }
@@ -738,22 +751,33 @@ function codingKey(coding) {
 // code-less Observation with a valueCodeableConcept that matched none of the editor's code systems
 // belongs to, or null. Phenotypes, genes and custom legend items are all saved in that shape; the
 // person's QuestionnaireResponse lists each one's coding under its item (indexLegendAnswers), so it
-// says which - another item's is restored from the QuestionnaireResponse itself. A person with no
-// QuestionnaireResponse was saved before custom legends existed: a phenotype, the likelier (left
-// out, as every phenotype is, if the Questionnaire has none).
+// says which - another item's is restored from the QuestionnaireResponse itself. One listed nowhere,
+// for a person whose QuestionnaireResponse lists no phenotypes or genes (or who has none: saved
+// before custom legends existed), is a phenotype, the likelier - left out, as every phenotype is,
+// if the Questionnaire has none.
 GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
   const inUse = ['hpo_positive', 'candidate_genes'].filter((linkId) => this._hasReservedLegendItem(linkId, 'legendObservation'));
-  const answers = nodeData.legendAnswers;
-  // (a QuestionnaireResponse with neither item, e.g. only one for another Questionnaire, says nothing)
-  if (!answers || (!answers.hpo_positive && !answers.candidate_genes)) {
-    return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
+  const listedUnder = this._itemsListing(codeableConcept, nodeData);
+  if (listedUnder.length > 0) {
+    return inUse.find((linkId) => listedUnder.includes(linkId)) || null;
   }
-  const keys = (codeableConcept.coding || []).map(codingKey);
-  return inUse.find((linkId) => answers[linkId] && keys.some((k) => answers[linkId].has(k))) || null;
+  const answers = nodeData.legendAnswers || {};
+  if (answers.hpo_positive || answers.candidate_genes) {
+    return null;
+  }
+  return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
+};
+
+// The items of the person's QuestionnaireResponse that list any of a CodeableConcept's codings.
+GA4GHFHIRConverter._itemsListing = function (codeableConcept, nodeData) {
+  const answers = nodeData.legendAnswers || {};
+  const keys = ((codeableConcept && codeableConcept.coding) || []).map(codingKey);
+  return Object.keys(answers).filter((linkId) => keys.some((k) => answers[linkId].has(k)));
 };
 
 // Notes, on the person's node data (not their properties, so it isn't kept), the coding of each
-// answer in their QuestionnaireResponse, by item: see _legendOfUnclaimedObservation.
+// answer in their QuestionnaireResponse to one of the Questionnaire's legend items, by item: see
+// _legendOfUnclaimedObservation. (Other items' answers, e.g. a carrier status, aren't legends.)
 GA4GHFHIRConverter.indexLegendAnswers = function (questionnaireResponseResource, nodeDataLookup) {
   if (!questionnaireResponseResource.subject) {
     return;
@@ -762,8 +786,12 @@ GA4GHFHIRConverter.indexLegendAnswers = function (questionnaireResponseResource,
   if (!nodeData) {
     return;
   }
+  const config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+  const legendItems = new Set(((config && config.items) || [])
+    .filter((i) => i.mapping && (i.mapping.kind === 'legendCondition' || i.mapping.kind === 'legendObservation'))
+    .map((i) => i.linkId));
   const answers = nodeData.legendAnswers = nodeData.legendAnswers || {};
-  for (const item of questionnaireResponseResource.item || []) {
+  for (const item of (questionnaireResponseResource.item || []).filter((i) => legendItems.has(i.linkId))) {
     for (const answer of item.answer || []) {
       if (answer.valueCoding && answer.valueCoding.code) {
         (answers[item.linkId] = answers[item.linkId] || new Set()).add(codingKey(answer.valueCoding));
@@ -804,18 +832,22 @@ GA4GHFHIRConverter._exportedTermId = function (propertyBagKey, term) {
   return legend.desanitizeID(legend.sanitizeID(term));
 };
 
-// A term's CodeableConcept to write: the coding the person kept for it (_keepTermCoding), else one
-// someone else in the pedigree being exported keeps for it, else the terminology helper's.
+// A term's CodeableConcept to write: the coding the person kept for it (_keepTermCoding); else the
+// terminology helper's, if it codes the term; else one someone else in the pedigree being exported
+// keeps for it.
 GA4GHFHIRConverter._termCodeableConcept = function (nodeProperties, propertyBagKey, term, ccMethod) {
   // (by the legend's form of the term, as it's kept: the person may not have given it back yet)
   const id = this._exportedTermId(propertyBagKey, term);
-  for (const kept of [nodeProperties.termCodings, this._pedigreeTermCodings]) {
+  const keptFor = (kept) => {
     const forProperty = kept && kept[propertyBagKey];
-    if (forProperty && Object.prototype.hasOwnProperty.call(forProperty, id)) {
-      return forProperty[id];
-    }
+    return forProperty && Object.prototype.hasOwnProperty.call(forProperty, id) ? forProperty[id] : null;
+  };
+  const own = keptFor(nodeProperties.termCodings);
+  if (own) {
+    return own;
   }
-  return editor.getFhirTerminologyHelper()[ccMethod](term);
+  const cc = editor.getFhirTerminologyHelper()[ccMethod](term);
+  return (cc && cc.coding) ? cc : (keptFor(this._pedigreeTermCodings) || cc);
 };
 
 
