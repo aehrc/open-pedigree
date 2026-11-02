@@ -197,3 +197,23 @@ test('a linked patient\'s name found when a pedigree is opened is not an undo st
   expect(await firstName(page, id)).toBe('Test Person');
   expect(errors).toEqual([]);
 });
+
+test('a name typed again after the menu is closed and opened is a new undo step', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page);
+  const openMenu = () => page.evaluate((nodeID) => window.editor.getNodeMenu().show(window.editor.getView().getNode(nodeID), 0, 0), id);
+  const closeMenu = () => page.evaluate(() => window.editor.getNodeMenu().hide());
+  await openMenu();
+  for (const typed of ['A', 'An', 'Ann']) {
+    await setProperty(page, id, { setFirstName: typed });
+  }
+  await closeMenu();
+  await openMenu();
+  await setProperty(page, id, { setFirstName: 'Anne' });
+  await closeMenu();
+
+  await undo(page);
+  expect(await firstName(page, id)).toBe('Ann');
+  await undo(page);
+  expect(await firstName(page, id)).toBe('');
+  expect(errors).toEqual([]);
+});

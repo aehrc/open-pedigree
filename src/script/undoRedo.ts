@@ -14,13 +14,20 @@ export default class ActionStack {
   _currentState: number;
   _stack: any[];
   _MAXUNDOSIZE: number;
-  _undoneOrRedone: boolean;
+  _newStepNext: boolean;
 
   constructor() {
     this._currentState = 0;
     this._stack = [];
     this._MAXUNDOSIZE = 100;
-    this._undoneOrRedone = false;
+    this._newStepNext = false;
+  }
+
+  // The next change is a step of its own, not combined with the current one: called when the user
+  // goes back to a step (an edit combined into it would make one undo skip its own value) and when
+  // the node menu opens or closes (typing in a field again later is a new edit).
+  startNewStep(): void {
+    this._newStepNext = true;
   }
 
   redo(): void {
@@ -29,7 +36,7 @@ export default class ActionStack {
       return;
     }
 
-    this._undoneOrRedone = true;
+    this.startNewStep();
     if (nextState.eventToGetToThisState) {
       const memo = Object.assign({}, nextState.eventToGetToThisState.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
@@ -47,7 +54,7 @@ export default class ActionStack {
       return;
     }
 
-    this._undoneOrRedone = true;
+    this.startNewStep();
     const currentState = this._getCurrentState();
     if (currentState.eventToUndo) {
       const memo = Object.assign({}, currentState.eventToUndo.memo, { noUndoRedo: true });
@@ -74,14 +81,12 @@ export default class ActionStack {
 
     const state = new State(serializedState, eventToGetToThisState, eventToUndo);
 
-    // (an edit after an undo or redo starts a new step: combined into the step the user went back
-    // to, one undo would skip that step's own value)
-    const afterUndoOrRedo = this._undoneOrRedone;
-    this._undoneOrRedone = false;
+    const newStep = this._newStepNext;
+    this._newStepNext = false;
 
     const currentState = this._getCurrentState();
     if (
-      !afterUndoOrRedo &&
+      !newStep &&
       eventToGetToThisState &&
       currentState &&
       currentState.eventToGetToThisState &&

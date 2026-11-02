@@ -822,6 +822,7 @@ export default class NodeMenu {
   };
 
   show(node: any, x: any, y: any): any {
+    editor.getActionStack().startNewStep();
     this._onscreen = true;
     this.targetNode = node;
     this._updating = true;
@@ -833,6 +834,10 @@ export default class NodeMenu {
   }
 
   hide(): any {
+    // (also hidden while the editor is still being built, before it has an action stack)
+    if (editor.getActionStack()) {
+      editor.getActionStack().startNewStep();
+    }
     this.hideSuggestPicker();
     this._onscreen = false;
     document.removeEventListener('mousedown', (this as any)._onClickOutside);
