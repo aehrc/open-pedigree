@@ -167,18 +167,18 @@ export default class SaveLoadEngine {
       if (!graph.isPerson(i)) continue;
       const node = view.getNode(i);
       if (!node || !node.getLinkedPatientRef || !node.getLinkedPatientRef()) continue;
+      if (node.getFirstName() || node.getLastName()) continue;
       const fhirRef = node.getLinkedPatientRef();
-      const nodeId = i;
       provider.lookupPatient(fhirRef,
         (displayName: string) => {
-          // (only for the person it was looked up for: by the time it's found, an undo or redo may
-          // have reloaded the pedigree, and started a lookup of its own, or given the ID to someone else)
-          if (view.getNode(nodeId) !== node || node.getLinkedPatientRef() !== fhirRef) {
+          // (only for the person it was looked up for, under the ID they have now: by the time it's
+          // found, an undo or redo may have reloaded the pedigree, and started a lookup of its own)
+          if (editor.getView().getNode(node.getID()) !== node || node.getLinkedPatientRef() !== fhirRef) {
             return;
           }
           if (!node.getFirstName() && !node.getLastName()) {
             document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-              detail: { nodeID: nodeId, properties: { setFirstName: displayName }, noUndoRedo: true }
+              detail: { nodeID: node.getID(), properties: { setFirstName: displayName }, noUndoRedo: true }
             }));
             editor.getActionStack().updateCurrentState();
           }

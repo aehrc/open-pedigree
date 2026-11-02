@@ -46,16 +46,15 @@ export default class ActionStack {
     }
 
     this.startNewStep();
+    // (moved first: what the step's event or reload sets off can update the current step's state,
+    // as a linked patient's name found straight away does, and that is the step being redone to)
+    this._currentState++;
     if (nextState.eventToGetToThisState) {
       const memo = Object.assign({}, nextState.eventToGetToThisState.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
-      this._currentState++;
       return;
     }
 
-    // (moved first: a reload can update the current step's state, as a linked patient's name found
-    // straight away does, and that is the step being redone to)
-    this._currentState++;
     editor.getSaveLoadEngine().createGraphFromSerializedData(nextState.serializedState, true);
   }
 
@@ -67,15 +66,14 @@ export default class ActionStack {
 
     this.startNewStep();
     const currentState = this._getCurrentState();
+    // (moved first, as in redo)
+    this._currentState--;
     if (currentState.eventToUndo) {
       const memo = Object.assign({}, currentState.eventToUndo.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(currentState.eventToUndo.eventName, { detail: memo }));
-      this._currentState--;
       return;
     }
 
-    // (moved first, as in redo)
-    this._currentState--;
     editor.getSaveLoadEngine().createGraphFromSerializedData(prevState.serializedState, true);
   }
 

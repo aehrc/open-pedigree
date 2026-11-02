@@ -301,3 +301,49 @@ test('a name found after the pedigree was reloaded again is left to the newer lo
   expect(await firstName(page, id)).toBe('Test Person');
   expect(errors).toEqual([]);
 });
+
+test('an undo or redo has moved to its step by the time it replays an event or reloads a state', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page);
+  // (records where the stack is when each replay or reload happens)
+  await page.evaluate(() => {
+    window.seen = [];
+    const stack = window.editor.getActionStack();
+    const engine = window.editor.getSaveLoadEngine();
+    const reload = engine.createGraphFromSerializedData.bind(engine);
+    engine.createGraphFromSerializedData = (...args) => { window.seen.push(stack._currentState); return reload(...args); };
+    ['pedigree:node:setproperty', 'pedigree:person:newsibling'].forEach((name) => document.addEventListener(name,
+      (e) => { if (e.detail && e.detail.noUndoRedo) { window.seen.push(stack._currentState); } }, true));
+  });
+  await addSister(page, id);
+  await setProperty(page, id, { setFirstName: 'Bob' });
+  const steps = [undo, undo, redo, redo];
+  for (const step of steps) {
+    await page.evaluate(() => { window.seen = []; });
+    await step(page);
+    const [at, now] = await page.evaluate(() => [window.seen, window.editor.getActionStack()._currentState]);
+    expect(at).toEqual([now]);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('a name found for a person whose ID changed while it was looked up still reaches them', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: 'byHand' });
+  await addSister(page, id);
+  await addSister(page, id);
+  const [lower, higher] = await page.evaluate((brother) => Object.keys(window.editor.getView().getNodeMap())
+    .map((k) => parseInt(k, 10))
+    .filter((k) => k !== brother && window.editor.getView().getNode(k).getType() === 'Person' &&
+      window.editor.getGraph().getParentRelationship(k) !== null)
+    .sort((a, b) => a - b), id);
+  await reopenLinked(page, higher);
+  expect(await page.evaluate(() => window.lookups.length)).toBe(1);
+
+  // removing the other sister gives her a lower ID
+  await page.evaluate((nodeID) => document.dispatchEvent(new CustomEvent('pedigree:node:remove', { detail: { nodeID } })), lower);
+  await page.evaluate(() => window.lookups[0]('Test Person'));
+  const linked = await page.evaluate(() => Object.values(window.editor.getView().getNodeMap())
+    .filter((n) => n.getLinkedPatientRef && n.getLinkedPatientRef() === 'Patient/1').map((n) => [n.getID(), n.getFirstName()]));
+  expect(linked).toEqual([[expect.any(Number), 'Test Person']]);
+  expect(linked[0][0]).toBeLessThan(higher);
+  expect(errors).toEqual([]);
+});
