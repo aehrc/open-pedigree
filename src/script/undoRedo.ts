@@ -30,6 +30,15 @@ export default class ActionStack {
     this._newStepNext = true;
   }
 
+  // The current step's state is the pedigree as it is now: for a change that isn't a step of its own
+  // but should be in the state an undo or redo goes back to.
+  updateCurrentState(): void {
+    const currentState = this._getCurrentState();
+    if (currentState) {
+      currentState.serializedState = editor.getSaveLoadEngine().serialize();
+    }
+  }
+
   redo(): void {
     const nextState = this._getNextState();
     if (!nextState) {
@@ -120,6 +129,7 @@ export default class ActionStack {
   // either changed (a patient link also sets the name, say) would be lost from one or the other.
   _combinableEvents(event1: any, event2: any): boolean {
     if (
+      event1.memo.linkedRecordRefresh || event2.memo.linkedRecordRefresh ||
       !event1.memo.hasOwnProperty('nodeID') ||
       !event2.memo.hasOwnProperty('nodeID') ||
       event1.memo.nodeID != event2.memo.nodeID

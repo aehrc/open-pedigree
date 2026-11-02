@@ -13,20 +13,23 @@ async function loadOneMan(page, { patientProvider } = {}) {
   await retireAutoCreatedEditor(page);
   await page.evaluate((withPatientProvider) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
-    // (a provider that finds every linked patient's name, after a moment as a server would)
+    // (a provider that finds every linked patient's name, after a moment as a server would - or,
+    // 'once', only the first time it is asked, then can't be reached)
+    let lookups = 0;
     const patientProvider = withPatientProvider ? {
       isConfigured: () => true,
       canImportClinicalData: () => false,
       canLinkProband: () => true,
       canSearchFamilyMembers: () => true,
-      lookupPatient: (_ref, onSuccess) => setTimeout(() => onSuccess('Test Person'), 0),
+      lookupPatient: (_ref, onSuccess, onError) => setTimeout(() => (withPatientProvider === 'once' && lookups++ > 0
+        ? onError('unreachable') : onSuccess('Test Person')), 0),
       openPatientPickerModal: () => {},
       openClinicalImportModal: () => {},
     } : undefined;
     window.editor = window.OpenPedigree.initialiseEditor(patientProvider ? { patientProvider } : {});
     // (loaded as an undo state, so there is one to undo back to)
     window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
-  }, !!patientProvider);
+  }, patientProvider || false);
   const id = await page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
     return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person'), 10);
@@ -215,5 +218,34 @@ test('a name typed again after the menu is closed and opened is a new undo step'
   expect(await firstName(page, id)).toBe('Ann');
   await undo(page);
   expect(await firstName(page, id)).toBe('');
+  expect(errors).toEqual([]);
+});
+
+test('a linked patient\'s name found when a pedigree is opened stays after an undo, when it can\'t be looked up again', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: 'once' });
+  await setProperty(page, id, { setLinkedPatientRef: 'Patient/1' });
+  await page.evaluate(() => {
+    const saved = window.editor.getSaveLoadEngine().serialize();
+    window.editor.getSaveLoadEngine().createGraphFromSerializedData(saved, false);
+  });
+  await expect.poll(() => firstName(page, id)).toBe('Test Person');
+  await addSister(page, id);
+
+  await undo(page);
+  await page.waitForTimeout(100);
+  expect(await firstName(page, id)).toBe('Test Person');
+  expect(errors).toEqual([]);
+});
+
+test('a linked record\'s refresh is not combined with a name typed before it', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page);
+  await setProperty(page, id, { setFirstName: 'Ann' });
+  const size = await page.evaluate(() => window.editor.getActionStack()._size());
+  await page.evaluate((nodeID) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
+    { detail: { nodeID, properties: { setFirstName: 'Anna' }, linkedRecordRefresh: true } })), id);
+  expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
+
+  await undo(page);
+  expect(await firstName(page, id)).toBe('Ann');
   expect(errors).toEqual([]);
 });

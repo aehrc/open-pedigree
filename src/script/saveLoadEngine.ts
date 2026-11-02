@@ -155,8 +155,9 @@ export default class SaveLoadEngine {
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
   }
 
-  // A name found here isn't an undo step: the user didn't make it, a step made after an undo or redo
-  // reloaded a state would drop the steps that could be redone, and a reload finds it again anyway.
+  // A name found here isn't an undo step: the user didn't make it, and a step made after an undo or
+  // redo reloaded a state would drop the steps that could be redone. It goes into the current
+  // step's state instead, so an undo back to it keeps the name even if it can't be found again.
   _resolveLinkedPatientNames(): void {
     const provider = (editor as any).getPatientProvider();
     if (!provider || !provider.isConfigured()) return;
@@ -175,6 +176,7 @@ export default class SaveLoadEngine {
             document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
               detail: { nodeID: nodeId, properties: { setFirstName: displayName }, noUndoRedo: true }
             }));
+            editor.getActionStack().updateCurrentState();
           }
         },
         (_err: string) => {}
