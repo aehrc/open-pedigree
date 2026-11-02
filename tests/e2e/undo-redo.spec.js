@@ -17,11 +17,11 @@ async function loadOneMan(page) {
     // (loaded as an undo state, so there is one to undo back to)
     window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
   });
-  await page.waitForTimeout(300);
   const id = await page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
     return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person'), 10);
   });
+  expect(id).not.toBeNaN();
   return { id, errors };
 }
 
@@ -31,6 +31,15 @@ function setProperty(page, nodeID, properties) {
 }
 
 const firstName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getFirstName(), id);
+const lastName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getLastName(), id);
+const gender = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getGender(), id);
+const sisterOf = (page, brother) => page.evaluate((id) => {
+  const map = window.editor.getView().getNodeMap();
+  return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' &&
+    parseInt(k, 10) !== id && window.editor.getGraph().getParentRelationship(parseInt(k, 10)) !== null), 10);
+}, brother);
+const addSister = (page, personID) => page.evaluate((id) => document.dispatchEvent(new CustomEvent('pedigree:person:newsibling',
+  { detail: { personID: id, childParams: { gender: 'F' } } })), personID);
 const personCount = (page) => page.evaluate(() => Object.values(window.editor.getView().getNodeMap())
   .filter((n) => n.getType && n.getType() === 'Person').length);
 const undo = (page) => page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
@@ -55,8 +64,7 @@ test('a property change can be undone and redone', async ({ page }) => {
 test('adding a sibling can be undone and redone', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
   const before = await personCount(page);
-  await page.evaluate((personID) => document.dispatchEvent(new CustomEvent('pedigree:person:newsibling',
-    { detail: { personID, childParams: { gender: 'F' } } })), id);
+  await addSister(page, id);
   const after = await personCount(page);
   expect(after).toBeGreaterThan(before);
 
@@ -85,14 +93,9 @@ test('typing a name is one undo step, as the name field sends a change on every 
 
 test('removing a person straight after renaming them is its own undo step', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
-  await page.evaluate((personID) => document.dispatchEvent(new CustomEvent('pedigree:person:newsibling',
-    { detail: { personID, childParams: { gender: 'F' } } })), id);
+  await addSister(page, id);
   const withSister = await personCount(page);
-  const sister = await page.evaluate((brother) => {
-    const map = window.editor.getView().getNodeMap();
-    return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person' &&
-      parseInt(k, 10) !== brother && window.editor.getGraph().getParentRelationship(parseInt(k, 10)) !== null), 10);
-  }, id);
+  const sister = await sisterOf(page, id);
   await setProperty(page, sister, { setFirstName: 'Sue' });
   await page.evaluate((nodeID) => document.dispatchEvent(new CustomEvent('pedigree:node:remove',
     { detail: { nodeID } })), sister);
@@ -104,5 +107,53 @@ test('removing a person straight after renaming them is its own undo step', asyn
   expect(await firstName(page, sister)).toBe('Sue');
   await undo(page);
   expect(await firstName(page, sister)).toBe('');
+  expect(errors).toEqual([]);
+});
+
+test('a key typed after a change to several properties is its own step, so undo and redo keep them all', async ({ page }) => {
+  // (as linking a patient sets the name with the rest)
+  const { id, errors } = await loadOneMan(page);
+  await setProperty(page, id, { setFirstName: 'Ann', setLastName: 'Lee', setGender: 'F' });
+  await setProperty(page, id, { setFirstName: 'Anna' });
+
+  await undo(page);
+  expect([await firstName(page, id), await lastName(page, id), await gender(page, id)]).toEqual(['Ann', 'Lee', 'F']);
+  await undo(page);
+  expect([await firstName(page, id), await lastName(page, id), await gender(page, id)]).toEqual(['', '', 'M']);
+  await redo(page);
+  expect([await firstName(page, id), await lastName(page, id), await gender(page, id)]).toEqual(['Ann', 'Lee', 'F']);
+  await redo(page);
+  expect(await firstName(page, id)).toBe('Anna');
+  expect(errors).toEqual([]);
+});
+
+test('a name typed after an undo is a step of its own, so undo goes back to the name before it', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page);
+  await setProperty(page, id, { setFirstName: 'Ann' });
+  await setProperty(page, id, { setLastName: 'Lee' });
+  await undo(page);
+  await setProperty(page, id, { setFirstName: 'Bob' });
+
+  await undo(page);
+  expect(await firstName(page, id)).toBe('Ann');
+  await undo(page);
+  expect(await firstName(page, id)).toBe('');
+  expect(errors).toEqual([]);
+});
+
+test('a new sibling and then her name are both redone', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page);
+  await addSister(page, id);
+  const sister = await sisterOf(page, id);
+  const withSister = await personCount(page);
+  await setProperty(page, sister, { setFirstName: 'Sue' });
+
+  await undo(page);
+  await undo(page);
+  expect(await personCount(page)).toBe(1);
+  await redo(page);
+  await redo(page);
+  expect(await personCount(page)).toBe(withSister);
+  expect(await firstName(page, sister)).toBe('Sue');
   expect(errors).toEqual([]);
 });

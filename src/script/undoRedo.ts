@@ -14,11 +14,13 @@ export default class ActionStack {
   _currentState: number;
   _stack: any[];
   _MAXUNDOSIZE: number;
+  _undoneOrRedone: boolean;
 
   constructor() {
     this._currentState = 0;
     this._stack = [];
     this._MAXUNDOSIZE = 100;
+    this._undoneOrRedone = false;
   }
 
   redo(): void {
@@ -27,6 +29,7 @@ export default class ActionStack {
       return;
     }
 
+    this._undoneOrRedone = true;
     if (nextState.eventToGetToThisState) {
       const memo = Object.assign({}, nextState.eventToGetToThisState.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
@@ -44,6 +47,7 @@ export default class ActionStack {
       return;
     }
 
+    this._undoneOrRedone = true;
     const currentState = this._getCurrentState();
     if (currentState.eventToUndo) {
       const memo = Object.assign({}, currentState.eventToUndo.memo, { noUndoRedo: true });
@@ -70,8 +74,14 @@ export default class ActionStack {
 
     const state = new State(serializedState, eventToGetToThisState, eventToUndo);
 
+    // (an edit after an undo or redo starts a new step: combined into the step the user went back
+    // to, one undo would skip that step's own value)
+    const afterUndoOrRedo = this._undoneOrRedone;
+    this._undoneOrRedone = false;
+
     const currentState = this._getCurrentState();
     if (
+      !afterUndoOrRedo &&
       eventToGetToThisState &&
       currentState &&
       currentState.eventToGetToThisState &&
@@ -100,6 +110,9 @@ export default class ActionStack {
     return { eventName: event.type, memo: event.detail || {} };
   }
 
+  // Keys typed in one text field, each sent as its own change. Only changes to that one property
+  // combine: the step keeps the first change's undo and the last change's redo, so anything else
+  // either changed (a patient link also sets the name, say) would be lost from one or the other.
   _combinableEvents(event1: any, event2: any): boolean {
     if (
       !event1.memo.hasOwnProperty('nodeID') ||
@@ -108,16 +121,10 @@ export default class ActionStack {
     ) {
       return false;
     }
-    if (event1.memo.properties.hasOwnProperty('setFirstName') && event2.memo.properties.hasOwnProperty('setFirstName')) {
-      return true;
-    }
-    if (event1.memo.properties.hasOwnProperty('setLastName') && event2.memo.properties.hasOwnProperty('setLastName')) {
-      return true;
-    }
-    if (event1.memo.properties.hasOwnProperty('setComments') && event2.memo.properties.hasOwnProperty('setComments')) {
-      return true;
-    }
-    return false;
+    const setters1 = Object.keys(event1.memo.properties || {});
+    const setters2 = Object.keys(event2.memo.properties || {});
+    return setters1.length == 1 && setters2.length == 1 && setters1[0] == setters2[0] &&
+      ['setFirstName', 'setLastName', 'setComments'].indexOf(setters1[0]) != -1;
   }
 
   _size(): number {
