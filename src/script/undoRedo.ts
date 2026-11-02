@@ -53,8 +53,10 @@ export default class ActionStack {
       return;
     }
 
-    editor.getSaveLoadEngine().createGraphFromSerializedData(nextState.serializedState, true);
+    // (moved first: a reload can update the current step's state, as a linked patient's name found
+    // straight away does, and that is the step being redone to)
     this._currentState++;
+    editor.getSaveLoadEngine().createGraphFromSerializedData(nextState.serializedState, true);
   }
 
   undo(): void {
@@ -72,8 +74,9 @@ export default class ActionStack {
       return;
     }
 
-    editor.getSaveLoadEngine().createGraphFromSerializedData(prevState.serializedState, true);
+    // (moved first, as in redo)
     this._currentState--;
+    editor.getSaveLoadEngine().createGraphFromSerializedData(prevState.serializedState, true);
   }
 
   addState(eventToGetToThisState: any, eventToUndo: any, serializedState: any): void {
@@ -99,8 +102,6 @@ export default class ActionStack {
       eventToGetToThisState &&
       currentState &&
       currentState.eventToGetToThisState &&
-      currentState.eventToGetToThisState.eventName == 'pedigree:node:setproperty' &&
-      eventToGetToThisState.eventName == 'pedigree:node:setproperty' &&
       this._combinableEvents(currentState.eventToGetToThisState, eventToGetToThisState)
     ) {
       currentState.eventToGetToThisState = eventToGetToThisState;
@@ -129,6 +130,7 @@ export default class ActionStack {
   // either changed (a patient link also sets the name, say) would be lost from one or the other.
   _combinableEvents(event1: any, event2: any): boolean {
     if (
+      event1.eventName != 'pedigree:node:setproperty' || event2.eventName != 'pedigree:node:setproperty' ||
       event1.memo.linkedRecordRefresh || event2.memo.linkedRecordRefresh ||
       !event1.memo.hasOwnProperty('nodeID') ||
       !event2.memo.hasOwnProperty('nodeID') ||

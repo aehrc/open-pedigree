@@ -14,15 +14,26 @@ async function loadOneMan(page, { patientProvider } = {}) {
   await page.evaluate((withPatientProvider) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
     // (a provider that finds every linked patient's name, after a moment as a server would - or,
-    // 'once', only the first time it is asked, then can't be reached)
+    // 'once', only the first time it is asked, then can't be reached; 'secondTime', straight away
+    // but not the first time, as a cache would; 'byHand', when the test answers the lookups queued
+    // in window.lookups)
     let lookups = 0;
+    window.lookups = [];
     const patientProvider = withPatientProvider ? {
       isConfigured: () => true,
       canImportClinicalData: () => false,
       canLinkProband: () => true,
       canSearchFamilyMembers: () => true,
-      lookupPatient: (_ref, onSuccess, onError) => setTimeout(() => (withPatientProvider === 'once' && lookups++ > 0
-        ? onError('unreachable') : onSuccess('Test Person')), 0),
+      lookupPatient: (_ref, onSuccess, onError) => {
+        if (withPatientProvider === 'byHand') {
+          window.lookups.push(onSuccess);
+        } else if (withPatientProvider === 'secondTime') {
+          lookups++ > 0 ? onSuccess('Test Person') : onError('unreachable');
+        } else {
+          setTimeout(() => (withPatientProvider === 'once' && lookups++ > 0
+            ? onError('unreachable') : onSuccess('Test Person')), 0);
+        }
+      },
       openPatientPickerModal: () => {},
       openClinicalImportModal: () => {},
     } : undefined;
@@ -247,5 +258,46 @@ test('a linked record\'s refresh is not combined with a name typed before it', a
 
   await undo(page);
   expect(await firstName(page, id)).toBe('Ann');
+  expect(errors).toEqual([]);
+});
+
+// Opens the pedigree as it is, with node `id` linked to a patient, as a load (an undo step).
+async function reopenLinked(page, id) {
+  await setProperty(page, id, { setLinkedPatientRef: 'Patient/1' });
+  await page.evaluate(() => {
+    const saved = window.editor.getSaveLoadEngine().serialize();
+    window.editor.getSaveLoadEngine().createGraphFromSerializedData(saved, false);
+  });
+}
+
+test('a name found straight away while an undo reloads the pedigree goes into the step undone to, not the one left', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: 'secondTime' });
+  await reopenLinked(page, id);
+  expect(await firstName(page, id)).toBe('');
+  await addSister(page, id);
+  await addSister(page, id);
+  const withTwo = await personCount(page);
+
+  await undo(page);
+  expect(await firstName(page, id)).toBe('Test Person');
+  await redo(page);
+  expect(await personCount(page)).toBe(withTwo);
+  await addSister(page, id);
+  await undo(page);
+  expect(await personCount(page)).toBe(withTwo);
+  expect(errors).toEqual([]);
+});
+
+test('a name found after the pedigree was reloaded again is left to the newer lookup', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: 'byHand' });
+  await reopenLinked(page, id);
+  await addSister(page, id);
+  await undo(page);
+  expect(await page.evaluate(() => window.lookups.length)).toBe(2);
+
+  // (the first lookup was for the pedigree as first opened, since reloaded)
+  await page.evaluate(() => window.lookups[0]('Stale Person'));
+  await page.evaluate(() => window.lookups[1]('Test Person'));
+  expect(await firstName(page, id)).toBe('Test Person');
   expect(errors).toEqual([]);
 });

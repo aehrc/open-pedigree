@@ -171,8 +171,12 @@ export default class SaveLoadEngine {
       const nodeId = i;
       provider.lookupPatient(fhirRef,
         (displayName: string) => {
-          const n = view.getNode(nodeId);
-          if (n && n.getFirstName && !n.getFirstName() && !n.getLastName()) {
+          // (only for the person it was looked up for: by the time it's found, an undo or redo may
+          // have reloaded the pedigree, and started a lookup of its own, or given the ID to someone else)
+          if (view.getNode(nodeId) !== node || node.getLinkedPatientRef() !== fhirRef) {
+            return;
+          }
+          if (!node.getFirstName() && !node.getLastName()) {
             document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
               detail: { nodeID: nodeId, properties: { setFirstName: displayName }, noUndoRedo: true }
             }));
