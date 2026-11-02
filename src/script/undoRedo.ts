@@ -28,8 +28,7 @@ export default class ActionStack {
     }
 
     if (nextState.eventToGetToThisState) {
-      const memo = nextState.eventToGetToThisState.memo;
-      memo['noUndoRedo'] = true;
+      const memo = Object.assign({}, nextState.eventToGetToThisState.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
       this._currentState++;
       return;
@@ -47,8 +46,7 @@ export default class ActionStack {
 
     const currentState = this._getCurrentState();
     if (currentState.eventToUndo) {
-      const memo = currentState.eventToUndo.memo;
-      memo['noUndoRedo'] = true;
+      const memo = Object.assign({}, currentState.eventToUndo.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(currentState.eventToUndo.eventName, { detail: memo }));
       this._currentState--;
       return;
@@ -59,6 +57,9 @@ export default class ActionStack {
   }
 
   addState(eventToGetToThisState: any, eventToUndo: any, serializedState: any): void {
+    eventToGetToThisState = ActionStack._replayable(eventToGetToThisState);
+    eventToUndo = ActionStack._replayable(eventToUndo);
+
     if (this._currentState < this._size()) {
       this._stack.splice(this._currentState, this._stack.length - this._currentState);
     }
@@ -75,6 +76,7 @@ export default class ActionStack {
       currentState &&
       currentState.eventToGetToThisState &&
       currentState.eventToGetToThisState.eventName == 'pedigree:node:setproperty' &&
+      eventToGetToThisState.eventName == 'pedigree:node:setproperty' &&
       this._combinableEvents(currentState.eventToGetToThisState, eventToGetToThisState)
     ) {
       currentState.eventToGetToThisState = eventToGetToThisState;
@@ -87,6 +89,15 @@ export default class ActionStack {
     if (this._size() > this._MAXUNDOSIZE) {
       this._removeOldest();
     }
+  }
+
+  // The Controller hands over the DOM CustomEvent it handled (name in .type, payload in .detail);
+  // redo, undo and combining read the {eventName, memo} shape of its hand-built undo events.
+  static _replayable(event: any): any {
+    if (!event || event.eventName) {
+      return event;
+    }
+    return { eventName: event.type, memo: event.detail || {} };
   }
 
   _combinableEvents(event1: any, event2: any): boolean {

@@ -4,8 +4,7 @@ import path from 'path';
 
 // A pedigree saved under another Default Terminology (terminology-change-keeps-codes): its terms are
 // shown by name, and saved again with their own codings - also after the person is edited and the
-// edit undone (redoing a property change throws, as before this change: ActionStack.redo reads the
-// event's memo, which CustomEvents don't have). localEditor.html's terminology is OMIM disorders and HPO phenotypes.
+// edit undone. localEditor.html's terminology is OMIM disorders and HPO phenotypes.
 const LEGACY = fs.readFileSync(path.join(__dirname, '..', 'unit', 'fixtures', 'legacy-fhir-v1-pedigree.json'), 'utf8');
 const SNOMED = 'http://snomed.info/sct';
 // (a name the editor's term ids don't keep as it is: it gives it back as "ADA2 deficiency, Sneddon s type")
