@@ -4,19 +4,29 @@ import { retireAutoCreatedEditor } from './helpers/singleEditor';
 // The Controller records the DOM CustomEvent it handled (payload in .detail, name in .type), while
 // the ActionStack replays and combines events by their Prototype-era .memo and .eventName: redoing
 // anything threw, and edits to a name never combined into one undo step.
-async function loadOneMan(page) {
+async function loadOneMan(page, { patientProvider } = {}) {
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
   page.on('dialog', (dialog) => dialog.dismiss());
   await page.goto('/localEditor.html');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
   await retireAutoCreatedEditor(page);
-  await page.evaluate(() => {
+  await page.evaluate((withPatientProvider) => {
     document.querySelectorAll('#work-area').forEach((el) => el.remove());
-    window.editor = window.OpenPedigree.initialiseEditor({});
+    // (a provider that finds every linked patient's name, after a moment as a server would)
+    const patientProvider = withPatientProvider ? {
+      isConfigured: () => true,
+      canImportClinicalData: () => false,
+      canLinkProband: () => true,
+      canSearchFamilyMembers: () => true,
+      lookupPatient: (_ref, onSuccess) => setTimeout(() => onSuccess('Test Person'), 0),
+      openPatientPickerModal: () => {},
+      openClinicalImportModal: () => {},
+    } : undefined;
+    window.editor = window.OpenPedigree.initialiseEditor(patientProvider ? { patientProvider } : {});
     // (loaded as an undo state, so there is one to undo back to)
     window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
-  });
+  }, !!patientProvider);
   const id = await page.evaluate(() => {
     const map = window.editor.getView().getNodeMap();
     return parseInt(Object.keys(map).find((k) => map[k].getType && map[k].getType() === 'Person'), 10);
@@ -155,5 +165,18 @@ test('a new sibling and then her name are both redone', async ({ page }) => {
   await redo(page);
   expect(await personCount(page)).toBe(withSister);
   expect(await firstName(page, sister)).toBe('Sue');
+  expect(errors).toEqual([]);
+});
+
+test('the name found for a linked patient when an undo reloads the pedigree leaves the redo in place', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: true });
+  await setProperty(page, id, { setLinkedPatientRef: 'Patient/1' });
+  await addSister(page, id);
+  const withSister = await personCount(page);
+
+  await undo(page);
+  await expect.poll(() => firstName(page, id)).toBe('Test Person');
+  await redo(page);
+  expect(await personCount(page)).toBe(withSister);
   expect(errors).toEqual([]);
 });
