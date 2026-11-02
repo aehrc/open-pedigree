@@ -180,3 +180,20 @@ test('the name found for a linked patient when an undo reloads the pedigree leav
   expect(await personCount(page)).toBe(withSister);
   expect(errors).toEqual([]);
 });
+
+test('a linked patient\'s name found when a pedigree is opened is not an undo step, so typing over it undoes back to it', async ({ page }) => {
+  const { id, errors } = await loadOneMan(page, { patientProvider: true });
+  await setProperty(page, id, { setLinkedPatientRef: 'Patient/1' });
+  await page.evaluate(() => {
+    const saved = window.editor.getSaveLoadEngine().serialize();
+    window.editor.getSaveLoadEngine().createGraphFromSerializedData(saved, false);
+  });
+  await expect.poll(() => firstName(page, id)).toBe('Test Person');
+  const size = await page.evaluate(() => window.editor.getActionStack()._size());
+  await setProperty(page, id, { setFirstName: 'Tess' });
+  expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
+
+  await undo(page);
+  expect(await firstName(page, id)).toBe('Test Person');
+  expect(errors).toEqual([]);
+});

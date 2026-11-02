@@ -150,14 +150,14 @@ export default class SaveLoadEngine {
       editor.getActionStack().addState(null, null, JSONString);
     }
 
-    this._resolveLinkedPatientNames(noUndo);
+    this._resolveLinkedPatientNames();
 
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
   }
 
-  // A reload that isn't an undo step (an undo or redo reloading a state) doesn't make the names it
-  // finds one either: a new step would drop the steps that could be redone.
-  _resolveLinkedPatientNames(noUndo?: any): void {
+  // A name found here isn't an undo step: the user didn't make it, a step made after an undo or redo
+  // reloaded a state would drop the steps that could be redone, and a reload finds it again anyway.
+  _resolveLinkedPatientNames(): void {
     const provider = (editor as any).getPatientProvider();
     if (!provider || !provider.isConfigured()) return;
     const graph = editor.getGraph();
@@ -172,11 +172,9 @@ export default class SaveLoadEngine {
         (displayName: string) => {
           const n = view.getNode(nodeId);
           if (n && n.getFirstName && !n.getFirstName() && !n.getLastName()) {
-            const detail: any = { nodeID: nodeId, properties: { setFirstName: displayName } };
-            if (noUndo) {
-              detail.noUndoRedo = true;
-            }
-            document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail }));
+            document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+              detail: { nodeID: nodeId, properties: { setFirstName: displayName }, noUndoRedo: true }
+            }));
           }
         },
         (_err: string) => {}
