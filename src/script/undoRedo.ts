@@ -14,11 +14,29 @@ export default class ActionStack {
   _currentState: number;
   _stack: any[];
   _MAXUNDOSIZE: number;
+  _newStepNext: boolean;
 
   constructor() {
     this._currentState = 0;
     this._stack = [];
     this._MAXUNDOSIZE = 100;
+    this._newStepNext = false;
+  }
+
+  // The next change is a step of its own, not combined with the current one: called when the user
+  // goes back to a step (an edit combined into it would make one undo skip its own value) and when
+  // the node menu opens or closes (typing in a field again later is a new edit).
+  startNewStep(): void {
+    this._newStepNext = true;
+  }
+
+  // The current step's state is the pedigree as it is now: for a change that isn't a step of its own
+  // but should be in the state an undo or redo goes back to.
+  updateCurrentState(): void {
+    const currentState = this._getCurrentState();
+    if (currentState) {
+      currentState.serializedState = editor.getSaveLoadEngine().serialize();
+    }
   }
 
   redo(): void {
@@ -27,16 +45,17 @@ export default class ActionStack {
       return;
     }
 
+    this.startNewStep();
+    // (moved first: what the step's event or reload sets off can update the current step's state,
+    // as a linked patient's name found straight away does, and that is the step being redone to)
+    this._currentState++;
     if (nextState.eventToGetToThisState) {
-      const memo = nextState.eventToGetToThisState.memo;
-      memo['noUndoRedo'] = true;
+      const memo = Object.assign({}, nextState.eventToGetToThisState.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(nextState.eventToGetToThisState.eventName, { detail: memo }));
-      this._currentState++;
       return;
     }
 
     editor.getSaveLoadEngine().createGraphFromSerializedData(nextState.serializedState, true);
-    this._currentState++;
   }
 
   undo(): void {
@@ -45,20 +64,23 @@ export default class ActionStack {
       return;
     }
 
+    this.startNewStep();
     const currentState = this._getCurrentState();
+    // (moved first, as in redo)
+    this._currentState--;
     if (currentState.eventToUndo) {
-      const memo = currentState.eventToUndo.memo;
-      memo['noUndoRedo'] = true;
+      const memo = Object.assign({}, currentState.eventToUndo.memo, { noUndoRedo: true });
       document.dispatchEvent(new CustomEvent(currentState.eventToUndo.eventName, { detail: memo }));
-      this._currentState--;
       return;
     }
 
     editor.getSaveLoadEngine().createGraphFromSerializedData(prevState.serializedState, true);
-    this._currentState--;
   }
 
   addState(eventToGetToThisState: any, eventToUndo: any, serializedState: any): void {
+    eventToGetToThisState = ActionStack._replayable(eventToGetToThisState);
+    eventToUndo = ActionStack._replayable(eventToUndo);
+
     if (this._currentState < this._size()) {
       this._stack.splice(this._currentState, this._stack.length - this._currentState);
     }
@@ -69,12 +91,15 @@ export default class ActionStack {
 
     const state = new State(serializedState, eventToGetToThisState, eventToUndo);
 
+    const newStep = this._newStepNext;
+    this._newStepNext = false;
+
     const currentState = this._getCurrentState();
     if (
+      !newStep &&
       eventToGetToThisState &&
       currentState &&
       currentState.eventToGetToThisState &&
-      currentState.eventToGetToThisState.eventName == 'pedigree:node:setproperty' &&
       this._combinableEvents(currentState.eventToGetToThisState, eventToGetToThisState)
     ) {
       currentState.eventToGetToThisState = eventToGetToThisState;
@@ -89,24 +114,32 @@ export default class ActionStack {
     }
   }
 
+  // The Controller hands over the DOM CustomEvent it handled (name in .type, payload in .detail);
+  // redo, undo and combining read the {eventName, memo} shape of its hand-built undo events.
+  static _replayable(event: any): any {
+    if (!event || event.eventName) {
+      return event;
+    }
+    return { eventName: event.type, memo: event.detail || {} };
+  }
+
+  // Keys typed in one text field, each sent as its own change. Only changes to that one property
+  // combine: the step keeps the first change's undo and the last change's redo, so anything else
+  // either changed (a patient link also sets the name, say) would be lost from one or the other.
   _combinableEvents(event1: any, event2: any): boolean {
     if (
+      event1.eventName != 'pedigree:node:setproperty' || event2.eventName != 'pedigree:node:setproperty' ||
+      event1.memo.linkedRecordRefresh || event2.memo.linkedRecordRefresh ||
       !event1.memo.hasOwnProperty('nodeID') ||
       !event2.memo.hasOwnProperty('nodeID') ||
       event1.memo.nodeID != event2.memo.nodeID
     ) {
       return false;
     }
-    if (event1.memo.properties.hasOwnProperty('setFirstName') && event2.memo.properties.hasOwnProperty('setFirstName')) {
-      return true;
-    }
-    if (event1.memo.properties.hasOwnProperty('setLastName') && event2.memo.properties.hasOwnProperty('setLastName')) {
-      return true;
-    }
-    if (event1.memo.properties.hasOwnProperty('setComments') && event2.memo.properties.hasOwnProperty('setComments')) {
-      return true;
-    }
-    return false;
+    const setters1 = Object.keys(event1.memo.properties || {});
+    const setters2 = Object.keys(event2.memo.properties || {});
+    return setters1.length == 1 && setters2.length == 1 && setters1[0] == setters2[0] &&
+      ['setFirstName', 'setLastName', 'setComments'].indexOf(setters1[0]) != -1;
   }
 
   _size(): number {

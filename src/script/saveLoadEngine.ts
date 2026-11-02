@@ -155,24 +155,32 @@ export default class SaveLoadEngine {
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
   }
 
+  // A name found here isn't an undo step: the user didn't make it, and a step made after an undo or
+  // redo reloaded a state would drop the steps that could be redone. It goes into the current
+  // step's state instead, so an undo back to it keeps the name even if it can't be found again.
   _resolveLinkedPatientNames(): void {
     const provider = (editor as any).getPatientProvider();
     if (!provider || !provider.isConfigured()) return;
     const graph = editor.getGraph();
     const view = editor.getView();
-    for (let i = 0; i < graph.getMaxNodeId(); i++) {
+    for (let i = 0; i <= graph.getMaxNodeId(); i++) {
       if (!graph.isPerson(i)) continue;
       const node = view.getNode(i);
       if (!node || !node.getLinkedPatientRef || !node.getLinkedPatientRef()) continue;
+      if (node.getFirstName() || node.getLastName()) continue;
       const fhirRef = node.getLinkedPatientRef();
-      const nodeId = i;
       provider.lookupPatient(fhirRef,
         (displayName: string) => {
-          const n = view.getNode(nodeId);
-          if (n && n.getFirstName && !n.getFirstName() && !n.getLastName()) {
+          // (only for the person it was looked up for, under the ID they have now: by the time it's
+          // found, an undo or redo may have reloaded the pedigree, and started a lookup of its own)
+          if (editor.getView().getNode(node.getID()) !== node || node.getLinkedPatientRef() !== fhirRef) {
+            return;
+          }
+          if (!node.getFirstName() && !node.getLastName()) {
             document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
-              detail: { nodeID: nodeId, properties: { setFirstName: displayName } }
+              detail: { nodeID: node.getID(), properties: { setFirstName: displayName }, noUndoRedo: true }
             }));
+            editor.getActionStack().updateCurrentState();
           }
         },
         (_err: string) => {}

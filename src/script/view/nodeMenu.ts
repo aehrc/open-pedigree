@@ -822,6 +822,7 @@ export default class NodeMenu {
   };
 
   show(node: any, x: any, y: any): any {
+    this._startNewUndoStep();
     this._onscreen = true;
     this.targetNode = node;
     this._updating = true;
@@ -833,6 +834,7 @@ export default class NodeMenu {
   }
 
   hide(): any {
+    this._startNewUndoStep();
     this.hideSuggestPicker();
     this._onscreen = false;
     document.removeEventListener('mousedown', (this as any)._onClickOutside);
@@ -842,6 +844,14 @@ export default class NodeMenu {
     }
     this.menuBox.style.display = 'none';
     this._clearCrtData();
+  }
+
+  // Typing in a field again after the menu is opened or closed is a new edit, not combined with the
+  // last one. (The menu is also hidden while the editor is being built, before it has an action stack.)
+  _startNewUndoStep(): void {
+    if (editor.getActionStack()) {
+      editor.getActionStack().startNewStep();
+    }
   }
 
   hideSuggestPicker(): any {
