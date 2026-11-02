@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.1...open-pedigree-v1.5.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* redo a change again, and combine typing in a text field into one undo step ([#78](https://github.com/aehrc/open-pedigree/issues/78)) ([12432c8](https://github.com/aehrc/open-pedigree/commit/12432c812409d6bd6dbb4c1f2964266fb105c42c))
+
 ## [1.5.1](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.0...open-pedigree-v1.5.1) (2026-11-01)
 
 
