@@ -235,8 +235,8 @@ export default class SaveLoadEngine {
     if (this._saveInProgress) {
       return;
     }
-    // Saving before the stored pedigree has loaded would overwrite it (autosave, or Close with
-    // autosave, while waiting for a questionnaireUrl). The Save button says so itself.
+    // Saving before the stored pedigree has loaded would overwrite it (an autosave, or a host's
+    // save, while waiting for a questionnaireUrl; the loading cover keeps the user out).
     if (editor.isAwaitingFirstLoad()) {
       console.warn('[SAVE] Skipped: the stored pedigree has not loaded yet');
       return;

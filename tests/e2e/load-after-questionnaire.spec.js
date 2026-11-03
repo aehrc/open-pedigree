@@ -82,6 +82,10 @@ function newEditor(page, options) {
           if (opts.backend === 'throws') {
             throw new Error('corrupt');
           }
+          if (opts.backend === 'loadsThenThrows') {
+            args.onSuccess(window.__serialized);
+            throw new Error('after loading');
+          }
           setTimeout(() => args.onSuccess(window.__serialized), 1000);
         },
       };
@@ -99,6 +103,12 @@ const probandName = (page) => page.evaluate(() => {
 // The template chooser a new (unstored) pedigree gets: count of visible ones.
 const visibleTemplateChoosers = (page) => page.evaluate(() => Array.from(document.querySelectorAll('.template-picture-container'))
   .filter((el) => el.offsetParent !== null).length);
+
+const coverShown = (page) => page.evaluate(() => Array.from(document.querySelectorAll('.pedigree-loading-cover')).length);
+
+// Whether the topmost element at the toolbar's corner and at the page's centre is the cover.
+const coverOnTop = (page) => page.evaluate(() => [[20, 20], [window.innerWidth / 2, window.innerHeight / 2]]
+  .every(([x, y]) => Boolean(document.elementFromPoint(x, y).closest('.pedigree-loading-cover'))));
 
 const probandAnswer = (page, linkId) => page.evaluate((id) => {
   const node = window.editor.getView().getNode(0);
@@ -163,7 +173,14 @@ test('the stored pedigree waits for the Questionnaire: nothing is loaded before 
 
   await page.waitForTimeout(500);
   expect(await probandName(page)).toBe('no proband');
+  // A cover keeps the user out of the empty editor meanwhile.
+  expect(await coverShown(page)).toBe(1);
+  await expect(page.locator('.pedigree-loading-cover')).toContainText('Loading the pedigree');
+  // It's on top of everything, so clicks anywhere (the toolbar too) land on it.
+  expect(await coverOnTop(page)).toBe(true);
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  expect(await coverShown(page)).toBe(0);
+  expect(await coverOnTop(page)).toBe(false);
   expect(await probandAnswer(page, 'comorbidities')).toEqual([HTN]);
   // A stored pedigree gets no template chooser.
   expect(await visibleTemplateChoosers(page)).toBe(choosersBefore);
@@ -255,21 +272,17 @@ test('saving while waiting does not overwrite the stored pedigree', async ({ pag
   await storePedigree(page);
   const stored = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
   await routeQuestionnaire(page, { delayMs: 1500 });
-  const alerts = [];
-  page.on('dialog', (dialog) => alerts.push(dialog.message()));
   await newEditor(page, {});
 
-  // An autosave-style save, and the Save button.
+  // An autosave or a host's save.
   await page.evaluate((url) => window.editor.getSaveLoadEngine().save(url), DATA_URL);
-  await page.evaluate(() => document.getElementById('action-save').click());
   expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(stored);
-  expect(alerts.some((message) => message.includes('still loading'))).toBe(true);
 
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
 });
 
-test('with a backend that fetches, saving waits until the stored pedigree has arrived', async ({ page }) => {
+test('with a backend that fetches, the stored pedigree arrives after the Questionnaire, with its answers', async ({ page }) => {
   await storePedigree(page);
   // The stored pedigree, serialized, for the page's slow backend to hand back.
   await newEditor(page, { local: CUSTOM_LEGEND_QUESTIONNAIRE });
@@ -280,11 +293,9 @@ test('with a backend that fetches, saving waits until the stored pedigree has ar
   page.on('dialog', (dialog) => dialog.dismiss());
   await newEditor(page, { backend: 'slow' });
 
-  // The Questionnaire has arrived; the backend is still fetching.
-  await expect.poll(() => page.evaluate(() => window.editor._questionnaireConfig.items.some((item) => item.linkId === 'note')), { timeout: 10000 }).toBe(true);
+  // The Questionnaire has arrived and the cover is gone; the backend is still fetching.
+  await expect.poll(() => coverShown(page), { timeout: 10000 }).toBe(0);
   expect(await probandName(page)).toBe('no proband');
-  await page.evaluate(() => window.editor.getSaveLoadEngine().save('custom:pedigree'));
-  expect(await page.evaluate(() => window.backendSaves)).toBe(0);
 
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   expect(await probandAnswer(page, 'comorbidities')).toEqual([HTN]);
@@ -303,9 +314,25 @@ test('a backend that throws on the deferred load gets the template chooser, and 
   await expect.poll(() => visibleTemplateChoosers(page), { timeout: 10000 }).toBe(choosersBefore + 1);
   expect(errors.some((text) => text.includes('Loading the stored pedigree failed'))).toBe(true);
   expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
+  expect(await coverShown(page)).toBe(0);
 });
 
-test('with autosave on, Clear while waiting does not save over the stored pedigree', async ({ page }) => {
+test('a backend that throws after loading the pedigree gets no template chooser over it', async ({ page }) => {
+  await storePedigree(page);
+  await newEditor(page, { local: CUSTOM_LEGEND_QUESTIONNAIRE });
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  await page.evaluate(() => { window.__serialized = window.editor.getGraph().toJSON(); });
+  await retireAutoCreatedEditor(page);
+  await routeQuestionnaire(page, { delayMs: 200 });
+  const choosersBefore = await visibleTemplateChoosers(page);
+  await newEditor(page, { backend: 'loadsThenThrows' });
+
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  await page.waitForTimeout(300);
+  expect(await visibleTemplateChoosers(page)).toBe(choosersBefore);
+});
+
+test('with autosave on, a Clear while waiting (by the host: the cover keeps the user out) does not save over the stored pedigree', async ({ page }) => {
   await storePedigree(page);
   const stored = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
   await routeQuestionnaire(page, { delayMs: 1000 });

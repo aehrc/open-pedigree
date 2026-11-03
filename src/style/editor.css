@@ -764,6 +764,11 @@
 .msdialog-modal-container .pedigree-template-chooser {
     width: 500px;
 }
+.pedigree-loading-cover .msdialog-box {
+    width: auto;
+    max-width: 300px;
+    text-align: center;
+}
 .picture-box {
     display: inline-block;
     box-shadow: rgba(0, 0, 0, 0.5) 0 0 5px 2px;

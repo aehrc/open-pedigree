@@ -214,10 +214,6 @@ export default class PedigreeEditor {
 
     var saveButton = document.getElementById('action-save');
     saveButton && saveButton.addEventListener('click', function(event: any) {
-      if (editor.isAwaitingFirstLoad()) {
-        alert('The pedigree is still loading. Please save again in a moment.');
-        return;
-      }
       editor.getView().unmarkAll();
       if (patientDataUrl) {
         editor.getSaveLoadEngine().save(patientDataUrl);
@@ -291,11 +287,12 @@ export default class PedigreeEditor {
   /**
    * Runs the backend's first load once the questionnaireUrl fetch has settled, or once waitMs has
    * passed, whichever is first. After the wait, the pedigree is read against the built-in default
-   * and a late Questionnaire is applied as before. Skipped if the host or user put a pedigree on
-   * the canvas meanwhile (an import, a template, Clear: undo can't empty it again), so that one is
-   * never replaced, and if
-   * this editor has been replaced (the load acts on window.editor). Saving is held back until
-   * this first load has finished or been skipped (isAwaitingFirstLoad).
+   * and a late Questionnaire is applied as before.
+   *
+   * While waiting, a cover keeps the user from acting on the empty editor, and saving is held
+   * (isAwaitingFirstLoad). The load is skipped if the host put a pedigree on the canvas meanwhile,
+   * so that one is never replaced (undo can't empty the canvas again), or if this editor has been
+   * replaced (the load acts on window.editor).
    */
   _loadOnceQuestionnaireSettled(patientDataUrl: any, waitMs: any): void {
     var _this = this;
@@ -303,11 +300,7 @@ export default class PedigreeEditor {
       || (typeof waitMs === 'string' && /^\s*\d+\s*$/.test(waitMs));
     var ms = validWait ? Math.min(Number(waitMs), MAX_TIMEOUT_MS) : QUESTIONNAIRE_WAIT_MS;
     this._firstLoadPending = true;
-
-    var finishFirstLoad = function() {
-      document.removeEventListener('pedigree:load:finish', finishFirstLoad);
-      _this._firstLoadPending = false;
-    };
+    var cover = this._showLoadingCover();
 
     var timer: any;
     var cap = new Promise<void>(function(resolve) {
@@ -315,24 +308,41 @@ export default class PedigreeEditor {
     });
     var run = function() {
       clearTimeout(timer);
-      if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
-        _this._firstLoadPending = false;
-        return;
-      }
-      // Saving stays held back until the load has put the stored pedigree on the canvas: an
-      // asynchronous backend is still fetching it when load() returns. With nothing stored, the
-      // template chooser's choice finishes it.
-      document.addEventListener('pedigree:load:finish', finishFirstLoad);
       try {
+        if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
+          return;
+        }
         _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
       } catch (err) {
         console.error('Loading the stored pedigree failed', err);
-        finishFirstLoad();
-        new TemplateSelector(true);
+        if (_this._graphIsEmpty()) {
+          new TemplateSelector(true);
+        }
+      } finally {
+        // Held only this far: an asynchronous backend is still fetching now, as it always was
+        // after the constructor, and a backend that never answers mustn't hold saving forever.
+        _this._firstLoadPending = false;
+        cover.parentNode && cover.parentNode.removeChild(cover);
       }
     };
     // _questionnaireSettled doesn't reject; if it ever did, the load still runs.
     Promise.race([this._questionnaireSettled, cap]).then(run, run);
+  }
+
+  /**
+   * A full-page cover saying the pedigree is loading, which can't be dismissed: the editor's
+   * own modal overlay, without a dialog's close handlers.
+   */
+  _showLoadingCover(): HTMLElement {
+    var cover = document.createElement('div');
+    cover.className = 'msdialog-modal-container pedigree-loading-cover';
+    var box = document.createElement('div');
+    box.className = 'msdialog-box msdialog-top';
+    box.setAttribute('role', 'status');
+    box.textContent = 'Loading the pedigree...';
+    cover.appendChild(box);
+    document.body.appendChild(cover);
+    return cover;
   }
 
   _graphIsEmpty(): boolean {
@@ -341,8 +351,8 @@ export default class PedigreeEditor {
   }
 
   /**
-   * True while the stored pedigree's first load is waiting for a questionnaireUrl, or is still
-   * being fetched: saving now could overwrite it with an empty or unrelated pedigree.
+   * True while the stored pedigree's first load is waiting for a questionnaireUrl: saving now
+   * could overwrite it with an empty or unrelated pedigree.
    */
   isAwaitingFirstLoad(): boolean {
     return Boolean(this._firstLoadPending);
