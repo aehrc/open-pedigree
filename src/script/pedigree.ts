@@ -341,7 +341,6 @@ export default class PedigreeEditor {
     var box = document.createElement('div');
     box.className = 'msdialog-box msdialog-top';
     box.setAttribute('role', 'status');
-    box.textContent = 'Loading the pedigree...';
     cover.appendChild(box);
     var madeInert: Element[] = [];
     Array.prototype.forEach.call(document.body.children, function(element: Element) {
@@ -351,12 +350,12 @@ export default class PedigreeEditor {
       }
     });
     document.body.appendChild(cover);
+    // Set once the status region is in the page, so screen readers announce it.
+    box.textContent = 'Loading the pedigree...';
     return {
       remove: function() {
         madeInert.forEach(function(element) { element.removeAttribute('inert'); });
-        if (cover.parentNode) {
-          cover.parentNode.removeChild(cover);
-        }
+        cover.remove();
       }
     };
   }

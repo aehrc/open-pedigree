@@ -187,6 +187,7 @@ test('the stored pedigree waits for the Questionnaire: nothing is loaded before 
   await expect(page.locator('.pedigree-loading-cover')).toContainText('Loading the pedigree');
   // It's on top of everything, so clicks anywhere (the toolbar too) land on it.
   expect(await coverOnTop(page)).toBe(true);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.pedigree-loading-cover')).zIndex)).toBe('100101');
   expect(await toolbarInert(page)).toBe(true);
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   expect(await coverShown(page)).toBe(0);
