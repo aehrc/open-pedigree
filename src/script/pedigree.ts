@@ -569,11 +569,18 @@ export default class PedigreeEditor {
         // choosable '-' on any drop-down (e.g. gestation age's).
         var hasEmptyOption = !!(item.answerOption && item.answerOption.some(function(opt: any) { return opt.value === ''; }));
         var hasChoices = (item.answerOption && item.answerOption.length > 0) || item.range;
+        // Whether the choice can show it's unanswered: a drop-down's '-', a radio choice's "reset".
+        var canBeUnanswered = hasChoices && !item.repeats && !mapped && !hasEmptyOption;
         if (item.fieldType === 'select' && item.nullValue) {
           descriptor.nullValue = true;
-        } else if (item.fieldType === 'select' && hasChoices && !item.repeats && !mapped && !hasEmptyOption) {
+        } else if (item.fieldType === 'select' && canBeUnanswered) {
           descriptor.nullValue = true;
           descriptor.nullValueChoosable = !item.required;
+        }
+        // A radio choice gets a "reset" to clear it back to unanswered, as REDCap's own forms have -
+        // on the same terms as a drop-down's choosable '-'.
+        if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
+          descriptor.clearable = true;
         }
         if (item.columns) {
           descriptor.columns = item.columns;

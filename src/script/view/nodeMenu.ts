@@ -26,6 +26,7 @@ import flatpickr from 'flatpickr';
 import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
 import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
+import { isBlankValue } from 'pedigree/model/helpers';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -78,6 +79,17 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   selectize.refreshOptions(false);
   if (legend && swatches) {
     applySelectizeSwatches(container, legend);
+  }
+}
+
+// A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
+// (disabled: true, not a list of options). Otherwise it can, as a drop-down's '-' can - including for
+// an answer whose option is now disabled or hidden, which is the one most worth clearing (undo brings
+// it back), and when a list happens to disable every option.
+function syncRadioReset(container: any, readOnly: boolean): void {
+  var reset = container.querySelector('button.field-reset');
+  if (reset) {
+    reset.disabled = readOnly;
   }
 }
 
@@ -456,8 +468,16 @@ export default class NodeMenu {
 
         var before = target.getSummary()[field.name].value;
         var after = _this.fieldMap[field.name].crtValue;
-        var structured = (before && typeof before === 'object') || (after && typeof after === 'object');
-        if (structured ? JSON.stringify(before) === JSON.stringify(after) : before == after) {
+        // Unanswered is undefined, null, '' or [] alike (e.g. a radio's reset gives '' for a person who
+        // has no answer): no change, so no setter call and no undo step. Clearing a real answer such as
+        // 0 (which == takes for '') is a change; the controller agrees on that, though it keeps its own
+        // looser rule otherwise.
+        var blankBefore = isBlankValue(before);
+        var blankAfter = isBlankValue(after);
+        var structured = (typeof before === 'object') || (typeof after === 'object');
+        var unchanged = (blankBefore || blankAfter) ? (blankBefore && blankAfter)
+          : (structured ? JSON.stringify(before) === JSON.stringify(after) : before == after);
+        if (unchanged) {
           return;
         }
 
@@ -510,6 +530,22 @@ export default class NodeMenu {
         _this._attachFieldEventListeners(radioButton, ['click']);
       };
       data.values.forEach(_generateRadioButton);
+      if (data.clearable) {
+        // "reset", as on REDCap's forms: back to unanswered - also an answer matching no option
+        // (none ticked). With no answer it changes nothing (see _attachFieldEventListeners), and the
+        // form shows the cleared choice once the change is applied (update()).
+        var reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'field-reset';
+        reset.name = data.name;
+        reset.textContent = 'reset';
+        reset.setAttribute('aria-label', 'Reset ' + (data.label || data.name));
+        (reset as any)._getValue = function() {
+          return [''];
+        };
+        result.inputsContainer.appendChild(reset);
+        _this._attachFieldEventListeners(reset, ['click']);
+      }
 
       return result;
     },
@@ -1172,6 +1208,7 @@ export default class NodeMenu {
       Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
         item.disabled = Array.isArray(disabled) ? (disabled.indexOf(item.value) >= 0) : !!disabled;
       });
+      syncRadioReset(container, !Array.isArray(disabled) && !!disabled);
     },
     'checkbox' : function(container: any, disabled: any): any {
       var target = container.querySelector('input[type=checkbox]');

@@ -1,4 +1,4 @@
-import { cloneObject, Timer } from 'pedigree/model/helpers';
+import { cloneObject, isBlankValue, Timer } from 'pedigree/model/helpers';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
@@ -127,7 +127,12 @@ export default class Controller {
 
         var propertyGetFunction =  propertySetFunction.replace('set','get');
         var oldValue = node[propertyGetFunction]();
-        if (isLinkedRecordRefresh ? oldValue === propValue : oldValue == propValue) {
+        // A refresh compares strictly. Otherwise loosely, as ever - except that clearing a real
+        // answer such as 0 (which == takes for '') is a change.
+        var unchanged = isLinkedRecordRefresh
+          ? oldValue === propValue
+          : oldValue == propValue && isBlankValue(oldValue) === isBlankValue(propValue);
+        if (unchanged) {
           continue;
         }
 
