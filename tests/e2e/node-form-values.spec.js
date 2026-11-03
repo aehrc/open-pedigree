@@ -296,10 +296,20 @@ test('only an optional, unmapped radio choice has a reset, usable unless the fie
     menu._setFieldInactive.radio(element, false);
     menu._setFieldDisabled.radio(element, false);
     const allBack = reset.disabled;
-    return { names, label, readOnly, anotherOptionOff, answersOptionOff, answersOptionHidden, allBack };
+    // A list that happens to disable every option isn't read-only.
+    const everyValue = [...element.querySelectorAll('input[type=radio]')].map((radio) => radio.value);
+    menu._setFieldDisabled.radio(element, everyValue);
+    const everyOptionListed = reset.disabled;
+    menu._setFieldDisabled.radio(element, false);
+    // Hiding options on its own leaves the reset alone.
+    menu._setFieldDisabled.radio(element, true);
+    menu._setFieldInactive.radio(element, false);
+    const inactiveLeavesItReadOnly = reset.disabled;
+    return { names, label, readOnly, anotherOptionOff, answersOptionOff, answersOptionHidden, allBack, everyOptionListed, inactiveLeavesItReadOnly };
   }, first);
   expect(resets).toEqual({
     names: ['shade', 'smoker'], label: 'Reset Shade', readOnly: true, anotherOptionOff: false, answersOptionOff: false, answersOptionHidden: false, allBack: false,
+    everyOptionListed: false, inactiveLeavesItReadOnly: true,
   });
 });
 

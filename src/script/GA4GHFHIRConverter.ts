@@ -2,6 +2,7 @@ import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
+import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
@@ -2009,7 +2010,7 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     } else {
       value = storedAnswers[item.linkId];
     }
-    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+    if (isBlankValue(value)) {
       continue;
     }
     const values = Array.isArray(value) ? value : [value];

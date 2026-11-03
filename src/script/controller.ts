@@ -127,10 +127,12 @@ export default class Controller {
 
         var propertyGetFunction =  propertySetFunction.replace('set','get');
         var oldValue = node[propertyGetFunction]();
-        // Loosely, as ever - except that clearing a real answer such as 0 (which == takes for '') is a
-        // change.
-        var unchanged = oldValue == propValue && isBlankValue(oldValue) === isBlankValue(propValue);
-        if (isLinkedRecordRefresh ? oldValue === propValue : unchanged) {
+        // A refresh compares strictly. Otherwise loosely, as ever - except that clearing a real
+        // answer such as 0 (which == takes for '') is a change.
+        var unchanged = isLinkedRecordRefresh
+          ? oldValue === propValue
+          : oldValue == propValue && isBlankValue(oldValue) === isBlankValue(propValue);
+        if (unchanged) {
           continue;
         }
 

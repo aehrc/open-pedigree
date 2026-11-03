@@ -82,13 +82,14 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   }
 }
 
-// A radio choice's "reset" (see the radio generator) can't be used while the field is read-only (every
-// option disabled). Otherwise it can, as a drop-down's '-' can - including for an answer whose option
-// is now disabled or hidden, which is the one most worth clearing (undo brings it back).
-function syncRadioReset(container: any): void {
+// A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
+// (disabled: true, not a list of options). Otherwise it can, as a drop-down's '-' can - including for
+// an answer whose option is now disabled or hidden, which is the one most worth clearing (undo brings
+// it back), and when a list happens to disable every option.
+function syncRadioReset(container: any, readOnly: boolean): void {
   var reset = container.querySelector('button.field-reset');
   if (reset) {
-    reset.disabled = Array.from(container.querySelectorAll('input[type=radio]')).every(function(radio: any) { return radio.disabled; });
+    reset.disabled = readOnly;
   }
 }
 
@@ -1207,7 +1208,7 @@ export default class NodeMenu {
       Array.from(container.querySelectorAll('input[type=radio]')).forEach(function(item: any) {
         item.disabled = Array.isArray(disabled) ? (disabled.indexOf(item.value) >= 0) : !!disabled;
       });
-      syncRadioReset(container);
+      syncRadioReset(container, !Array.isArray(disabled) && !!disabled);
     },
     'checkbox' : function(container: any, disabled: any): any {
       var target = container.querySelector('input[type=checkbox]');

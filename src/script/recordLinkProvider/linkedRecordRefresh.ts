@@ -1,4 +1,5 @@
 import { parseLocalIsoDate } from 'pedigree/model/localDate';
+import { isBlankValue } from 'pedigree/model/helpers';
 /**
  * Pure refresh logic for a linked record's answers (linked-record-round-trip).
  *
@@ -69,9 +70,8 @@ export const CLEAR_VALUES: Record<string, any> = {
 
 const DATE_SETTERS = ['setBirthDate', 'setDeathDate'];
 
-export function isEmptyAnswer(value: any): boolean {
-  return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
-}
+// Unanswered, as the node form and the controller take it.
+export const isEmptyAnswer = isBlankValue;
 
 // A non-empty answer the setter can't take: an unparseable date (e.g. "31-12-1980" or "unknown"),
 // which would be stored as Invalid Date and could never be cleared again.
