@@ -38,6 +38,12 @@ import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
+// How long the first load waits for a questionnaireUrl fetch before reading the pedigree against
+// the built-in default (option questionnaireWaitMs; see pedigree-editor-load-after-questionnaire).
+// setTimeout takes at most 2^31-1 ms; a longer delay fires at once.
+const QUESTIONNAIRE_WAIT_MS = 10000;
+const MAX_TIMEOUT_MS = 2147483647;
+
 // Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
 // setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
 const SETTER_TO_GETTER: Record<string, string> = {};
@@ -79,6 +85,7 @@ export default class PedigreeEditor {
   _recordLinkProvider: any;
   _linkedRowsCheck: any;
   _questionnaireSettled: Promise<void>;
+  _firstLoadPending: boolean;
   _questionnaireConfig: any;
   _questionnaireTerminologies: any;
   _questionnaireLegends: any;
@@ -178,7 +185,13 @@ export default class PedigreeEditor {
     };
     document.addEventListener('pedigree:load:finish', onFirstLoad);
 
-    this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+    // With a questionnaireUrl, the stored pedigree is loaded once the fetch settles (end of this
+    // constructor), so it's read against the Questionnaire in effect: the late catch-up
+    // (applyPendingQuestionnaireResponses) can't bring back resource-mapped answers.
+    var loadAfterQuestionnaire = Boolean(options.questionnaireUrl && !options.questionnaireLocal);
+    if (!loadAfterQuestionnaire) {
+      this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+    }
     this._closing = false;
 
     this._controller = new Controller();
@@ -265,9 +278,99 @@ export default class PedigreeEditor {
       document.addEventListener('pedigree:partnership:newchild',      autosave);
     }
 
-    if (options.questionnaireUrl && !options.questionnaireLocal) {
+    if (loadAfterQuestionnaire) {
       this._questionnaireSettled = this._loadQuestionnaireFromUrl(options.questionnaireUrl, options);
+      this._loadOnceQuestionnaireSettled(patientDataUrl, options.questionnaireWaitMs);
     }
+  }
+
+  /**
+   * Runs the backend's first load once the questionnaireUrl fetch has settled, or once waitMs has
+   * passed, whichever is first. After the wait, the pedigree is read against the built-in default
+   * and a late Questionnaire is applied as before.
+   *
+   * While waiting, a cover keeps the user from acting on the empty editor, and saving is held
+   * (isAwaitingFirstLoad). The load is skipped if the host put a pedigree on the canvas meanwhile,
+   * so that one is never replaced (undo can't empty the canvas again), or if this editor has been
+   * replaced (the load acts on window.editor).
+   */
+  _loadOnceQuestionnaireSettled(patientDataUrl: any, waitMs: any): void {
+    var _this = this;
+    var validWait = (typeof waitMs === 'number' && waitMs >= 0)
+      || (typeof waitMs === 'string' && /^\s*\d+\s*$/.test(waitMs));
+    var ms = validWait ? Math.min(Number(waitMs), MAX_TIMEOUT_MS) : QUESTIONNAIRE_WAIT_MS;
+    this._firstLoadPending = true;
+    var cover = this._showLoadingCover();
+
+    var timer: any;
+    var cap = new Promise<void>(function(resolve) {
+      timer = setTimeout(resolve, ms);
+    });
+    var run = function() {
+      clearTimeout(timer);
+      try {
+        if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
+          return;
+        }
+        _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
+      } catch (err) {
+        console.error('Loading the stored pedigree failed', err);
+        if (_this._graphIsEmpty()) {
+          new TemplateSelector(true);
+        }
+      } finally {
+        // Held only this far: an asynchronous backend is still fetching now, as it always was
+        // after the constructor, and a backend that never answers mustn't hold saving forever.
+        _this._firstLoadPending = false;
+        cover.remove();
+      }
+    };
+    // _questionnaireSettled doesn't reject; if it ever did, the load still runs.
+    Promise.race([this._questionnaireSettled, cap]).then(run, run);
+  }
+
+  /**
+   * A full-page cover saying the pedigree is loading, which can't be dismissed. The rest of the
+   * page is made inert under it, so the toolbar can't be reached with Tab either. It fades in
+   * after a moment (CSS), so a quick fetch doesn't flash it, but blocks the pointer at once.
+   * Returns it with a remove() that takes it away and undoes the inert.
+   */
+  _showLoadingCover(): { remove: () => void } {
+    var cover = document.createElement('div');
+    cover.className = 'pedigree-loading-cover';
+    var box = document.createElement('div');
+    box.className = 'msdialog-box msdialog-top';
+    box.setAttribute('role', 'status');
+    cover.appendChild(box);
+    var madeInert: Element[] = [];
+    Array.prototype.forEach.call(document.body.children, function(element: Element) {
+      if (!element.hasAttribute('inert')) {
+        element.setAttribute('inert', '');
+        madeInert.push(element);
+      }
+    });
+    document.body.appendChild(cover);
+    // Set once the status region is in the page, so screen readers announce it.
+    box.textContent = 'Loading the pedigree...';
+    return {
+      remove: function() {
+        madeInert.forEach(function(element) { element.removeAttribute('inert'); });
+        cover.remove();
+      }
+    };
+  }
+
+  _graphIsEmpty(): boolean {
+    var graph = this.getGraph();
+    return !graph || graph.getMaxNodeId() < 0;
+  }
+
+  /**
+   * True while the stored pedigree's first load is waiting for a questionnaireUrl: saving now
+   * could overwrite it with an empty or unrelated pedigree.
+   */
+  isAwaitingFirstLoad(): boolean {
+    return Boolean(this._firstLoadPending);
   }
 
   autosave(patientDataUrl: any): any {

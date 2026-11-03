@@ -79,7 +79,7 @@ OpenPedigree.initialiseEditor({
 });
 ```
 
-`questionnaireUrl` is fetched asynchronously — the editor renders immediately and the Custom tab's fields appear once the fetch resolves (a brief delay, not a race the caller needs to handle). `questionnaireLocal` is available synchronously from the first render.
+`questionnaireUrl` is fetched asynchronously. The backend's load of the stored pedigree waits until the fetch settles, so the pedigree is read against that Questionnaire; if the fetch fails, it's read against the built-in default. Meanwhile a "Loading the pedigree..." cover keeps the user out of the editor, and saves are skipped. The wait is capped by `questionnaireWaitMs` (default 10000): after that the pedigree loads against the default and the Questionnaire is applied when it arrives, but answers to its legend items (`mapsToLegendCondition`/`mapsToLegendObservation`) are then lost. A host that needs the loaded graph should listen for `pedigree:load:finish` rather than read it straight after `initialiseEditor`. A pedigree the host imports itself during the wait is kept: the deferred load is skipped. `questionnaireLocal` is available synchronously from the first render, and the load isn't delayed.
 
 ### Supported item types
 

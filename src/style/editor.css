@@ -778,6 +778,11 @@
 .msdialog-modal-container .pedigree-template-chooser {
     width: 500px;
 }
+.pedigree-loading-cover .msdialog-box {
+    width: auto;
+    max-width: 300px;
+    text-align: center;
+}
 .picture-box {
     display: inline-block;
     box-shadow: rgba(0, 0, 0, 0.5) 0 0 5px 2px;
@@ -793,7 +798,7 @@
     margin: 3px;
 }
 
-.msdialog-modal-container {
+.msdialog-modal-container, .pedigree-loading-cover {
     position: fixed;
     top: 0;
     left: 0;
@@ -802,6 +807,21 @@
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 100100;
     overflow: auto;
+}
+/* Above dialogs (100100): nothing opened under it during the wait is reachable. Fades in after
+   a moment so a quick load doesn't flash it; it blocks the pointer from the start. */
+.pedigree-loading-cover {
+    z-index: 100101;
+    animation: pedigree-loading-cover-in 0.15s ease-in 0.25s both;
+}
+@media (prefers-reduced-motion: reduce) {
+    .pedigree-loading-cover {
+        animation: none;
+    }
+}
+@keyframes pedigree-loading-cover-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 .msdialog-box {
     /*overflow:auto;*/
