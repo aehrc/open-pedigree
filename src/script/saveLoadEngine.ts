@@ -235,6 +235,12 @@ export default class SaveLoadEngine {
     if (this._saveInProgress) {
       return;
     }
+    // Saving before the stored pedigree has loaded would overwrite it with an empty one
+    // (autosave, or Close with autosave, while waiting for a questionnaireUrl).
+    if (editor.isAwaitingFirstLoad && editor.isAwaitingFirstLoad()) {
+      console.warn('[SAVE] Skipped: the stored pedigree has not loaded yet');
+      return;
+    }
 
     var jsonData = this.serialize();
 

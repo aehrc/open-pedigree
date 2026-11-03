@@ -165,7 +165,8 @@ test('a failed Questionnaire fetch still loads the stored pedigree, against the 
 test('a Questionnaire that never arrives: the stored pedigree loads once the wait cap passes', async ({ page }) => {
   await storePedigree(page);
   await routeQuestionnaire(page, { hang: true });
-  await newEditor(page, { waitMs: 1500 });
+  // As a string, as a host might pass it from a URL parameter.
+  await newEditor(page, { waitMs: '1500' });
 
   await page.waitForTimeout(500);
   expect(await probandName(page)).toBe('no proband');
@@ -204,4 +205,48 @@ test('with nothing stored, the template chooser is shown once the Questionnaire 
   await newEditor(page, {});
 
   await expect.poll(() => visibleTemplateChoosers(page), { timeout: 10000 }).toBe(choosersBefore + 1);
+});
+
+test('an import that fails while waiting leaves the canvas empty, so the stored pedigree still loads', async ({ page }) => {
+  await storePedigree(page);
+  await routeQuestionnaire(page, { delayMs: 1000 });
+  await newEditor(page, {});
+  const imported = await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('not a pedigree', 'GA4GH', {}, true, true));
+  expect(imported).toBeFalsy();
+
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+});
+
+test('after Clear while waiting, the new proband and its edits are kept', async ({ page }) => {
+  await storePedigree(page);
+  await routeQuestionnaire(page, { delayMs: 1000 });
+  await newEditor(page, {});
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+      detail: { nodeID: 0, properties: { setFirstName: 'Mine' } },
+    }));
+  });
+
+  await expect.poll(() => page.evaluate(() => window.editor._questionnaireConfig.items.some((item) => item.linkId === 'note')), { timeout: 10000 }).toBe(true);
+  await page.waitForTimeout(500);
+  expect(await probandName(page)).toBe('Mine');
+});
+
+test('saving while waiting does not overwrite the stored pedigree', async ({ page }) => {
+  await storePedigree(page);
+  const stored = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  await routeQuestionnaire(page, { delayMs: 1500 });
+  const alerts = [];
+  page.on('dialog', (dialog) => alerts.push(dialog.message()));
+  await newEditor(page, {});
+
+  // An autosave-style save, and the Save button.
+  await page.evaluate((url) => window.editor.getSaveLoadEngine().save(url), DATA_URL);
+  await page.evaluate(() => document.getElementById('action-save').click());
+  expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(stored);
+  expect(alerts.some((message) => message.includes('still loading'))).toBe(true);
+
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
 });

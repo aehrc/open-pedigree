@@ -38,13 +38,15 @@ import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 
+// How long the first load waits for a questionnaireUrl fetch before reading the pedigree against
+// the built-in default (option questionnaireWaitMs; see pedigree-editor-load-after-questionnaire).
+// setTimeout takes at most 2^31-1 ms; a longer delay fires at once.
+const QUESTIONNAIRE_WAIT_MS = 10000;
+const MAX_TIMEOUT_MS = 2147483647;
+
 // Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
 // setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
 const SETTER_TO_GETTER: Record<string, string> = {};
-
-// How long the first load waits for a questionnaireUrl fetch before reading the pedigree against
-// the built-in default (option questionnaireWaitMs; see pedigree-editor-load-after-questionnaire).
-const QUESTIONNAIRE_WAIT_MS = 10000;
 Object.keys(RESERVED_LEGEND_TARGETS).forEach(function(linkId: string) {
   SETTER_TO_GETTER[RESERVED_LEGEND_TARGETS[linkId].setter] = RESERVED_LEGEND_TARGETS[linkId].getter;
 });
@@ -83,6 +85,7 @@ export default class PedigreeEditor {
   _recordLinkProvider: any;
   _linkedRowsCheck: any;
   _questionnaireSettled: Promise<void>;
+  _firstLoadPending: boolean;
   _questionnaireConfig: any;
   _questionnaireTerminologies: any;
   _questionnaireLegends: any;
@@ -211,6 +214,10 @@ export default class PedigreeEditor {
 
     var saveButton = document.getElementById('action-save');
     saveButton && saveButton.addEventListener('click', function(event: any) {
+      if (editor.isAwaitingFirstLoad()) {
+        alert('The pedigree is still loading. Please save again in a moment.');
+        return;
+      }
       editor.getView().unmarkAll();
       if (patientDataUrl) {
         editor.getSaveLoadEngine().save(patientDataUrl);
@@ -290,21 +297,42 @@ export default class PedigreeEditor {
    */
   _loadOnceQuestionnaireSettled(patientDataUrl: any, waitMs: any): void {
     var _this = this;
-    var loadedMeanwhile = false;
-    var onLoadStart = function() { loadedMeanwhile = true; };
-    document.addEventListener('pedigree:load:start', onLoadStart);
+    var ms = Number(waitMs);
+    if (waitMs === undefined || waitMs === null || waitMs === '' || isNaN(ms) || ms < 0) {
+      ms = QUESTIONNAIRE_WAIT_MS;
+    }
     var timer: any;
     var cap = new Promise<void>(function(resolve) {
-      timer = setTimeout(resolve, typeof waitMs === 'number' && waitMs >= 0 ? waitMs : QUESTIONNAIRE_WAIT_MS);
+      timer = setTimeout(resolve, Math.min(ms, MAX_TIMEOUT_MS));
     });
-    Promise.race([this._questionnaireSettled, cap]).then(function() {
-      clearTimeout(timer);
-      document.removeEventListener('pedigree:load:start', onLoadStart);
-      if (loadedMeanwhile || (window as any).editor !== _this) {
-        return;
-      }
-      _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
-    });
+    this._firstLoadPending = true;
+    Promise.race([this._questionnaireSettled, cap])
+      .then(function() {
+        clearTimeout(timer);
+        _this._firstLoadPending = false;
+        // Something is on the canvas already (an import, a template, Clear): the user or host has
+        // taken over, so don't replace it. A failed import leaves it empty, and the load runs.
+        if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
+          return;
+        }
+        _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
+      })
+      .catch(function(err: any) {
+        console.error('Loading the stored pedigree failed', err);
+      });
+  }
+
+  _graphIsEmpty(): boolean {
+    var graph = this.getGraph();
+    return !graph || graph.getMaxNodeId() < 0;
+  }
+
+  /**
+   * True while the stored pedigree is yet to be loaded (waiting for a questionnaireUrl) and
+   * nothing else is on the canvas: saving now would overwrite it with an empty pedigree.
+   */
+  isAwaitingFirstLoad(): boolean {
+    return Boolean(this._firstLoadPending) && this._graphIsEmpty();
   }
 
   autosave(patientDataUrl: any): any {
