@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.3](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.2...open-pedigree-v1.5.3) (2026-11-03)
+
+
+### Bug Fixes
+
+* a radio choice can be reset to unanswered ([#80](https://github.com/aehrc/open-pedigree/issues/80)) ([e8a2e2e](https://github.com/aehrc/open-pedigree/commit/e8a2e2ed85f40542407b6cf3efba12bb13bb6416))
+* load a stored pedigree only once its questionnaireUrl has arrived ([#81](https://github.com/aehrc/open-pedigree/issues/81)) ([1fee692](https://github.com/aehrc/open-pedigree/commit/1fee6924b6329a853878ef0d8dec9f17104e8deb))
+
 ## [1.5.2](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.1...open-pedigree-v1.5.2) (2026-11-02)
 
 
