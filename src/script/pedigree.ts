@@ -41,6 +41,10 @@ import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 // Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
 // setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
 const SETTER_TO_GETTER: Record<string, string> = {};
+
+// How long the first load waits for a questionnaireUrl fetch before reading the pedigree against
+// the built-in default (option questionnaireWaitMs; see pedigree-editor-load-after-questionnaire).
+const QUESTIONNAIRE_WAIT_MS = 10000;
 Object.keys(RESERVED_LEGEND_TARGETS).forEach(function(linkId: string) {
   SETTER_TO_GETTER[RESERVED_LEGEND_TARGETS[linkId].setter] = RESERVED_LEGEND_TARGETS[linkId].getter;
 });
@@ -178,7 +182,13 @@ export default class PedigreeEditor {
     };
     document.addEventListener('pedigree:load:finish', onFirstLoad);
 
-    this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+    // With a questionnaireUrl, the stored pedigree is loaded once the fetch settles (end of this
+    // constructor), so it's read against the Questionnaire in effect: the late catch-up
+    // (applyPendingQuestionnaireResponses) can't bring back resource-mapped answers.
+    var loadAfterQuestionnaire = Boolean(options.questionnaireUrl && !options.questionnaireLocal);
+    if (!loadAfterQuestionnaire) {
+      this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+    }
     this._closing = false;
 
     this._controller = new Controller();
@@ -265,9 +275,36 @@ export default class PedigreeEditor {
       document.addEventListener('pedigree:partnership:newchild',      autosave);
     }
 
-    if (options.questionnaireUrl && !options.questionnaireLocal) {
+    if (loadAfterQuestionnaire) {
       this._questionnaireSettled = this._loadQuestionnaireFromUrl(options.questionnaireUrl, options);
+      this._loadOnceQuestionnaireSettled(patientDataUrl, options.questionnaireWaitMs);
     }
+  }
+
+  /**
+   * Runs the backend's first load once the questionnaireUrl fetch has settled (it never rejects),
+   * or once waitMs has passed, whichever is first. After the wait, the pedigree is read against
+   * the built-in default and a late Questionnaire is applied as before. Skipped if a pedigree was
+   * loaded meanwhile (the host's or user's import, a template), so that one is never replaced,
+   * and if this editor has been replaced (the load acts on window.editor).
+   */
+  _loadOnceQuestionnaireSettled(patientDataUrl: any, waitMs: any): void {
+    var _this = this;
+    var loadedMeanwhile = false;
+    var onLoadStart = function() { loadedMeanwhile = true; };
+    document.addEventListener('pedigree:load:start', onLoadStart);
+    var timer: any;
+    var cap = new Promise<void>(function(resolve) {
+      timer = setTimeout(resolve, typeof waitMs === 'number' && waitMs >= 0 ? waitMs : QUESTIONNAIRE_WAIT_MS);
+    });
+    Promise.race([this._questionnaireSettled, cap]).then(function() {
+      clearTimeout(timer);
+      document.removeEventListener('pedigree:load:start', onLoadStart);
+      if (loadedMeanwhile || (window as any).editor !== _this) {
+        return;
+      }
+      _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
+    });
   }
 
   autosave(patientDataUrl: any): any {
