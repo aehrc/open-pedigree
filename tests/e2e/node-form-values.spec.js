@@ -28,6 +28,16 @@ const QUESTIONNAIRE = {
           linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark')],
           extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
         },
+        // an integer radio choice, as REDCap codes No/Yes: 0 is an answer
+        {
+          linkId: 'smoker', type: 'choice', text: 'Smoker', answerOption: [{ valueInteger: 0 }, { valueInteger: 1 }],
+          extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
+        },
+        // a required radio choice: no reset
+        {
+          linkId: 'tone', type: 'choice', text: 'Tone', required: true, answerOption: [option('warm', 'Warm'), option('cool', 'Cool')],
+          extension: [{ url: ITEM_CONTROL, valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
+        },
         {
           linkId: 'features', type: 'choice', text: 'Features', repeats: true,
           answerOption: [option('1', 'Vertigo'), option('A', 'Tinnitus'), option('-1', 'Not known')],
@@ -211,4 +221,93 @@ test('a required choice shows \'-\' when unanswered but can\'t be cleared to it,
     grade: ['(disabled)', 'g1', 'g2'], gradeShown: '', weeks: ['', '1', '2', '3'], size: ['', 'small', 'large'],
     days: ['', '1', '2'], gradeAfterToggles: ['(disabled)', 'g1', 'g2(disabled)'],
   });
+});
+
+// A radio choice, like a drop-down's '-', can go back to unanswered: a "reset", as on REDCap's forms.
+const resetShade = (page) => page.evaluate(() => document.querySelector('.menu-box .field-shade button.field-reset').click());
+const shadeCode = (page, id) => page.evaluate((nodeId) => {
+  // a choice answer is stored as its coding
+  const value = window.editor.getView().getNode(nodeId).getQuestionnaireAnswer('shade');
+  return value && typeof value === 'object' ? value.code : value;
+}, id);
+const tickedShade = (page) => page.$$eval('.menu-box .field-shade input[type=radio]', (radios) => radios.filter((r) => r.checked).map((r) => r.value));
+
+test('a radio choice can be reset to unanswered, as one undo step', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100), first);
+  await page.evaluate(() => document.querySelector('.menu-box .field-shade input[value="dark"]').click());
+  expect(await shadeCode(page, first)).toBe('dark');
+
+  await resetShade(page);
+  expect(await shadeCode(page, first)).toBeFalsy();
+  expect(await tickedShade(page)).toEqual([]);
+
+  // with no answer, reset changes nothing - not even an undo step, so one undo brings back 'dark'
+  await resetShade(page);
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  await expect.poll(() => shadeCode(page, first)).toBe('dark');
+  expect(await shown(page, first)).toMatchObject({ shade: ['dark'] });
+});
+
+test('reset clears an answer that matches none of the choice\'s options', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => {
+    const node = window.editor.getView().getNode(id);
+    node.setQuestionnaireAnswer('shade', { system: 'http://example.org/cs', code: 'purple', display: 'Purple' });
+    window.editor.getNodeMenu().show(node, 100, 100);
+  }, first);
+  expect(await tickedShade(page)).toEqual([]);
+  await resetShade(page);
+  expect(await shadeCode(page, first)).toBeFalsy();
+});
+
+// == takes 0 for '': an answer of 0 must still be a change from unanswered, both ways.
+test('an answer of 0 can be chosen and reset', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  const smoker = () => page.evaluate((id) => window.editor.getView().getNode(id).getQuestionnaireAnswer('smoker'), first);
+  await page.evaluate((id) => window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100), first);
+  await page.evaluate(() => document.querySelector('.menu-box .field-smoker input[value="0"]').click());
+  expect(await smoker()).toBe(0);
+  await page.evaluate(() => document.querySelector('.menu-box .field-smoker button.field-reset').click());
+  expect(await smoker()).toBeUndefined();
+  expect(await page.$$eval('.menu-box .field-smoker input[type=radio]', (radios) => radios.filter((r) => r.checked).length)).toBe(0);
+});
+
+test('only an optional, unmapped radio choice has a reset, usable unless the field is read-only', async ({ page }) => {
+  const [first] = await loadFamily(page);
+  await page.evaluate((id) => window.editor.getView().getNode(id).setQuestionnaireAnswer('shade', 'dark'), first);
+  const resets = await page.evaluate((id) => {
+    const menu = window.editor.getNodeMenu();
+    menu.show(window.editor.getView().getNode(id), 100, 100);
+    const names = [...document.querySelectorAll('.menu-box button.field-reset')].map((b) => b.name);
+    const reset = document.querySelector('.menu-box .field-shade button.field-reset');
+    const label = reset.getAttribute('aria-label');
+    const element = menu.fieldMap.shade.element;
+    menu._setFieldDisabled.radio(element, true);
+    const readOnly = reset.disabled;
+    menu._setFieldDisabled.radio(element, ['light']);
+    const anotherOptionOff = reset.disabled;
+    menu._setFieldDisabled.radio(element, ['dark']);
+    const answersOptionOff = reset.disabled;
+    // as update() does it: inactive, then disabled (which enables the options again)
+    menu._setFieldInactive.radio(element, ['dark']);
+    menu._setFieldDisabled.radio(element, false);
+    const answersOptionHidden = reset.disabled;
+    menu._setFieldInactive.radio(element, false);
+    menu._setFieldDisabled.radio(element, false);
+    const allBack = reset.disabled;
+    return { names, label, readOnly, anotherOptionOff, answersOptionOff, answersOptionHidden, allBack };
+  }, first);
+  expect(resets).toEqual({
+    names: ['shade', 'smoker'], label: 'Reset Shade', readOnly: true, anotherOptionOff: false, answersOptionOff: false, answersOptionHidden: false, allBack: false,
+  });
+});
+
+test('the default form\'s radios, all mapped to the person\'s properties (e.g. gender), have no reset', async ({ page }) => {
+  const [person] = await loadFamily(page, null);
+  const defaults = await page.evaluate((id) => {
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100);
+    return document.querySelectorAll('.menu-box button.field-reset').length;
+  }, person);
+  expect(defaults).toBe(0);
 });

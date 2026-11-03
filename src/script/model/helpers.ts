@@ -253,4 +253,12 @@ Timer.prototype = {
   },
 };
 
-export { clone2DArray, cloneObject, arrayContains, arrayIndexOf, indexOfLastMinElementInArray, filterUnique, replaceInArray, removeFirstOccurrenceByValue, isInt, toObjectWithTrue, romanize, makeFlattened2DArrayCopy, permute2DArrayInFirstDimension, Timer };
+/**
+ * Whether a field's value means "unanswered": undefined, null, '' or an empty list. A real answer
+ * such as 0 or false isn't, though == takes either for ''.
+ */
+function isBlankValue(value: any): boolean {
+  return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
+}
+
+export { isBlankValue, clone2DArray, cloneObject, arrayContains, arrayIndexOf, indexOfLastMinElementInArray, filterUnique, replaceInArray, removeFirstOccurrenceByValue, isInt, toObjectWithTrue, romanize, makeFlattened2DArrayCopy, permute2DArrayInFirstDimension, Timer };
