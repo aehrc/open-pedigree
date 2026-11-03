@@ -764,6 +764,21 @@
 .msdialog-modal-container .pedigree-template-chooser {
     width: 500px;
 }
+/* Above dialogs (100100): nothing opened under it during the wait is reachable. */
+.pedigree-loading-cover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 100101;
+    animation: pedigree-loading-cover-in 0.15s ease-in 0.25s both;
+}
+@keyframes pedigree-loading-cover-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 .pedigree-loading-cover .msdialog-box {
     width: auto;
     max-width: 300px;

@@ -322,7 +322,7 @@ export default class PedigreeEditor {
         // Held only this far: an asynchronous backend is still fetching now, as it always was
         // after the constructor, and a backend that never answers mustn't hold saving forever.
         _this._firstLoadPending = false;
-        cover.parentNode && cover.parentNode.removeChild(cover);
+        cover.remove();
       }
     };
     // _questionnaireSettled doesn't reject; if it ever did, the load still runs.
@@ -330,19 +330,35 @@ export default class PedigreeEditor {
   }
 
   /**
-   * A full-page cover saying the pedigree is loading, which can't be dismissed: the editor's
-   * own modal overlay, without a dialog's close handlers.
+   * A full-page cover saying the pedigree is loading, which can't be dismissed. The rest of the
+   * page is made inert under it, so the toolbar can't be reached with Tab either. It fades in
+   * after a moment (CSS), so a quick fetch doesn't flash it, but blocks the pointer at once.
+   * Returns it with a remove() that takes it away and undoes the inert.
    */
-  _showLoadingCover(): HTMLElement {
+  _showLoadingCover(): { remove: () => void } {
     var cover = document.createElement('div');
-    cover.className = 'msdialog-modal-container pedigree-loading-cover';
+    cover.className = 'pedigree-loading-cover';
     var box = document.createElement('div');
     box.className = 'msdialog-box msdialog-top';
     box.setAttribute('role', 'status');
     box.textContent = 'Loading the pedigree...';
     cover.appendChild(box);
+    var madeInert: Element[] = [];
+    Array.prototype.forEach.call(document.body.children, function(element: Element) {
+      if (!element.hasAttribute('inert')) {
+        element.setAttribute('inert', '');
+        madeInert.push(element);
+      }
+    });
     document.body.appendChild(cover);
-    return cover;
+    return {
+      remove: function() {
+        madeInert.forEach(function(element) { element.removeAttribute('inert'); });
+        if (cover.parentNode) {
+          cover.parentNode.removeChild(cover);
+        }
+      }
+    };
   }
 
   _graphIsEmpty(): boolean {

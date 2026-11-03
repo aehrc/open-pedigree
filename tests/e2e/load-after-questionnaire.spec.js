@@ -108,7 +108,16 @@ const coverShown = (page) => page.evaluate(() => Array.from(document.querySelect
 
 // Whether the topmost element at the toolbar's corner and at the page's centre is the cover.
 const coverOnTop = (page) => page.evaluate(() => [[20, 20], [window.innerWidth / 2, window.innerHeight / 2]]
-  .every(([x, y]) => Boolean(document.elementFromPoint(x, y).closest('.pedigree-loading-cover'))));
+  .every(([x, y]) => {
+    const element = document.elementFromPoint(x, y);
+    return Boolean(element && element.closest('.pedigree-loading-cover'));
+  }));
+
+// Whether the visible toolbar's Clear button is inert (out of reach of Tab and assistive tech).
+const toolbarInert = (page) => page.evaluate(() => {
+  const button = Array.from(document.querySelectorAll('#action-clear')).find((el) => el.offsetParent !== null);
+  return Boolean(button && button.closest('[inert]'));
+});
 
 const probandAnswer = (page, linkId) => page.evaluate((id) => {
   const node = window.editor.getView().getNode(0);
@@ -178,9 +187,11 @@ test('the stored pedigree waits for the Questionnaire: nothing is loaded before 
   await expect(page.locator('.pedigree-loading-cover')).toContainText('Loading the pedigree');
   // It's on top of everything, so clicks anywhere (the toolbar too) land on it.
   expect(await coverOnTop(page)).toBe(true);
+  expect(await toolbarInert(page)).toBe(true);
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   expect(await coverShown(page)).toBe(0);
   expect(await coverOnTop(page)).toBe(false);
+  expect(await toolbarInert(page)).toBe(false);
   expect(await probandAnswer(page, 'comorbidities')).toEqual([HTN]);
   // A stored pedigree gets no template chooser.
   expect(await visibleTemplateChoosers(page)).toBe(choosersBefore);
@@ -330,6 +341,8 @@ test('a backend that throws after loading the pedigree gets no template chooser 
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   await page.waitForTimeout(300);
   expect(await visibleTemplateChoosers(page)).toBe(choosersBefore);
+  expect(await coverShown(page)).toBe(0);
+  expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
 });
 
 test('with autosave on, a Clear while waiting (by the host: the cover keeps the user out) does not save over the stored pedigree', async ({ page }) => {
