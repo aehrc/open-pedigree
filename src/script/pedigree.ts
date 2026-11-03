@@ -289,37 +289,50 @@ export default class PedigreeEditor {
   }
 
   /**
-   * Runs the backend's first load once the questionnaireUrl fetch has settled (it never rejects),
-   * or once waitMs has passed, whichever is first. After the wait, the pedigree is read against
-   * the built-in default and a late Questionnaire is applied as before. Skipped if a pedigree was
-   * loaded meanwhile (the host's or user's import, a template), so that one is never replaced,
-   * and if this editor has been replaced (the load acts on window.editor).
+   * Runs the backend's first load once the questionnaireUrl fetch has settled, or once waitMs has
+   * passed, whichever is first. After the wait, the pedigree is read against the built-in default
+   * and a late Questionnaire is applied as before. Skipped if the host or user put a pedigree on
+   * the canvas meanwhile (an import, a template, Clear: undo can't empty it again), so that one is
+   * never replaced, and if
+   * this editor has been replaced (the load acts on window.editor). Saving is held back until
+   * this first load has finished or been skipped (isAwaitingFirstLoad).
    */
   _loadOnceQuestionnaireSettled(patientDataUrl: any, waitMs: any): void {
     var _this = this;
-    var ms = Number(waitMs);
-    if (waitMs === undefined || waitMs === null || waitMs === '' || isNaN(ms) || ms < 0) {
-      ms = QUESTIONNAIRE_WAIT_MS;
-    }
+    var validWait = (typeof waitMs === 'number' && waitMs >= 0)
+      || (typeof waitMs === 'string' && /^\s*\d+\s*$/.test(waitMs));
+    var ms = validWait ? Math.min(Number(waitMs), MAX_TIMEOUT_MS) : QUESTIONNAIRE_WAIT_MS;
+    this._firstLoadPending = true;
+
+    var finishFirstLoad = function() {
+      document.removeEventListener('pedigree:load:finish', finishFirstLoad);
+      _this._firstLoadPending = false;
+    };
+
     var timer: any;
     var cap = new Promise<void>(function(resolve) {
-      timer = setTimeout(resolve, Math.min(ms, MAX_TIMEOUT_MS));
+      timer = setTimeout(resolve, ms);
     });
-    this._firstLoadPending = true;
-    Promise.race([this._questionnaireSettled, cap])
-      .then(function() {
-        clearTimeout(timer);
+    var run = function() {
+      clearTimeout(timer);
+      if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
         _this._firstLoadPending = false;
-        // Something is on the canvas already (an import, a template, Clear): the user or host has
-        // taken over, so don't replace it. A failed import leaves it empty, and the load runs.
-        if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
-          return;
-        }
+        return;
+      }
+      // Saving stays held back until the load has put the stored pedigree on the canvas: an
+      // asynchronous backend is still fetching it when load() returns. With nothing stored, the
+      // template chooser's choice finishes it.
+      document.addEventListener('pedigree:load:finish', finishFirstLoad);
+      try {
         _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
-      })
-      .catch(function(err: any) {
+      } catch (err) {
         console.error('Loading the stored pedigree failed', err);
-      });
+        finishFirstLoad();
+        new TemplateSelector(true);
+      }
+    };
+    // _questionnaireSettled doesn't reject; if it ever did, the load still runs.
+    Promise.race([this._questionnaireSettled, cap]).then(run, run);
   }
 
   _graphIsEmpty(): boolean {
@@ -328,11 +341,11 @@ export default class PedigreeEditor {
   }
 
   /**
-   * True while the stored pedigree is yet to be loaded (waiting for a questionnaireUrl) and
-   * nothing else is on the canvas: saving now would overwrite it with an empty pedigree.
+   * True while the stored pedigree's first load is waiting for a questionnaireUrl, or is still
+   * being fetched: saving now could overwrite it with an empty or unrelated pedigree.
    */
   isAwaitingFirstLoad(): boolean {
-    return Boolean(this._firstLoadPending) && this._graphIsEmpty();
+    return Boolean(this._firstLoadPending);
   }
 
   autosave(patientDataUrl: any): any {

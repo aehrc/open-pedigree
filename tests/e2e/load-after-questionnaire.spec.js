@@ -69,6 +69,24 @@ function newEditor(page, options) {
     if (opts.waitMs !== undefined) {
       editorOptions.questionnaireWaitMs = opts.waitMs;
     }
+    if (opts.autosave) {
+      editorOptions.autosave = true;
+    }
+    // A backend built in the page: 'slow' answers with the stored pedigree after 1 s (as a fetch
+    // does), 'throws' throws from load. Saves are counted in window.backendSaves.
+    if (opts.backend) {
+      window.backendSaves = 0;
+      editorOptions.backend = {
+        save: (args) => { window.backendSaves++; args.setSaveInProgress(false); },
+        load: (args) => {
+          if (opts.backend === 'throws') {
+            throw new Error('corrupt');
+          }
+          setTimeout(() => args.onSuccess(window.__serialized), 1000);
+        },
+      };
+      editorOptions.patientDataUrl = 'custom:pedigree';
+    }
     window.editor = window.OpenPedigree.initialiseEditor(editorOptions);
   }, { opts: options, url: QUESTIONNAIRE_URL, dataUrl: DATA_URL });
 }
@@ -249,4 +267,57 @@ test('saving while waiting does not overwrite the stored pedigree', async ({ pag
 
   await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
   expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
+});
+
+test('with a backend that fetches, saving waits until the stored pedigree has arrived', async ({ page }) => {
+  await storePedigree(page);
+  // The stored pedigree, serialized, for the page's slow backend to hand back.
+  await newEditor(page, { local: CUSTOM_LEGEND_QUESTIONNAIRE });
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  await page.evaluate(() => { window.__serialized = window.editor.getGraph().toJSON(); });
+  await retireAutoCreatedEditor(page);
+  await routeQuestionnaire(page, { delayMs: 200 });
+  page.on('dialog', (dialog) => dialog.dismiss());
+  await newEditor(page, { backend: 'slow' });
+
+  // The Questionnaire has arrived; the backend is still fetching.
+  await expect.poll(() => page.evaluate(() => window.editor._questionnaireConfig.items.some((item) => item.linkId === 'note')), { timeout: 10000 }).toBe(true);
+  expect(await probandName(page)).toBe('no proband');
+  await page.evaluate(() => window.editor.getSaveLoadEngine().save('custom:pedigree'));
+  expect(await page.evaluate(() => window.backendSaves)).toBe(0);
+
+  await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+  expect(await probandAnswer(page, 'comorbidities')).toEqual([HTN]);
+  await page.evaluate(() => window.editor.getSaveLoadEngine().save('custom:pedigree'));
+  expect(await page.evaluate(() => window.backendSaves)).toBe(1);
+});
+
+test('a backend that throws on the deferred load gets the template chooser, and saving works again', async ({ page }) => {
+  await storePedigree(page);
+  await routeQuestionnaire(page, { delayMs: 200 });
+  const errors = [];
+  page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+  const choosersBefore = await visibleTemplateChoosers(page);
+  await newEditor(page, { backend: 'throws' });
+
+  await expect.poll(() => visibleTemplateChoosers(page), { timeout: 10000 }).toBe(choosersBefore + 1);
+  expect(errors.some((text) => text.includes('Loading the stored pedigree failed'))).toBe(true);
+  expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
+});
+
+test('with autosave on, Clear while waiting does not save over the stored pedigree', async ({ page }) => {
+  await storePedigree(page);
+  const stored = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  await routeQuestionnaire(page, { delayMs: 1000 });
+  await newEditor(page, { autosave: true });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:graph:clear')));
+  expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(stored);
+});
+
+test('a blank questionnaireWaitMs means the default wait, not none', async ({ page }) => {
+  await storePedigree(page);
+  await routeQuestionnaire(page, { hang: true });
+  await newEditor(page, { waitMs: ' ' });
+  await page.waitForTimeout(1500);
+  expect(await probandName(page)).toBe('no proband');
 });
