@@ -82,6 +82,12 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   }
 }
 
+// An 'input' event from typing or deleting text, as opposed to a paste, a drop, autofill, the
+// browser's own undo/redo, or a number field's arrow-key or spinner step.
+function isTypedInput(event: any): boolean {
+  return event.type === 'input' && /^(insertText|insertCompositionText|deleteContent(Backward|Forward)|deleteWord(Backward|Forward))$/.test(event.inputType || '');
+}
+
 // A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
 // (disabled: true, not a list of options). Otherwise it can, as a drop-down's '-' can - including for
 // an answer whose option is now disabled or hidden, which is the one most worth clearing (undo brings
@@ -443,8 +449,11 @@ export default class NodeMenu {
     return result;
   }
 
-  _attachFieldEventListeners(field: any, eventNames: any, values?: any): any {
+  // options.typing: a text, text-area or number field, whose typed keys the undo stack combines
+  // into one step (see isTypedInput).
+  _attachFieldEventListeners(field: any, eventNames: any, options?: any): any {
     var _this = this;
+    var typingField = !!(options && options.typing);
     eventNames.forEach(function(eventName: any) {
       field.addEventListener(eventName, function(event: any) {
         if (_this._updating) {
@@ -485,9 +494,10 @@ export default class NodeMenu {
           var properties: any = {};
           properties[method] = _this.fieldMap[field.name].crtValue;
           var fireEvent: any = { 'nodeID': target.getID(), 'properties': properties };
-          // A key typed in a text, text-area or number field: the undo stack combines a run of them
-          // into one step (ActionStack._combinableEvents). A spinner click or a picked value isn't.
-          if (event.type === 'keyup') {
+          // Text typed or deleted in a text, text-area or number field: the undo stack combines a run
+          // of it into one step (ActionStack._combinableEvents). A paste, the browser's own undo, an
+          // arrow-key or spinner step, or a picked value is a step of its own.
+          if (typingField && isTypedInput(event)) {
             fireEvent.typed = true;
           }
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: fireEvent }));
@@ -581,8 +591,9 @@ export default class NodeMenu {
       (text as any)._getValue = function(this: any) {
         return [(this as any).value];
       }.bind(text);
-      //this._attachFieldEventListeners(text, ['keypress', 'keyup'], [true]);
-      this._attachFieldEventListeners(text, ['keyup'], [true]);
+      // 'input', not 'keyup': it also catches a paste, autofill or drop, and fires on this field
+      // even when the key is let go elsewhere (e.g. after Tab).
+      this._attachFieldEventListeners(text, ['input'], { typing: true });
       return result;
     },
     'textarea' : function(this: any, data: any): any {
@@ -595,7 +606,7 @@ export default class NodeMenu {
       (text as any)._getValue = function(this: any) {
         return [(this as any).value];
       }.bind(text);
-      this._attachFieldEventListeners(text, ['keyup'], [true]);
+      this._attachFieldEventListeners(text, ['input'], { typing: true });
       return result;
     },
     'date-picker' : function(this: any, data: any): any {
@@ -786,7 +797,7 @@ export default class NodeMenu {
         var parsed = Number((this as any).value);
         return [isNaN(parsed) ? null : parsed];
       }.bind(number);
-      this._attachFieldEventListeners(number, ['keyup', 'change'], [true]);
+      this._attachFieldEventListeners(number, ['input', 'change'], { typing: true });
       return result;
     },
     'heading' : function(this: any, data: any): any {

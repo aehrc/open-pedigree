@@ -121,7 +121,7 @@ test('typing a name is one undo step, as the name field sends a change on every 
 // Every field the node form sends on each key combines the same way: the identifier, and a
 // Questionnaire's text and number answers - typed with the keyboard, in the real form. A choice, a
 // number changed without a key (its spinner) and a change made by code aren't combined.
-test('typing in any text or number field is one undo step; a choice, a spinner and code are not combined', async ({ page }) => {
+test('typing in any text or number field is one undo step; a paste, a choice, an arrow step and code are not combined', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
   page.on('dialog', (dialog) => dialog.dismiss());
@@ -147,26 +147,67 @@ test('typing in any text or number field is one undo step; a choice, a spinner a
     window.editor.getNodeMenu().show(window.editor.getView().getNode(0), 100, 100);
   });
   const size = () => page.evaluate(() => window.editor.getActionStack()._size());
-  const field = (name, tag) => page.locator(`.menu-box .field-${name} ${tag}`).first();
+  // Focuses a field of the node menu (its own box: the group menu has fields of the same names),
+  // on its tab, as a click would.
+  const focus = (name, tag) => page.evaluate(([n, t]) => {
+    const menu = window.editor.getNodeMenu();
+    const el = menu.menuBox.querySelector(`.field-${n} ${t}`);
+    menu.tabHeaders[el.closest('.content').id.replace(/^tab_/, '')].dispatchEvent(new Event('click'));
+    el.focus();
+    return el === document.activeElement;
+  }, [name, tag]);
+  const answer = (linkId) => page.evaluate((l) => window.editor.getView().getNode(0).getQuestionnaireAnswer(l), linkId);
+  const externalId = () => page.evaluate(() => window.editor.getView().getNode(0).getExternalID());
+
   const typed = [['external_id', 'input', 'P12'], ['note', 'input', 'hi!'], ['story', 'textarea', 'once'], ['count', 'input', '123']];
   for (const [name, tag, text] of typed) {
     const before = await size();
-    // (the field's tab first, then focus it as a click would, then type)
-    await field(name, tag).evaluate((el) => {
-      const tab = el.closest('.content');
-      window.editor.getNodeMenu().tabHeaders[tab.id.replace(/^tab_/, '')].dispatchEvent(new Event('click'));
-      el.focus();
-    });
-    expect(await field(name, tag).evaluate((el) => el === document.activeElement), name).toBe(true);
+    expect(await focus(name, tag), name).toBe(true);
     await page.keyboard.type(text);
     expect(await size(), name).toBe(before + 1);
   }
-  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('story'))).toBe('once');
+  expect(await answer('story')).toBe('once');
+  expect(await answer('count')).toBe(123);
+
+  // Each undo takes a whole field's typing back; redo puts them back.
+  await undo(page);
+  expect(await answer('count')).toBeUndefined();
+  await undo(page);
+  expect(await answer('story')).toBeUndefined();
+  await undo(page);
+  expect(await answer('note')).toBeUndefined();
+  await undo(page);
+  expect(await externalId()).toBeFalsy();
+  for (let i = 0; i < 4; i++) {
+    await redo(page);
+  }
+  expect(await answer('count')).toBe(123);
+
+  // The same answer set by code (e.g. an import) straight after typing it isn't folded into it.
+  expect(await focus('note', 'input')).toBe(true);
+  await page.keyboard.type('?');
+  let before = await size();
+  await setProperty(page, 0, { setQuestionnaireAnswer_note: 'imported' });
+  expect(await size()).toBe(before + 1);
+  await undo(page);
+  expect(await answer('note')).toBe('hi!?');
+
+  // A paste is saved, as a step of its own (undo goes back to the typed note).
+  await page.evaluate(() => {
+    const el = window.editor.getNodeMenu().menuBox.querySelector('.field-note input');
+    el.value = 'pasted';
+    el.dispatchEvent(new InputEvent('input', { inputType: 'insertFromPaste' }));
+  });
+  expect(await answer('note')).toBe('pasted');
+  await undo(page);
+  expect(await answer('note')).toBe('hi!?');
+  await redo(page);
+  expect(await answer('note')).toBe('pasted');
 
   // A choice: two picks, two steps.
-  let before = await size();
+  before = await size();
   await page.evaluate(() => {
-    const select = document.querySelector('.menu-box .field-shade select');
+    const select = window.editor.getNodeMenu().menuBox.querySelector('.field-shade select');
     for (const value of ['light', 'dark']) {
       select.value = value;
       select.dispatchEvent(new Event('change'));
@@ -174,21 +215,13 @@ test('typing in any text or number field is one undo step; a choice, a spinner a
   });
   expect(await size()).toBe(before + 2);
 
-  // The count's spinner (a change with no key): each click is its own step.
+  // The count's arrow keys step it: each step is its own.
+  expect(await focus('count', 'input')).toBe(true);
   before = await size();
-  await page.evaluate(() => {
-    const number = document.querySelector('.menu-box .field-count input');
-    for (const value of ['124', '125']) {
-      number.value = value;
-      number.dispatchEvent(new Event('change'));
-    }
-  });
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  expect(await answer('count')).toBe(125);
   expect(await size()).toBe(before + 2);
-
-  // The same setter set by code (e.g. an import) straight after typing isn't folded into it.
-  before = await size();
-  await setProperty(page, 0, { setQuestionnaireAnswer_note: 'imported' });
-  expect(await size()).toBe(before + 1);
   expect(errors).toEqual([]);
 });
 
