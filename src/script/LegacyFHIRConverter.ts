@@ -1,5 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
+import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -221,10 +222,56 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
 
       let personID = getPersonID(nextPerson);
 
-      let motherLink = nextPerson.hasOwnProperty('mother') ? nextPerson['mother']
-        : null;
-      let fatherLink = nextPerson.hasOwnProperty('father') ? nextPerson['father']
-        : null;
+      // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
+      // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
+      // for the parents placed only - one left out can't fail the import)
+      // A parent whose reference matches nobody is set aside before placing, so it can't take a
+      // real parent's slot - unless they're needed: then the import fails as before. An ambiguous
+      // reference always fails it.
+      let resolves = (node) => {
+        try {
+          findReferencedPerson(node, 'parent');
+          return true;
+        } catch (err) {
+          if (String(err).indexOf('ambiguous reference') !== -1) {
+            throw err;
+          }
+          return false;
+        }
+      };
+      let claims = nextPerson.parentClaims || [];
+      let missing = claims.filter((c) => !resolves(c.node));
+      let unresolved = new Set(missing.map((c) => c.node)).size;
+      let chosen = chooseParentClaims(claims.filter((c) => resolves(c.node)));
+      let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
+      let placed = placedClaims(chosen, parents);
+      if (missing.length > 0) {
+        // needed: the child's adoptive parent, or one without whom fewer parents are placed than
+        // the child has (up to two)
+        let chosenAll = chooseParentClaims(claims);
+        let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
+        let placedCount = [parents.mother, parents.father].filter(Boolean).length;
+        let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
+        if (neededMissing && ((chosenAll.adopted && !chosen.adopted) || placedCount < wanted)) {
+          findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
+        }
+      }
+      for (const claim of placed.checked) {
+        const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
+        if (conflict) {
+          throw conflict;
+        }
+      }
+      // (a fetus can't be adopted in the editor)
+      if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+        newG.properties[personID].isAdopted = true;
+      }
+      let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
+      if (leftOut) {
+        console.warn(leftOut);
+      }
+      let motherLink = parents.mother ? parents.mother.node : null;
+      let fatherLink = parents.father ? parents.father.node : null;
 
       if (motherLink == null && fatherLink == null) {
         continue;
@@ -240,10 +287,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         }, newG.defaultPersonNodeWidth);
       } else {
         fatherID = findReferencedPerson(fatherLink, 'father');
-        if (newG.properties[fatherID].gender === 'F') {
-          throw 'Unable to import pedigree: a person declared as female is also declared as being a father ('
-            + fatherLink + ')';
-        }
       }
       if (motherLink == null) {
         motherID = newG._addVertex(null, Graph.TYPE.PERSON, {
@@ -252,12 +295,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         }, newG.defaultPersonNodeWidth);
       } else {
         motherID = findReferencedPerson(motherLink, 'mother');
-        if (newG.properties[motherID].gender === 'M') {
-          throw 'Unable to import pedigree: a person declared as male is also declared as being a mother ('
-            + motherLink + ')';
-        }
       }
-
       if (fatherID === personID || motherID === personID) {
         throw 'Unable to import pedigree: a person is declared to be his or hew own parent';
       }
@@ -463,16 +501,15 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
   }
 
   if (familyHistoryResource.extension) {
-    let motherCodes = [ 'NMTH', 'MTH', 'STPMTH', 'ADOPTM' ];
-    let fatherCodes = [ 'NFTH', 'FTH', 'STPFTH', 'ADOPTF' ];
+    let motherCodes = [ 'NMTH', 'MTH', 'STPMTH', 'ADOPTM', 'ADOPTMTH' ];
+    let fatherCodes = [ 'NFTH', 'FTH', 'STPFTH', 'ADOPTF', 'ADOPTFTH' ];
     // not /g: test() on a global regex starts where its last match ended, so a second parent or
     // twin of the same family member could be missed
     let motherRegex = /mother/i;
     let fatherRegex = /father/i;
     let extensions = familyHistoryResource.extension;
-    let possibleMother = [];
-    let possibleFather = [];
-    let possibleParent = [];
+    // each parent as a claim, placed as the GA4GH importer does (placeParents)
+    let parentClaims = [];
     let twinCodes = [ 'TWINSIS', 'TWINBRO' ];
     let fraternalTwinCodes = [ 'FTWINSIS', 'FTWINBRO', 'TWIN' ];
     let twinRegex = /twin/i;
@@ -483,6 +520,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
       if (ex.url === 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent') {
         let type = undefined;
         let ref = undefined;
+        let roleCode = '';
+        let roleText = '';
         let subExtensions = ex.extension;
         for (let j = 0; j < subExtensions.length; j++) {
           let subEx = subExtensions[j];
@@ -490,6 +529,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
             let codings = subEx.valueCodeableConcept.coding || [];
             for (let k = 0; k < codings.length; k++) {
               if (codings[k].system === 'http://terminology.hl7.org/CodeSystem/v3-RoleCode') {
+                roleCode = codings[k].code || '';
                 if (motherCodes.includes(codings[k].code)) {
                   type = 'mother';
                 } else if (fatherCodes
@@ -500,6 +540,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
                 break;
               } else if (codings[k].display) {
+                roleText = roleText + ' ' + codings[k].display;
                 if (motherRegex.test(codings[k].display)) {
                   type = 'mother';
                 } else if (fatherRegex.test(codings[k].display)) {
@@ -507,6 +548,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
               }
             }
+            roleText = roleText + ' ' + (subEx.valueCodeableConcept.text || '');
             if (type == null && subEx.valueCodeableConcept.text) {
               if (motherRegex
                 .test(subEx.valueCodeableConcept.text)) {
@@ -561,13 +603,12 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
           }
         }
         let parentId = ref.substring(1); // remove leading #
-        if ('mother' === type) {
-          possibleMother.push(parentId);
-        } else if ('father' === type) {
-          possibleFather.push(parentId);
-        } else {
-          possibleParent.push(parentId);
-        }
+        parentClaims.push({
+          node: parentId,
+          gender: ('mother' === type) ? 'F' : ('father' === type) ? 'M' : null,
+          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /\badoptive\b/i.test(roleText)),
+          step: /^STP/.test(roleCode) || (!roleCode && /\bstep[- ]?(mother|father|parent|mom|mum|dad)/i.test(roleText))
+        });
       } else if (ex.url === 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling') {
         let type = undefined;
         let ref = undefined;
@@ -733,32 +774,9 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         }
       }
     }
-    if (possibleMother.length === 1) {
-      result.mother = possibleMother[0];
-    }
-    if (possibleFather.length === 1) {
-      result.father = possibleFather[0];
-    }
-    if (!result.father && possibleMother.length > 1) {
-      result.father = possibleMother[1];
-    }
-    if (!result.mother && possibleFather.length > 1) {
-      result.mother = possibleFather[1];
-    }
-    if (possibleParent.length > 0) {
-      if (!result.mother) {
-        result.mother = possibleParent[0];
-      } else if (!result.father) {
-        result.father = possibleParent[0];
-      }
-    }
-    if (possibleParent.length > 1) {
-      if (!result.mother) {
-        result.mother = possibleParent[1];
-      } else if (!result.father) {
-        result.father = possibleParent[1];
-      }
-    }
+    // placed in the second pass, once every person (and their gender) is known
+    // (pedigree-editor-fetus-and-adoption-fidelity D3)
+    result.parentClaims = parentClaims;
     if (lookForTwins && possibleTwins != null){
       // the group is fraternal if any of its twins is
       let isFraternal = false;

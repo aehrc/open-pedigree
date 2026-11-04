@@ -259,3 +259,143 @@ describe('LegacyFHIRConverter', () => {
     expect(graph.v.length).toBe(5); // Mum, Dad, Kid, their relationship and childhub
   });
 });
+
+// pedigree-editor-fetus-and-adoption-fidelity D3: the legacy importer places parents as the GA4GH
+// one does - two of a kind both kept, an adoptive parent making the child adopted.
+describe('LegacyFHIRConverter parents', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => terminologyHelper });
+  });
+
+  // The fixture with `change` applied to its contained resources (by id).
+  function legacyWith(change) {
+    const pedigree = structuredClone(legacyPedigree);
+    const byId = Object.fromEntries(pedigree.contained.map((c) => [c.id, c]));
+    change(byId);
+    return JSON.stringify(pedigree);
+  }
+  const parentExtension = (code, reference) => ({
+    url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+    extension: [
+      { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode', code }] } },
+      { url: 'reference', valueReference: { reference } },
+    ],
+  });
+  // Maya (vertex 0): her parents' first names, sorted, and whether she's adopted.
+  const maya = (graph) => ({
+    parents: graph.getParents(0).map((v) => graph.properties[v].fName || '?').sort(),
+    adopted: !!graph.properties[0].isAdopted,
+  });
+
+  it('keeps two mothers', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_5.sex.coding[0].code = 'female'; // Tom, now a second mother - of all three children
+      for (const child of ['FMH_0', 'FMH_7', 'FMH_8']) {
+        byId[child].extension[0] = parentExtension('NMTH', '#FMH_5');
+      }
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('reads a natural and an adoptive mother: the child is adopted, under the adoptive one', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2')); // Edith
+    });
+    const read = maya(LegacyFHIRConverter.initFromFHIR(text));
+    expect(read.adopted).toBe(true);
+    expect(read.parents).toContain('Edith');
+    expect(read.parents).not.toContain('Grace');
+    expect(read.parents).not.toContain('Tom');
+  });
+
+  it('doesn\'t fail on a parent it leaves out (an adopted child\'s other parent with a broken reference)', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2'));
+      byId.FMH_0.extension.push(parentExtension('NFTH', '#NOBODY'));
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
+  });
+
+  it('doesn\'t fail on a third parent it doesn\'t place: a man coded as mother, or a broken reference', () => {
+    for (const third of ['#FMH_1', '#NOBODY']) { // Arthur (male), and nobody
+      const text = legacyWith((byId) => {
+        byId.FMH_0.extension.push(parentExtension('NMTH', third));
+      });
+      expect(maya(LegacyFHIRConverter.initFromFHIR(text)), third).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+    }
+  });
+
+  it('doesn\'t let a broken reference take a parent\'s slot when the real parents are coded only as parents', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension = [parentExtension('NMTH', '#NOBODY'), parentExtension('PRN', '#FMH_6'), parentExtension('PRN', '#FMH_5')];
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('doesn\'t take a word merely containing "step" for a step-parent', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension[1] = {
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://snomed.info/sct', code: '72705000', display: 'Mother' }], text: 'Mother (stepwise interview)' } },
+          { url: 'reference', valueReference: { reference: '#FMH_6' } },
+        ],
+      };
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('reads "adoptive" in a type\'s text alongside a coding\'s plain display', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push({
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://snomed.info/sct', code: '72705000', display: 'Mother' }], text: 'Adoptive mother' } },
+          { url: 'reference', valueReference: { reference: '#FMH_2' } },
+        ],
+      });
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
+  });
+
+  it('still fails when a parent it needs can\'t be found', () => {
+    // the child's only parent
+    const only = legacyWith((byId) => { byId.FMH_0.extension = [parentExtension('NMTH', '#MISSING')]; });
+    expect(() => LegacyFHIRConverter.initFromFHIR(only)).toThrow(/not a valid/);
+    // the child's adoptive parent
+    const adoptive = legacyWith((byId) => { byId.FMH_0.extension.push(parentExtension('ADOPTM', '#MISSING')); });
+    expect(() => LegacyFHIRConverter.initFromFHIR(adoptive)).toThrow(/not a valid/);
+  });
+
+  it('doesn\'t take "not adopted" for adoptive', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension[1] = {
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { text: 'Mother (not adopted)' } },
+          { url: 'reference', valueReference: { reference: '#FMH_6' } },
+        ],
+      };
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('reads "Adoptive mother" given only as text as adoptive', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push({
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { text: 'Adoptive mother' } },
+          { url: 'reference', valueReference: { reference: '#FMH_2' } },
+        ],
+      });
+    });
+    const read = maya(LegacyFHIRConverter.initFromFHIR(text));
+    expect(read.adopted).toBe(true);
+    expect(read.parents).toContain('Edith');
+  });
+
+  it('leaves the fixture\'s natural parents as they were', () => {
+    expect(maya(LegacyFHIRConverter.initFromFHIR(legacyText))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+});

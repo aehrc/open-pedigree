@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import GA4GHFHIRConverter, { placeParents } from 'pedigree/GA4GHFHIRConverter';
+import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import { placeParents, chooseParentClaims } from 'pedigree/model/parentClaims';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
@@ -337,5 +338,128 @@ describe('GA4GHFHIRConverter.initFromFHIR profile check', () => {
     const profile = exported.entry[0].resource.meta.profile;
     exported.entry[0].resource.meta.profile = 'https://example.org/?' + profile[0];
     expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).toThrow(/not expected JSON format/);
+  });
+});
+
+// pedigree-editor-fetus-and-adoption-fidelity
+describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+  const patients = (exported) => JSON.parse(exported).entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+
+  it('keeps a stillborn fetus with a date of death a stillborn fetus, with its date (D1)', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { fName: 'Fetus', lifeStatus: 'stillborn', gestationAge: '30', dod: '03/04/2020' });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const fetus = patients(exported).find((p) => p.deceasedString);
+    expect(fetus.deceasedString).toBe('stillborn 30 weeks');
+    expect(fetus.deceasedDateTime).toBeUndefined();
+    expect(fetus.extension.find((e) => e.url.endsWith('/fetus-date-of-death')).valueDate).toBe('2020-03-04');
+
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const read = Object.values(graph.properties).find((p) => p.fName === 'Fetus');
+    expect(read.lifeStatus).toBe('stillborn');
+    expect(read.gestationAge).toBe('30');
+    expect(read.dod).toBe('03/04/2020');
+  });
+
+  it('leaves the date out with reduced privacy', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { lifeStatus: 'stillborn', dod: '03/04/2020' });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null);
+    const fetus = patients(exported).find((p) => p.deceasedString);
+    expect(fetus.deceasedString).toBe('stillborn');
+    expect(fetus.extension.find((e) => e.url.endsWith('/fetus-date-of-death'))).toBeUndefined();
+  });
+
+  it('keeps an adopted child adopted, under the same parents (D2)', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).toContain('KIN:022');
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    const child = people.find((v) => graph.getParents(v).length === 2);
+    expect(graph.properties[child].isAdopted).toBe(true);
+    expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
+  });
+});
+
+describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('ignores a fetus date-of-death extension on someone who isn\'t a fetus', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.lifeStatus = 'alive';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
+    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death', valueDate: '2020-03-04' });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const read = Object.values(graph.properties).find((p) => p.fName === 'John');
+    expect(read.dod).toBeUndefined();
+  });
+
+  it('doesn\'t fail on a biological parent it leaves out, whose code contradicts their gender', () => {
+    // John (M) and Jane (F) adopt the child; a second relationship codes John as the child's mother.
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.isAdopted = true;
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const fmh = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'FamilyMemberHistory' && r.relationship
+      && r.relationship.coding[0].code === 'KIN:022');
+    const extra = structuredClone(fmh[0]);
+    extra.id = extra.id + '-bio';
+    extra.relationship.coding[0] = { system: 'http://purl.org/ga4gh/kin.fhir', code: 'KIN:027', display: 'isBiologicalMother' };
+    exported.entry.push({ fullUrl: 'FamilyMemberHistory/' + extra.id, resource: extra });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
+    expect(graph.properties[child].isAdopted).toBe(true);
+    // under the adoptive parents, John as father: the KIN:027 claim on him was left out
+    expect(graph.getParents(child).map((v) => `${graph.properties[v].fName}:${graph.properties[v].gender}`).sort()).toEqual(['Jane:F', 'John:M']);
+  });
+
+});
+
+describe('GA4GHFHIRConverter adoption: fetus and step-parents', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('doesn\'t mark a fetus adopted, as the editor can\'t show one', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { fName: 'Fetus', lifeStatus: 'stillborn', isAdopted: true });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).toContain('KIN:022');
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const fetus = Object.values(graph.properties).find((p) => p.fName === 'Fetus');
+    expect(fetus.isAdopted).toBeFalsy();
+  });
+
+  it('places step-parents (KIN:023) when a child has no other parents', () => {
+    const gg = structuredClone(simpleGG);
+    let exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    for (const code of ['KIN:027', 'KIN:028', 'KIN:003']) {
+      exported = exported.split(`"code": "${code}"`).join('"code": "KIN:023"');
+    }
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
+    expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
+  });
+});
+
+describe('chooseParentClaims (D2)', () => {
+  it('takes the adoptive claims, and the child is adopted', () => {
+    const claims = [{ node: 1, gender: 'F' }, { node: 2, gender: null, adoptive: true }, { node: 3, gender: 'M' }];
+    expect(chooseParentClaims(claims)).toEqual({ claims: [claims[1]], adopted: true, left: [claims[0], claims[2]] });
+  });
+  it('takes the claims that aren\'t step-parents when there are any', () => {
+    const claims = [{ node: 1, gender: 'F', step: true }, { node: 2, gender: 'M' }];
+    expect(chooseParentClaims(claims)).toEqual({ claims: [claims[1]], adopted: false, left: [claims[0]] });
+  });
+  it('takes step-parents when they are all there is', () => {
+    const claims = [{ node: 1, gender: 'F', step: true }];
+    expect(chooseParentClaims(claims)).toEqual({ claims, adopted: false, left: [] });
   });
 });

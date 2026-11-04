@@ -4,6 +4,7 @@ import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questio
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
+import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -27,49 +28,9 @@ function generateUUID() {
   return 'urn:uuid:' + uuidv4();
 }
 
-/**
- * A child's two parents, from the parent relationships read for it (`claims`: { node, gender } where
- * gender is what the code says - 'F' for a mother, 'M' for a father, null for just a parent). A
- * mother goes in the mother slot and a father in the father slot; a parent coded only as a parent
- * goes where their own gender fits (those of known gender first), else in whichever slot is free -
- * so a slot says nothing about a parent's gender unless their code did. A parent coded more than
- * once is placed once (by a gendered code if there is one); any more than two are left out.
- */
-export function placeParents(claims, genderOf) {
-  const slots = { mother: null, father: null };
-  const placed = new Set();
-  const place = (claim, order) => {
-    const slot = order.find((name) => slots[name] == null);
-    if (slot && !placed.has(claim.node)) {
-      slots[slot] = claim;
-      placed.add(claim.node);
-    }
-  };
-  const coded = claims.filter((c) => c.gender != null);
-  // a mother or father in their own slot first, so a second of either can't push one out
-  for (const claim of coded) {
-    place(claim, [(claim.gender === 'M') ? 'father' : 'mother']);
-  }
-  for (const claim of coded) {
-    place(claim, ['mother', 'father']);
-  }
-  const known = (c) => (genderOf(c.node) === 'M' || genderOf(c.node) === 'F') ? 1 : 0;
-  for (const claim of claims.filter((c) => c.gender == null).sort((a, b) => known(b) - known(a))) {
-    place(claim, (genderOf(claim.node) === 'M') ? ['father', 'mother'] : ['mother', 'father']);
-  }
-  return slots;
-}
 
-/** Why a parent's code contradicts their gender, or null if it doesn't (see placeParents). */
-function parentGenderConflict(claim, gender, reference) {
-  if (claim.gender === 'F' && gender === 'M') {
-    return 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + reference + ')';
-  }
-  if (claim.gender === 'M' && gender === 'F') {
-    return 'Unable to import pedigree: a person declared as female is also declared as being a father (' + reference + ')';
-  }
-  return null;
-}
+// open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
+const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
 
 var GA4GHFHIRConverter = function () {
 };
@@ -283,14 +244,25 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
-    // every code for a parent must fit their gender, not just the one that placed them
-    for (const claim of nextPerson.parentClaims || []) {
+    const chosen = chooseParentClaims(nextPerson.parentClaims || []);
+    const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
+    const placed = placedClaims(chosen, parents);
+    // every code for a parent placed must fit their gender, not just the one that placed them (a
+    // parent left out can't fail the import)
+    for (const claim of placed.checked) {
       const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
       if (conflict) {
         throw conflict;
       }
     }
-    const parents = placeParents(nextPerson.parentClaims || [], (node) => nodeData[node].properties.gender);
+    // (a fetus can't be adopted in the editor)
+    if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+      newG.properties[personID].isAdopted = true;
+    }
+    const leftOut = leftOutWarning(chosen, placed.dropped);
+    if (leftOut) {
+      console.warn(leftOut);
+    }
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
 
@@ -420,12 +392,14 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
     return;
   }
 
-  if (rel === 'KIN:027' || rel === 'KIN:028' || rel === 'KIN:003' || rel === 'KIN:022') {
+  if (rel === 'KIN:027' || rel === 'KIN:028' || rel === 'KIN:003' || rel === 'KIN:022' || rel === 'KIN:023') {
     // NMTH, NFTH, NPRN or ADOPTPRN: kept as a claim, and the child's two parents are placed once
     // all are read (see placeParents), so a parent coded only as a parent (e.g. one of a same-sex
     // couple) isn't held to a mother's or father's gender
     const claims = firstNodeData.parentClaims || (firstNodeData.parentClaims = []);
-    claims.push({ node: secondNodeData.nodeId, gender: (rel === 'KIN:027') ? 'F' : (rel === 'KIN:028') ? 'M' : null });
+    // (KIN:023, a step-parent: used only when a child has no other parents, as in the legacy importer)
+    claims.push({ node: secondNodeData.nodeId, gender: (rel === 'KIN:027') ? 'F' : (rel === 'KIN:028') ? 'M' : null,
+      adoptive: rel === 'KIN:022', step: rel === 'KIN:023' });
   } else if (rel === 'KIN:026' || rel === 'KIN:030' || rel === 'KIN:048'  || rel === 'KIN:049'){
     // SIGOTHR
     let isConsang = (rel === 'KIN:030' || rel === 'KIN:049');
@@ -1036,6 +1010,15 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
       }
     }
   }
+  // A fetus's date of death (see the export), read only for a fetus: on anyone else it would make
+  // them deceased.
+  if (patientResource.extension && FETAL_STATUSES.indexOf((properties as any).lifeStatus) !== -1) {
+    const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION);
+    const fetusDodSplit = fetusDod && typeof fetusDod.valueDate === 'string' ? dateTimeSplitter.exec(fetusDod.valueDate) : null;
+    if (fetusDodSplit) {
+      (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
+    }
+  }
 
   return result;
 };
@@ -1584,37 +1567,36 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
     ];
   }
   let unbornFlag = false;
+  let lifeStatus = nodeProperties['lifeStatus'];
+  // A fetus is written as one whatever else it has: deceased[x] holds one value, and the fetal status
+  // wins over a date of death, which goes in an extension (pedigree-editor-fetus-and-adoption-fidelity
+  // D1). Before, a fetus with a date of death was written as a born, deceased person.
+  let isFetus = FETAL_STATUSES.indexOf(lifeStatus) !== -1;
+  let fetusDateOfDeath: any = null;
   if (privacySetting === 'all') {
     if (toLocalIsoDate(nodeProperties['dob'])) {
       patientResource['birthDate'] = toLocalIsoDate(nodeProperties['dob']);
     }
-    if (toLocalIsoDate(nodeProperties['dod'])) {
-      patientResource['deceasedDateTime'] = toLocalIsoDate(nodeProperties['dod']);
-    } else if (nodeProperties['lifeStatus']) {
-      let lifeStatus = nodeProperties['lifeStatus'];
-      if (lifeStatus === 'stillborn' || lifeStatus === 'miscarriage' || lifeStatus === 'aborted' || lifeStatus === 'unborn') {
-        unbornFlag = true;
-        if (nodeProperties.hasOwnProperty('gestationAge')) {
-          patientResource['deceasedString'] = lifeStatus + ' ' + nodeProperties['gestationAge'] + ' weeks';
-        } else {
-          patientResource['deceasedString'] = lifeStatus;
-        }
-      } else if (lifeStatus === 'deceased') {
-        patientResource['deceasedBoolean'] = true;
+    if (isFetus) {
+      unbornFlag = true;
+      if (nodeProperties.hasOwnProperty('gestationAge')) {
+        patientResource['deceasedString'] = lifeStatus + ' ' + nodeProperties['gestationAge'] + ' weeks';
+      } else {
+        patientResource['deceasedString'] = lifeStatus;
       }
+      fetusDateOfDeath = toLocalIsoDate(nodeProperties['dod']) || null;
+    } else if (toLocalIsoDate(nodeProperties['dod'])) {
+      patientResource['deceasedDateTime'] = toLocalIsoDate(nodeProperties['dod']);
+    } else if (lifeStatus === 'deceased') {
+      patientResource['deceasedBoolean'] = true;
     }
   } else {
-    if (nodeProperties['dod']) {
+    if (isFetus) {
+      unbornFlag = true;
+      // no gestational age or date, as no dates or ages are exported with this privacy setting
+      patientResource['deceasedString'] = lifeStatus;
+    } else if (nodeProperties['dod'] || lifeStatus === 'deceased') {
       patientResource['deceasedBoolean'] = true;
-    } else if (nodeProperties['lifeStatus']) {
-      let lifeStatus = nodeProperties['lifeStatus'];
-      if (lifeStatus === 'stillborn' || lifeStatus === 'miscarriage' || lifeStatus === 'aborted' || lifeStatus === 'unborn') {
-        unbornFlag = true;
-        // no gestational age, as no dates or ages are exported with this privacy setting
-        patientResource['deceasedString'] = lifeStatus;
-      } else if (lifeStatus === 'deceased') {
-        patientResource['deceasedBoolean'] = true;
-      }
     }
   }
 
@@ -1623,6 +1605,9 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
     'valueBoolean': unbornFlag
   }
   );
+  if (fetusDateOfDeath) {
+    patientResource.extension.push({ 'url': FETUS_DATE_OF_DEATH_EXTENSION, 'valueDate': fetusDateOfDeath });
+  }
 
   // twin groups are numbered from 0
   if (nodeProperties.twinGroup != null) {
