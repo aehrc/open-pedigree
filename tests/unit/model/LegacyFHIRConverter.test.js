@@ -259,3 +259,56 @@ describe('LegacyFHIRConverter', () => {
     expect(graph.v.length).toBe(5); // Mum, Dad, Kid, their relationship and childhub
   });
 });
+
+// pedigree-editor-fetus-and-adoption-fidelity D3: the legacy importer places parents as the GA4GH
+// one does - two of a kind both kept, an adoptive parent making the child adopted.
+describe('LegacyFHIRConverter parents', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => terminologyHelper });
+  });
+
+  // The fixture with `change` applied to its contained resources (by id).
+  function legacyWith(change) {
+    const pedigree = structuredClone(legacyPedigree);
+    const byId = Object.fromEntries(pedigree.contained.map((c) => [c.id, c]));
+    change(byId);
+    return JSON.stringify(pedigree);
+  }
+  const parentExtension = (code, reference) => ({
+    url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+    extension: [
+      { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode', code }] } },
+      { url: 'reference', valueReference: { reference } },
+    ],
+  });
+  // Maya (vertex 0): her parents' first names, sorted, and whether she's adopted.
+  const maya = (graph) => ({
+    parents: graph.getParents(0).map((v) => graph.properties[v].fName || '?').sort(),
+    adopted: !!graph.properties[0].isAdopted,
+  });
+
+  it('keeps two mothers', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_5.sex.coding[0].code = 'female'; // Tom, now a second mother - of all three children
+      for (const child of ['FMH_0', 'FMH_7', 'FMH_8']) {
+        byId[child].extension[0] = parentExtension('NMTH', '#FMH_5');
+      }
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('reads a natural and an adoptive mother: the child is adopted, under the adoptive one', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2')); // Edith
+    });
+    const read = maya(LegacyFHIRConverter.initFromFHIR(text));
+    expect(read.adopted).toBe(true);
+    expect(read.parents).toContain('Edith');
+    expect(read.parents).not.toContain('Grace');
+    expect(read.parents).not.toContain('Tom');
+  });
+
+  it('leaves the fixture\'s natural parents as they were', () => {
+    expect(maya(LegacyFHIRConverter.initFromFHIR(legacyText))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+});
