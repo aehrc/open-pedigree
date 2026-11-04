@@ -82,10 +82,14 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   }
 }
 
-// An 'input' event from typing or deleting text, as opposed to a paste, a drop, autofill, the
-// browser's own undo/redo, or a number field's arrow-key or spinner step.
+// Input that isn't typing: a paste, a drop or a drag within the field, a cut, the browser's own
+// undo/redo. Input with no type at all is a number field's arrow-key or spinner step, or autofill.
+var NOT_TYPED_INPUT = /^(insertFromPaste.*|insertFromDrop|deleteByDrag|deleteByCut|history(Undo|Redo))$/;
+
+// An 'input' event that is typing (any other kind: keys, Enter in a text area, an input method,
+// autocorrect, word or line deletion), as opposed to the cases above.
 function isTypedInput(event: any): boolean {
-  return event.type === 'input' && /^(insertText|insertCompositionText|deleteContent(Backward|Forward)|deleteWord(Backward|Forward))$/.test(event.inputType || '');
+  return event.type === 'input' && !!event.inputType && !NOT_TYPED_INPUT.test(event.inputType);
 }
 
 // A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
@@ -465,6 +469,11 @@ export default class NodeMenu {
           return;
         }
 
+        // A number field part-way through being typed ('-', '1e') has no value yet: wait for it,
+        // rather than clear the answer.
+        if (field.validity && field.validity.badInput) {
+          return;
+        }
         var newValue = field._getValue && field._getValue() || undefined;
         if (Array.isArray(newValue)) {
           _this.fieldMap[field.name].crtValue = newValue[0];

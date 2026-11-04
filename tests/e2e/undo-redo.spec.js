@@ -118,9 +118,10 @@ test('typing a name is one undo step, as the name field sends a change on every 
   expect(errors).toEqual([]);
 });
 
-// Every field the node form sends on each key combines the same way: the identifier, and a
-// Questionnaire's text and number answers - typed with the keyboard, in the real form. A choice, a
-// number changed without a key (its spinner) and a change made by code aren't combined.
+// Every field the node form sends on each change combines typing the same way: the identifier, and
+// a Questionnaire's text and number answers - typed with the keyboard, in the real form, Enter in a
+// text area included. A paste, a choice, a number's arrow-key step and a change made by code aren't
+// combined, and a number part-way through being typed doesn't clear the answer.
 test('typing in any text or number field is one undo step; a paste, a choice, an arrow step and code are not combined', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
@@ -159,14 +160,14 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   const answer = (linkId) => page.evaluate((l) => window.editor.getView().getNode(0).getQuestionnaireAnswer(l), linkId);
   const externalId = () => page.evaluate(() => window.editor.getView().getNode(0).getExternalID());
 
-  const typed = [['external_id', 'input', 'P12'], ['note', 'input', 'hi!'], ['story', 'textarea', 'once'], ['count', 'input', '123']];
+  const typed = [['external_id', 'input', 'P12'], ['note', 'input', 'hi!'], ['story', 'textarea', 'once\nupon'], ['count', 'input', '123']];
   for (const [name, tag, text] of typed) {
     const before = await size();
     expect(await focus(name, tag), name).toBe(true);
     await page.keyboard.type(text);
     expect(await size(), name).toBe(before + 1);
   }
-  expect(await answer('story')).toBe('once');
+  expect(await answer('story')).toBe('once\nupon');
   expect(await answer('count')).toBe(123);
 
   // Each undo takes a whole field's typing back; redo puts them back.
@@ -192,7 +193,9 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   await undo(page);
   expect(await answer('note')).toBe('hi!?');
 
-  // A paste is saved, as a step of its own (undo goes back to the typed note).
+  // A paste straight after typing is saved, as a step of its own (undo goes back to the typed note).
+  expect(await focus('note', 'input')).toBe(true);
+  await page.keyboard.type('!');
   await page.evaluate(() => {
     const el = window.editor.getNodeMenu().menuBox.querySelector('.field-note input');
     el.value = 'pasted';
@@ -200,7 +203,7 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   });
   expect(await answer('note')).toBe('pasted');
   await undo(page);
-  expect(await answer('note')).toBe('hi!?');
+  expect(await answer('note')).toBe('hi!?!');
   await redo(page);
   expect(await answer('note')).toBe('pasted');
 
@@ -222,6 +225,11 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   await page.keyboard.press('ArrowUp');
   expect(await answer('count')).toBe(125);
   expect(await size()).toBe(before + 2);
+
+  // A number part-way through ('7e') keeps the answer it had at '7'.
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('7e');
+  expect(await answer('count')).toBe(7);
   expect(errors).toEqual([]);
 });
 
