@@ -759,11 +759,14 @@ export default class PedigreeEditor {
         // blank value: the one coded "none" if there is one, else the first (e.g. REDCap's "0, None")
         // (pedigree-editor-choice-defaults D3).
         var mappedTarget = mapped ? MAPS_TO_FIELD_TARGETS[item.mapping.field] : null;
-        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption) {
+        // Only for a list that has the property's real codes: with none of them (e.g. numbered codes,
+        // against the README), every option would count as blank, and the first would show falsely.
+        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption
+          && item.answerOption.some(function(opt: any) { return !mappedTarget.isBlankCode(opt.value); })) {
           var blankOptions = item.answerOption.filter(function(opt: any) { return mappedTarget.isBlankCode(opt.value); });
-          var noneOption = blankOptions.find(function(opt: any) { return opt.value === 'none'; });
-          if (noneOption || blankOptions.length > 0) {
-            descriptor.blankShows = (noneOption || blankOptions[0]).value;
+          var shown = blankOptions.find(function(opt: any) { return opt.value === 'none'; }) || blankOptions[0];
+          if (shown) {
+            descriptor.blankShows = shown.value;
           }
         }
         if (item.columns) {

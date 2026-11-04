@@ -39,6 +39,15 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
             answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('0', 'No')] },
+          // "none" wins over another blank code; a numbered list (against the README) shows nothing
+          { linkId: 'heredity_both', type: 'choice', text: 'Heredity (both)',
+            definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
+            extension: [{ url: mapping, valueCode: 'mapsToField' }],
+            answerOption: [option('childless', 'Childless'), option('0', 'No'), option('none', 'None')] },
+          { linkId: 'heredity_numbered', type: 'choice', text: 'Heredity (numbered)',
+            definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
+            extension: [{ url: mapping, valueCode: 'mapsToField' }],
+            answerOption: [option('1', 'Childless'), option('2', 'Infertile'), option('0', 'None')] },
         ],
       }],
     };
@@ -141,6 +150,8 @@ test('heredity shows None for a person with no status, in the default form', asy
   expect(await shownOption(page, proband, 'childlessSelect')).toBe('None');
   // and REDCap's own code for it, wherever it is in the list
   expect(await shownOption(page, proband, 'heredity_codes')).toBe('No');
+  expect(await shownOption(page, proband, 'heredity_both')).toBe('None');
+  expect(await shownOption(page, proband, 'heredity_numbered')).toBe('');
 });
 
 test('a pedigree started from a template gets the defaults, in its undo step too', async ({ page }) => {
