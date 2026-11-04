@@ -44,6 +44,15 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
             answerOption: [option('childless', 'Childless'), option('0', 'No'), option('none', 'None')] },
+          { linkId: 'heredity_radio', type: 'choice', text: 'Heredity (radio)',
+            definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
+            extension: [{ url: mapping, valueCode: 'mapsToField' },
+              { url: 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl', valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] } }],
+            answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('0', 'No')] },
+          // shown only for a fetus, with a default
+          { linkId: 'fetal_note', type: 'choice', text: 'Fetal note',
+            enableWhen: [{ extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate', valueCode: 'isFetus' }] }],
+            answerOption: [option('p', 'P', true), option('q', 'Q')] },
           { linkId: 'heredity_numbered', type: 'choice', text: 'Heredity (numbered)',
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
@@ -92,6 +101,8 @@ test('a person added in the editor gets the marked defaults; a loaded person doe
   for (const id of added) {
     expect(codeOf(await answer(page, id, 'shade')), `person ${id}`).toBe('dark');
     expect(codeOf(await answer(page, id, 'tags')), `person ${id}`).toEqual(['a', 'c']);
+    // not an item hidden for them (fetus-only)
+    expect(await answer(page, id, 'fetal_note'), `person ${id}`).toBeUndefined();
     expect(await shownOption(page, id, 'shade')).toBe('Dark');
   }
   // The proband, loaded before, still has no answer.
@@ -152,6 +163,24 @@ test('heredity shows None for a person with no status, in the default form', asy
   expect(await shownOption(page, proband, 'heredity_codes')).toBe('No');
   expect(await shownOption(page, proband, 'heredity_both')).toBe('None');
   expect(await shownOption(page, proband, 'heredity_numbered')).toBe('');
+  // and as radio buttons
+  expect(await page.evaluate(() => [...document.querySelectorAll('.menu-box .field-heredity_radio input[type=radio]')]
+    .filter((r) => r.checked).map((r) => r.value))).toEqual(['0']);
+});
+
+test('a relationship\'s heredity shows None when it has no status', async ({ page }) => {
+  await loadEditor(page);
+  const [proband] = await people(page);
+  await addSister(page, proband);
+  const shown = await page.evaluate(() => {
+    const map = window.editor.getView().getNodeMap();
+    const partnership = Object.values(map).find((n) => n.getType && n.getType() === 'Partnership');
+    window.editor.getPartnershipMenu().show(partnership, 100, 100);
+    const select = document.querySelector('.menu-box .field-childlessSelect select:not([disabled])')
+      || [...document.querySelectorAll('.field-childlessSelect select')].find((s) => s.offsetParent !== null);
+    return select.selectedIndex < 0 ? '' : select.options[select.selectedIndex].textContent;
+  });
+  expect(shown).toBe('None');
 });
 
 test('a pedigree started from a template gets the defaults, in its undo step too', async ({ page }) => {

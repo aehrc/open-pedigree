@@ -509,6 +509,8 @@ export default class NodeMenu {
   _generateField: any = {
     'radio' : function(this: any, data: any): any {
       var result = this._generateEmptyField(data);
+      // a mapped property's blank option, shown for a blank value (see _setFieldValue.radio)
+      (result as any)._blankShows = data.blankShows;
       var columnClass = data.columns ? 'field-values-' + data.columns + '-columns' : 'field-values';
       var values = document.createElement('div');
       values.className = columnClass;
@@ -991,8 +993,14 @@ export default class NodeMenu {
     // The form's controls are reused for every person, so each setter clears what the previous
     // person's form left before showing this person's value (or none).
     'radio' : function(container: any, value: any): any {
-      container.querySelectorAll('input[type=radio]').forEach(function(radio: any) {
-        var code = currentAnswerValue(value);
+      var code = currentAnswerValue(value);
+      // a blank value shows a mapped property's blank option, if it has one (as the drop-down does)
+      var radios = Array.from(container.querySelectorAll('input[type=radio]'));
+      var matches = radios.some(function(radio: any) { return code !== null && code !== undefined && String(radio.value) === String(code); });
+      if (!matches && (code === null || code === undefined || code === '') && container._blankShows !== undefined) {
+        code = container._blankShows;
+      }
+      radios.forEach(function(radio: any) {
         radio.checked = (code !== null && code !== undefined && String(radio.value) === String(code));
       });
     },

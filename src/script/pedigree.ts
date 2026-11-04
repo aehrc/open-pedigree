@@ -394,9 +394,19 @@ export default class PedigreeEditor {
       return;
     }
     var tried = false;
+    var summary: any = null;
     config.items.forEach(function(item: any) {
       // (not an item whose answer only a linked record gives)
       if (!item.initialOptions || item.linkedRecordSource) {
+        return;
+      }
+      // nor one hidden for this person (enableWhen), e.g. a fetus-only item for someone born
+      try {
+        summary = summary || node.getSummary();
+      } catch (err) {
+        summary = {};
+      }
+      if (summary[item.linkId] && summary[item.linkId].inactive === true) {
         return;
       }
       // one item's failure doesn't keep the others from their defaults
@@ -408,9 +418,9 @@ export default class PedigreeEditor {
             || !isBlankValue(node[target.getter]())) {
             return;
           }
-          var values = item.initialOptions.map(function(option: any) { return option.value; });
+          // (a mapped property holds one value, even for a repeating item)
           tried = true;
-          node[target.setter](item.repeats ? values : values[0]);
+          node[target.setter](item.initialOptions[0].value);
         } else if (!item.mapping) {
           if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
             return;
