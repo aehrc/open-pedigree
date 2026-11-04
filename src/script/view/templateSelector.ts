@@ -66,6 +66,8 @@ export default class TemplateSelector {
   _onTemplateSelected(event: any, pictureBox: any): void {
     this.dialog.close();
     editor.getSaveLoadEngine().createGraphFromSerializedData(pictureBox.pedigreeData, false /* add to undo stack */, true /*center around 0*/);
+    // a new pedigree: its people get the choices' marked defaults, as people added in the editor do
+    editor.applyInitialAnswersToAll();
   }
 
   /**

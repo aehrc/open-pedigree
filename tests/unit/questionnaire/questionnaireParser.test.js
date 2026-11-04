@@ -552,3 +552,36 @@ describe('smart demo questionnaire fixture (tests/fixtures/smart/questionnaire.j
     warnSpy.mockRestore();
   });
 });
+
+describe('initialSelected (pedigree-editor-choice-defaults D1)', () => {
+  const parseItem = (item) => parseQuestionnaire({ resourceType: 'Questionnaire', item: [
+    { linkId: 'g', type: 'group', text: 'G', item: [item] }] }).items.find((i) => i.linkId === item.linkId);
+  const option = (code, initialSelected) => ({ valueCoding: { code, display: code.toUpperCase() }, ...(initialSelected ? { initialSelected: true } : {}) });
+
+  it('keeps the marked option, with its value and answer', () => {
+    const parsed = parseItem({ linkId: 'shade', type: 'choice', answerOption: [option('light'), option('dark', true)] });
+    expect(parsed.initialOptions).toEqual([{ value: 'dark', display: 'DARK', answer: { system: undefined, code: 'dark', display: 'DARK' } }]);
+  });
+
+  it('has none when nothing is marked', () => {
+    expect(parseItem({ linkId: 'shade', type: 'choice', answerOption: [option('light'), option('dark')] }).initialOptions).toBeUndefined();
+  });
+
+  it('keeps every marked option for a repeating item', () => {
+    const parsed = parseItem({ linkId: 'tags', type: 'choice', repeats: true, answerOption: [option('a', true), option('b'), option('c', true)] });
+    expect(parsed.initialOptions.map((o) => o.value)).toEqual(['a', 'c']);
+  });
+
+  it('keeps the first of several marked for a single choice, with a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const parsed = parseItem({ linkId: 'shade', type: 'choice', answerOption: [option('light', true), option('dark', true)] });
+    expect(parsed.initialOptions.map((o) => o.value)).toEqual(['light']);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('reads an integer option\'s answer as the integer', () => {
+    const parsed = parseItem({ linkId: 'n', type: 'choice', answerOption: [{ valueInteger: 0 }, { valueInteger: 1, initialSelected: true }] });
+    expect(parsed.initialOptions[0].answer).toBe(1);
+  });
+});

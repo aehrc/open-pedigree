@@ -34,6 +34,7 @@ import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecor
 import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
+import { isBlankValue } from 'pedigree/model/helpers';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
@@ -380,6 +381,85 @@ export default class PedigreeEditor {
   }
 
   /**
+   * Gives a new person - one added in the editor (View.applyChanges with markNew) or in a pedigree
+   * just started from a template, never one loaded, imported, restored or kept by Clear - each
+   * choice's marked default (answerOption.initialSelected) as their answer, where they have none:
+   * the property for a mapped item, through its own setter, else the Questionnaire answer. Then the
+   * graph takes the person's properties, as after any change (pedigree-editor-choice-defaults D2).
+   * A failure is logged: it never stops the drawing this runs in.
+   */
+  applyInitialAnswers(node: any): void {
+    var config = this._questionnaireConfig;
+    if (!config || !node || !node.getType || node.getType() !== 'Person') {
+      return;
+    }
+    var tried = false;
+    var summary: any = null;
+    config.items.forEach(function(item: any) {
+      // (not an item whose answer only a linked record gives)
+      if (!item.initialOptions || item.linkedRecordSource) {
+        return;
+      }
+      // nor one hidden for this person (enableWhen), e.g. a fetus-only item for someone born
+      try {
+        summary = summary || node.getSummary();
+      } catch (err) {
+        summary = {};
+      }
+      if (summary[item.linkId] && summary[item.linkId].inactive === true) {
+        return;
+      }
+      // one item's failure doesn't keep the others from their defaults
+      try {
+        if (item.mapping && item.mapping.kind === 'field') {
+          // A mapped property that is never blank (gender, life status) keeps its own default.
+          var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
+          if (!target || typeof node[target.setter] !== 'function' || typeof node[target.getter] !== 'function'
+            || !isBlankValue(node[target.getter]())) {
+            return;
+          }
+          // (a mapped property holds one value, even for a repeating item)
+          tried = true;
+          node[target.setter](item.initialOptions[0].value);
+        } else if (!item.mapping) {
+          if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
+            return;
+          }
+          var answers = item.initialOptions.map(function(option: any) {
+            return option.answer !== undefined ? option.answer : option.value;
+          });
+          tried = true;
+          node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
+        }
+      } catch (err) {
+        console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
+      }
+    });
+    if (tried) {
+      try {
+        this.getGraph().setProperties(node.getID(), node.getProperties());
+      } catch (err) {
+        console.warn('Couldn\'t record a new person\'s defaults', err);
+      }
+    }
+  }
+
+  /**
+   * Gives every person on the canvas their defaults (applyInitialAnswers), for a pedigree just
+   * started from a template, and updates the undo step that loaded it to include them.
+   */
+  applyInitialAnswersToAll(): void {
+    var view = this.getView();
+    var nodeMap = view.getNodeMap();
+    for (var id in nodeMap) {
+      if (nodeMap.hasOwnProperty(id)) {
+        this.applyInitialAnswers(nodeMap[id]);
+      }
+    }
+    this.getActionStack().updateCurrentState();
+  }
+
+  /**
    * Turns each person's kept-aside QuestionnaireResponses (loaded for a Questionnaire that
    * wasn't the one in effect) that match the current Questionnaire into answers, in the graph.
    * Answers the person already has win. Runs whenever a pedigree is loaded or restored (import,
@@ -684,6 +764,20 @@ export default class PedigreeEditor {
         // on the same terms as a drop-down's choosable '-'.
         if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
           descriptor.clearable = true;
+        }
+        // A mapped property that stores some codes as blank (heredity) shows such an option for a
+        // blank value: the one coded "none" if there is one, else the first (e.g. REDCap's "0, None")
+        // (pedigree-editor-choice-defaults D3).
+        var mappedTarget = mapped ? MAPS_TO_FIELD_TARGETS[item.mapping.field] : null;
+        // Only for a list that has the property's real codes: with none of them (e.g. numbered codes,
+        // against the README), every option would count as blank, and the first would show falsely.
+        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption
+          && item.answerOption.some(function(opt: any) { return !mappedTarget.isBlankCode(opt.value); })) {
+          var blankOptions = item.answerOption.filter(function(opt: any) { return mappedTarget.isBlankCode(opt.value); });
+          var shown = blankOptions.find(function(opt: any) { return opt.value === 'none'; }) || blankOptions[0];
+          if (shown) {
+            descriptor.blankShows = shown.value;
+          }
         }
         if (item.columns) {
           descriptor.columns = item.columns;

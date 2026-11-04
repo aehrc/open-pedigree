@@ -51,7 +51,11 @@ export const MAPS_TO_FIELD_TARGETS: any = {
   'gestationAge':      { propertyBagKey: 'gestationAge',   getter: 'getGestationAge',    setter: 'setGestationAge' },
   'carrierStatus':     { propertyBagKey: 'carrierStatus',  getter: 'getCarrierStatus',   setter: 'setCarrierStatus' },
   'comments':          { propertyBagKey: 'comments',       getter: 'getComments',        setter: 'setComments' },
-  'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus' },
+  // isBlankCode: a choice code this property stores as blank - setChildlessStatus keeps only
+  // "childless" and "infertile" (as the module's README tells admins: "anything else is cleared"),
+  // so e.g. "none" or REDCap's "0". A drop-down shows such an option for a blank value: "None".
+  'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus',
+    isBlankCode: (code: any) => code !== 'childless' && code !== 'infertile' },
   'isAdopted':         { propertyBagKey: 'isAdopted',      getter: 'getAdopted',         setter: 'setAdopted' },
   'monozygotic':       { propertyBagKey: 'monozygotic',    getter: 'getMonozygotic',     setter: 'setMonozygotic' },
   'evaluated':         { propertyBagKey: 'evaluated',      getter: 'getEvaluated',       setter: 'setEvaluated' },
@@ -273,6 +277,24 @@ function parseAnswerOptions(item: any): any {
   });
 }
 
+// The options marked `initialSelected` (as parseAnswerOptions gives them): a person added in the
+// editor gets them as the answer (pedigree-editor-choice-defaults D1). A single choice keeps the
+// first marked.
+function parseInitialOptions(item: any, options: any): any {
+  if (!item.answerOption || !options) {
+    return undefined;
+  }
+  const marked = options.filter((_opt: any, i: number) => item.answerOption[i].initialSelected === true);
+  if (marked.length === 0) {
+    return undefined;
+  }
+  if (!item.repeats && marked.length > 1) {
+    console.warn('Questionnaire item ' + item.linkId + ' marks several answerOptions initialSelected but takes one answer - using the first');
+    return [marked[0]];
+  }
+  return marked;
+}
+
 // `parentGroup` is the nearest enclosing group's {key, label} - the top-level group itself for
 // items authored directly under it, or the nearest nested group for deeper items - used by
 // pedigree.ts's _buildFieldDescriptors() to sub-head linked-record-sourced items regrouped onto
@@ -302,6 +324,7 @@ function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
       }
     }
 
+    const answerOptions = parseAnswerOptions(item);
     const parsed: any = {
       linkId: item.linkId,
       label: item.text || item.linkId,
@@ -311,7 +334,8 @@ function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
       repeats: !!item.repeats,
       required: !!item.required,
       answerValueSet: item.answerValueSet,
-      answerOption: parseAnswerOptions(item),
+      answerOption: answerOptions,
+      initialOptions: parseInitialOptions(item, answerOptions),
       enableWhen: parseConditions(item.enableWhen),
       enableBehavior: item.enableBehavior || 'all',
       disabledWhen: parseConditions(item.disabledWhen),
