@@ -33,11 +33,12 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
           { linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark', true)] },
           { linkId: 'tags', type: 'choice', text: 'Tags', repeats: true,
             answerOption: [option('a', 'A', true), option('b', 'B'), option('c', 'C', true)] },
-          // a heredity drop-down with "None" not first, and marked as a default
+          // heredity as a REDCap drop-down codes it (the module's README: anything but childless or
+          // infertile is cleared), its "None" last
           { linkId: 'heredity_codes', type: 'choice', text: 'Heredity (codes)',
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
-            answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('none', 'No', true)] },
+            answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('0', 'No')] },
         ],
       }],
     };
@@ -138,7 +139,7 @@ test('heredity shows None for a person with no status, in the default form', asy
   const [proband] = await people(page);
   expect(await page.evaluate((id) => window.editor.getView().getNode(id).getChildlessStatus(), proband)).toBeNull();
   expect(await shownOption(page, proband, 'childlessSelect')).toBe('None');
-  // wherever "None" is in the list
+  // and REDCap's own code for it, wherever it is in the list
   expect(await shownOption(page, proband, 'heredity_codes')).toBe('No');
 });
 
@@ -166,8 +167,11 @@ test('a pedigree started from a template gets the defaults, in its undo step too
 
 test('Clear leaves the kept proband\'s answers alone, defaults or not', async ({ page }) => {
   await loadEditor(page, { mappedDefault: true });
+  // an answer given before Clear stays; a blank stays blank
+  await page.evaluate(() => window.editor.getView().getNode(0).setQuestionnaireAnswer('tags', [{ code: 'b', display: 'B' }]));
   await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:graph:clear')));
   const [proband] = await people(page);
+  expect(codeOf(await answer(page, proband, 'tags'))).toEqual(['b']);
   expect(await answer(page, proband, 'shade')).toBeUndefined();
   expect(await page.evaluate((id) => window.editor.getView().getNode(id).getCarrierStatus(), proband)).toBe('');
 });

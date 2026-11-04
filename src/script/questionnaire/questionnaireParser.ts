@@ -51,10 +51,11 @@ export const MAPS_TO_FIELD_TARGETS: any = {
   'gestationAge':      { propertyBagKey: 'gestationAge',   getter: 'getGestationAge',    setter: 'setGestationAge' },
   'carrierStatus':     { propertyBagKey: 'carrierStatus',  getter: 'getCarrierStatus',   setter: 'setCarrierStatus' },
   'comments':          { propertyBagKey: 'comments',       getter: 'getComments',        setter: 'setComments' },
-  // blankCode: the choice code that means this property's blank (setChildlessStatus stores "none" as
-  // null), so a drop-down shows that option for a blank value: "None".
+  // isBlankCode: a choice code this property stores as blank - setChildlessStatus keeps only
+  // "childless" and "infertile" (as the module's README tells admins: "anything else is cleared"),
+  // so e.g. "none" or REDCap's "0". A drop-down shows such an option for a blank value: "None".
   'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus',
-    blankCode: 'none' },
+    isBlankCode: (code: any) => code !== 'childless' && code !== 'infertile' },
   'isAdopted':         { propertyBagKey: 'isAdopted',      getter: 'getAdopted',         setter: 'setAdopted' },
   'monozygotic':       { propertyBagKey: 'monozygotic',    getter: 'getMonozygotic',     setter: 'setMonozygotic' },
   'evaluated':         { propertyBagKey: 'evaluated',      getter: 'getEvaluated',       setter: 'setEvaluated' },

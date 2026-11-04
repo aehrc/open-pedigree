@@ -394,12 +394,13 @@ export default class PedigreeEditor {
       return;
     }
     var tried = false;
-    try {
-      config.items.forEach(function(item: any) {
-        // (not an item whose answer only a linked record gives)
-        if (!item.initialOptions || item.linkedRecordSource) {
-          return;
-        }
+    config.items.forEach(function(item: any) {
+      // (not an item whose answer only a linked record gives)
+      if (!item.initialOptions || item.linkedRecordSource) {
+        return;
+      }
+      // one item's failure doesn't keep the others from their defaults
+      try {
         if (item.mapping && item.mapping.kind === 'field') {
           // A mapped property that is never blank (gender, life status) keeps its own default.
           var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
@@ -420,10 +421,10 @@ export default class PedigreeEditor {
           tried = true;
           node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
         }
-      });
-    } catch (err) {
-      console.warn('Couldn\'t give a new person their defaults', err);
-    }
+      } catch (err) {
+        console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
+      }
+    });
     if (tried) {
       try {
         this.getGraph().setProperties(node.getID(), node.getProperties());
@@ -754,12 +755,16 @@ export default class PedigreeEditor {
         if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
           descriptor.clearable = true;
         }
-        // A mapped property whose blank has a code (heredity's "none") shows that option for a blank
-        // value, e.g. "None" (pedigree-editor-choice-defaults D3).
+        // A mapped property that stores some codes as blank (heredity) shows such an option for a
+        // blank value: the one coded "none" if there is one, else the first (e.g. REDCap's "0, None")
+        // (pedigree-editor-choice-defaults D3).
         var mappedTarget = mapped ? MAPS_TO_FIELD_TARGETS[item.mapping.field] : null;
-        if (mappedTarget && mappedTarget.blankCode !== undefined && item.answerOption
-          && item.answerOption.some(function(opt: any) { return opt.value === mappedTarget.blankCode; })) {
-          descriptor.blankShows = mappedTarget.blankCode;
+        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption) {
+          var blankOptions = item.answerOption.filter(function(opt: any) { return mappedTarget.isBlankCode(opt.value); });
+          var noneOption = blankOptions.find(function(opt: any) { return opt.value === 'none'; });
+          if (noneOption || blankOptions.length > 0) {
+            descriptor.blankShows = (noneOption || blankOptions[0]).value;
+          }
         }
         if (item.columns) {
           descriptor.columns = item.columns;
