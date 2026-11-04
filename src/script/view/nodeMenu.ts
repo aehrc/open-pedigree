@@ -82,14 +82,19 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   }
 }
 
-// Input that isn't typing: a paste, a drop or a drag within the field, a cut, the browser's own
-// undo/redo. Input with no type at all is a number field's arrow-key or spinner step, or autofill.
-var NOT_TYPED_INPUT = /^(insertFromPaste.*|insertFromDrop|deleteByDrag|deleteByCut|history(Undo|Redo))$/;
+// Input that isn't typing: a paste or yank, a drop or a drag within the field, a cut, the browser's
+// own undo/redo, a suggestion it put in (a remembered value, autocorrect: insertReplacementText).
+// Input with no type at all is a number field's arrow-key or spinner step, or autofill.
+var NOT_TYPED_INPUT = /^(insertFromPaste.*|insertFromYank|insertFromDrop|deleteByDrag|deleteByCut|insertReplacementText|history(Undo|Redo))$/;
 
-// An 'input' event that is typing (any other kind: keys, Enter in a text area, an input method,
-// autocorrect, word or line deletion), as opposed to the cases above.
+// An 'input' event that is typing (keys, Enter in a text area, an input method, word or line
+// deletion), as opposed to the cases above. In a number field only plain typing and deleting count,
+// however a browser types its arrow-key and spinner steps.
 function isTypedInput(event: any): boolean {
-  return event.type === 'input' && !!event.inputType && !NOT_TYPED_INPUT.test(event.inputType);
+  if (event.type !== 'input' || !event.inputType || NOT_TYPED_INPUT.test(event.inputType)) {
+    return false;
+  }
+  return !(event.target && event.target.type === 'number') || /^(insertText|delete)/.test(event.inputType);
 }
 
 // A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
@@ -470,8 +475,12 @@ export default class NodeMenu {
         }
 
         // A number field part-way through being typed ('-', '1e') has no value yet: wait for it,
-        // rather than clear the answer.
+        // rather than clear the answer. Left like that (its 'change'), it shows the answer again.
         if (field.validity && field.validity.badInput) {
+          if (event.type === 'change' && _this.targetNode) {
+            var kept = _this.targetNode.getSummary()[field.name].value;
+            field.value = (kept === null || kept === undefined) ? '' : kept;
+          }
           return;
         }
         var newValue = field._getValue && field._getValue() || undefined;

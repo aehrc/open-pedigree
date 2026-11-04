@@ -226,10 +226,12 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   expect(await answer('count')).toBe(125);
   expect(await size()).toBe(before + 2);
 
-  // A number part-way through ('7e') keeps the answer it had at '7'.
+  // A number part-way through ('7e') keeps the answer it had at '7', and left like that, shows it.
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type('7e');
   expect(await answer('count')).toBe(7);
+  await page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').dispatchEvent(new Event('change')));
+  expect(await page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').value)).toBe('7');
   expect(errors).toEqual([]);
 });
 
