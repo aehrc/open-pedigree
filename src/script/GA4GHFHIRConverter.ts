@@ -4,7 +4,7 @@ import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questio
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
-import { placeParents, chooseParentClaims } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning } from 'pedigree/model/parentClaims';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -43,7 +43,7 @@ function parentGenderConflict(claim, gender, reference) {
 }
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
-const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/fhir/StructureDefinition/fetus-date-of-death';
+const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
 
 var GA4GHFHIRConverter = function () {
 };
@@ -257,20 +257,21 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
-    // every code for a parent must fit their gender, not just the one that placed them
-    for (const claim of nextPerson.parentClaims || []) {
+    const chosen = chooseParentClaims(nextPerson.parentClaims || []);
+    // every code for a parent placed must fit their gender, not just the one that placed them (a
+    // parent left out can't fail the import)
+    for (const claim of chosen.claims) {
       const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
       if (conflict) {
         throw conflict;
       }
     }
-    const chosen = chooseParentClaims(nextPerson.parentClaims || []);
     if (chosen.adopted) {
       newG.properties[personID].isAdopted = true;
     }
-    if (chosen.left.length > 0) {
-      console.warn('A child\'s ' + chosen.left.length + ' other parent(s) were left out: '
-        + (chosen.adopted ? 'the child is placed under their adoptive parents' : 'step-parents are a parent\'s partner'));
+    const leftOut = leftOutWarning(chosen);
+    if (leftOut) {
+      console.warn(leftOut);
     }
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
@@ -1009,15 +1010,6 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     }
   }
 
-  // A fetus's date of death (see the export): read whatever its status came out as.
-  if (patientResource.extension) {
-    const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION);
-    const fetusDodSplit = fetusDod && typeof fetusDod.valueDate === 'string' ? dateTimeSplitter.exec(fetusDod.valueDate) : null;
-    if (fetusDodSplit) {
-      (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
-    }
-  }
-
   if (checkUnbornExtension && patientResource.extension) {
     for (const ext of patientResource.extension) {
       if (ext.url === 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn') {
@@ -1026,6 +1018,16 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
         }
         break;
       }
+    }
+  }
+  // A fetus's date of death (see the export), read only for a fetus: on anyone else it would make
+  // them deceased.
+  const FETAL_STATUSES = ['stillborn', 'miscarriage', 'aborted', 'unborn'];
+  if (patientResource.extension && FETAL_STATUSES.indexOf((properties as any).lifeStatus) !== -1) {
+    const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION);
+    const fetusDodSplit = fetusDod && typeof fetusDod.valueDate === 'string' ? dateTimeSplitter.exec(fetusDod.valueDate) : null;
+    if (fetusDodSplit) {
+      (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
     }
   }
 

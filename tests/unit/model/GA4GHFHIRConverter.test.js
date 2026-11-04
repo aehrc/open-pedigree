@@ -385,6 +385,39 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
   });
 });
 
+describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('ignores a fetus date-of-death extension on someone who isn\'t a fetus', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.lifeStatus = 'alive';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
+    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death', valueDate: '2020-03-04' });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const read = Object.values(graph.properties).find((p) => p.fName === 'John');
+    expect(read.dod).toBeUndefined();
+  });
+
+  it('doesn\'t fail on a biological parent it leaves out, whose code contradicts their gender', () => {
+    // John (M) and Jane (F) adopt the child; a second relationship codes John as the child's mother.
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.isAdopted = true;
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const fmh = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'FamilyMemberHistory' && r.relationship
+      && r.relationship.coding[0].code === 'KIN:022');
+    const extra = structuredClone(fmh[0]);
+    extra.id = extra.id + '-bio';
+    extra.relationship.coding[0] = { system: 'http://purl.org/ga4gh/kin.fhir', code: 'KIN:027', display: 'isBiologicalMother' };
+    exported.entry.push({ fullUrl: 'FamilyMemberHistory/' + extra.id, resource: extra });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
+    expect(graph.properties[child].isAdopted).toBe(true);
+  });
+});
+
 describe('chooseParentClaims (D2)', () => {
   it('takes the adoptive claims, and the child is adopted', () => {
     const claims = [{ node: 1, gender: 'F' }, { node: 2, gender: null, adoptive: true }, { node: 3, gender: 'M' }];

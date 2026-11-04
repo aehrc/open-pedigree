@@ -53,3 +53,12 @@ export function chooseParentClaims(claims) {
   }
   return { claims: claims, adopted: false, left: [] };
 }
+
+/** A console warning for the claims chooseParentClaims left out, or null if none were. */
+export function leftOutWarning(chosen) {
+  if (chosen.left.length === 0) {
+    return null;
+  }
+  return 'A child\'s ' + chosen.left.length + ' other parent(s) were left out: '
+    + (chosen.adopted ? 'the child is placed under their adoptive parents' : 'step-parents are a parent\'s partner');
+}

@@ -308,6 +308,29 @@ describe('LegacyFHIRConverter parents', () => {
     expect(read.parents).not.toContain('Tom');
   });
 
+  it('doesn\'t fail on a parent it leaves out (an adopted child\'s other parent with a broken reference)', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2'));
+      byId.FMH_0.extension.push(parentExtension('NFTH', '#NOBODY'));
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
+  });
+
+  it('reads "Adoptive mother" given only as text as adoptive', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push({
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { text: 'Adoptive mother' } },
+          { url: 'reference', valueReference: { reference: '#FMH_2' } },
+        ],
+      });
+    });
+    const read = maya(LegacyFHIRConverter.initFromFHIR(text));
+    expect(read.adopted).toBe(true);
+    expect(read.parents).toContain('Edith');
+  });
+
   it('leaves the fixture\'s natural parents as they were', () => {
     expect(maya(LegacyFHIRConverter.initFromFHIR(legacyText))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
   });

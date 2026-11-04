@@ -1,6 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { placeParents, chooseParentClaims } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -222,10 +222,29 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
 
       let personID = getPersonID(nextPerson);
 
-      let motherLink = nextPerson.hasOwnProperty('mother') ? nextPerson['mother']
-        : null;
-      let fatherLink = nextPerson.hasOwnProperty('father') ? nextPerson['father']
-        : null;
+      // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
+      // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
+      // for the parents placed only - one left out can't fail the import)
+      let chosen = chooseParentClaims(nextPerson.parentClaims || []);
+      for (const claim of chosen.claims) {
+        const parentGender = newG.properties[findReferencedPerson(claim.node, 'parent')].gender;
+        if (claim.gender === 'F' && parentGender === 'M') {
+          throw 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + claim.node + ')';
+        }
+        if (claim.gender === 'M' && parentGender === 'F') {
+          throw 'Unable to import pedigree: a person declared as female is also declared as being a father (' + claim.node + ')';
+        }
+      }
+      if (chosen.adopted) {
+        newG.properties[personID].isAdopted = true;
+      }
+      let leftOut = leftOutWarning(chosen);
+      if (leftOut) {
+        console.warn(leftOut);
+      }
+      let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
+      let motherLink = parents.mother ? parents.mother.node : null;
+      let fatherLink = parents.father ? parents.father.node : null;
 
       if (motherLink == null && fatherLink == null) {
         continue;
@@ -250,18 +269,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       } else {
         motherID = findReferencedPerson(motherLink, 'mother');
       }
-      // Every parent code must fit that parent's gender - not the slot they're in, as two mothers
-      // fill both slots (as in the GA4GH importer).
-      for (const claim of nextPerson.parentClaims || []) {
-        const parentGender = newG.properties[findReferencedPerson(claim.node, 'parent')].gender;
-        if (claim.gender === 'F' && parentGender === 'M') {
-          throw 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + claim.node + ')';
-        }
-        if (claim.gender === 'M' && parentGender === 'F') {
-          throw 'Unable to import pedigree: a person declared as female is also declared as being a father (' + claim.node + ')';
-        }
-      }
-
       if (fatherID === personID || motherID === personID) {
         throw 'Unable to import pedigree: a person is declared to be his or hew own parent';
       }
@@ -487,6 +494,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         let type = undefined;
         let ref = undefined;
         let roleCode = '';
+        let roleText = '';
         let subExtensions = ex.extension;
         for (let j = 0; j < subExtensions.length; j++) {
           let subEx = subExtensions[j];
@@ -505,6 +513,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
                 break;
               } else if (codings[k].display) {
+                roleText = roleText || codings[k].display;
                 if (motherRegex.test(codings[k].display)) {
                   type = 'mother';
                 } else if (fatherRegex.test(codings[k].display)) {
@@ -512,6 +521,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
               }
             }
+            roleText = roleText || subEx.valueCodeableConcept.text || '';
             if (type == null && subEx.valueCodeableConcept.text) {
               if (motherRegex
                 .test(subEx.valueCodeableConcept.text)) {
@@ -569,8 +579,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         parentClaims.push({
           node: parentId,
           gender: ('mother' === type) ? 'F' : ('father' === type) ? 'M' : null,
-          adoptive: /^ADOPT/.test(roleCode),
-          step: /^STP/.test(roleCode)
+          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /adopt/i.test(roleText)),
+          step: /^STP/.test(roleCode) || (!roleCode && /step/i.test(roleText))
         });
       } else if (ex.url === 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling') {
         let type = undefined;
@@ -737,25 +747,9 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         }
       }
     }
-    // pedigree-editor-fetus-and-adoption-fidelity D3: as the GA4GH importer - an adoptive parent
-    // makes the child adopted, under the adoptive parents; two of a kind are both kept.
+    // placed in the second pass, once every person (and their gender) is known
+    // (pedigree-editor-fetus-and-adoption-fidelity D3)
     result.parentClaims = parentClaims;
-    let chosen = chooseParentClaims(parentClaims);
-    if (chosen.adopted) {
-      properties.isAdopted = true;
-    }
-    if (chosen.left.length > 0) {
-      console.warn('A child\'s ' + chosen.left.length + ' other parent(s) were left out: '
-        + (chosen.adopted ? 'the child is placed under their adoptive parents' : 'step-parents are a parent\'s partner'));
-    }
-    // (the genders are the claims': a parent's own sex was read into them above)
-    let parents = placeParents(chosen.claims, () => null);
-    if (parents.mother) {
-      result.mother = parents.mother.node;
-    }
-    if (parents.father) {
-      result.father = parents.father.node;
-    }
     if (lookForTwins && possibleTwins != null){
       // the group is fraternal if any of its twins is
       let isFraternal = false;
