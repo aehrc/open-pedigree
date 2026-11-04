@@ -273,6 +273,25 @@ function parseAnswerOptions(item: any): any {
   });
 }
 
+// The options marked `initialSelected` (as parseAnswerOptions gives them): a person added in the
+// editor gets them as the answer (pedigree-editor-choice-defaults D1). A single choice keeps the
+// first marked.
+function parseInitialOptions(item: any): any {
+  if (!item.answerOption) {
+    return undefined;
+  }
+  const options = parseAnswerOptions(item);
+  const marked = options.filter((_opt: any, i: number) => item.answerOption[i].initialSelected === true);
+  if (marked.length === 0) {
+    return undefined;
+  }
+  if (!item.repeats && marked.length > 1) {
+    console.warn('Questionnaire item ' + item.linkId + ' marks several answerOptions initialSelected but takes one answer - using the first');
+    return [marked[0]];
+  }
+  return marked;
+}
+
 // `parentGroup` is the nearest enclosing group's {key, label} - the top-level group itself for
 // items authored directly under it, or the nearest nested group for deeper items - used by
 // pedigree.ts's _buildFieldDescriptors() to sub-head linked-record-sourced items regrouped onto
@@ -312,6 +331,7 @@ function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
       required: !!item.required,
       answerValueSet: item.answerValueSet,
       answerOption: parseAnswerOptions(item),
+      initialOptions: parseInitialOptions(item),
       enableWhen: parseConditions(item.enableWhen),
       enableBehavior: item.enableBehavior || 'all',
       disabledWhen: parseConditions(item.disabledWhen),

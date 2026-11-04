@@ -718,6 +718,8 @@ export default class NodeMenu {
       }
       var select = document.createElement('select');
       select.name = data.name;
+      // a mapped item's marked default, shown for a blank value (see _setFieldValue.select)
+      (select as any)._blankShows = data.blankShows;
       var selectSpan = document.createElement('span');
       selectSpan.appendChild(select);
       result.inputsContainer.appendChild(selectSpan);
@@ -1064,15 +1066,20 @@ export default class NodeMenu {
       if (!select) {
         return;
       }
-      // Set once: a single select reselects its first option whenever none is selected, so
-      // deselecting option by option would misreport. With no value (or none matching), the empty
-      // '-' choice if the item has one (every unmapped single choice does - see
-      // _buildFieldDescriptors in pedigree.ts), else the first option (a mapped item's own default,
-      // e.g. heredity's "None").
+      // Set once, by index. An option shows as chosen only when it's the answer
+      // (pedigree-editor-choice-defaults D3): the matching option; else, for a blank value, a mapped
+      // item's marked default (heredity's "None", which its property stores as blank); else the empty
+      // '-' (or '') choice if the item has one (every unmapped single choice does - see
+      // _buildFieldDescriptors in pedigree.ts); else none (index -1, shown blank), so that whichever
+      // option is picked is a change.
       var options = Array.from(select.options);
       var index = options.findIndex(function(o: any) { return values.indexOf(o.value) >= 0; });
+      var blank = values.every(function(v: any) { return v === ''; });
+      if (index < 0 && blank && select._blankShows !== undefined) {
+        index = options.findIndex(function(o: any) { return o.value === String(select._blankShows); });
+      }
       if (index < 0) {
-        index = Math.max(0, options.findIndex(function(o: any) { return o.value === ''; }));
+        index = options.findIndex(function(o: any) { return o.value === ''; });
       }
       select.selectedIndex = index;
     },

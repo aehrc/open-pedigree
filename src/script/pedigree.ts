@@ -34,6 +34,7 @@ import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecor
 import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
+import { isBlankValue } from 'pedigree/model/helpers';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
@@ -380,6 +381,47 @@ export default class PedigreeEditor {
   }
 
   /**
+   * Gives a person just added in the editor (View.applyChanges with markNew) each choice's marked
+   * default (answerOption.initialSelected) as their answer, where they have none: the property for
+   * a mapped item, through its own setter, else the Questionnaire answer. Then the graph takes the
+   * person's properties, as after any change, so the defaults are part of the step that added them
+   * (pedigree-editor-choice-defaults D2).
+   */
+  applyInitialAnswers(node: any): void {
+    var config = this._questionnaireConfig;
+    if (!config || !node || !node.getType || node.getType() !== 'Person') {
+      return;
+    }
+    var changed = false;
+    config.items.forEach(function(item: any) {
+      if (!item.initialOptions) {
+        return;
+      }
+      if (item.mapping && item.mapping.kind === 'field') {
+        var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
+        if (!target || typeof node[target.setter] !== 'function' || !isBlankValue(node[target.getter]())) {
+          return;
+        }
+        var values = item.initialOptions.map(function(option: any) { return option.value; });
+        node[target.setter](item.repeats ? values : values[0]);
+        changed = true;
+      } else if (!item.mapping) {
+        if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
+          return;
+        }
+        var answers = item.initialOptions.map(function(option: any) {
+          return option.answer !== undefined ? option.answer : option.value;
+        });
+        node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.getGraph().setProperties(node.getID(), node.getProperties());
+    }
+  }
+
+  /**
    * Turns each person's kept-aside QuestionnaireResponses (loaded for a Questionnaire that
    * wasn't the one in effect) that match the current Questionnaire into answers, in the graph.
    * Answers the person already has win. Runs whenever a pedigree is loaded or restored (import,
@@ -684,6 +726,11 @@ export default class PedigreeEditor {
         // on the same terms as a drop-down's choosable '-'.
         if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
           descriptor.clearable = true;
+        }
+        // A mapped item's marked default is what its property's blank means (e.g. heredity's "None"),
+        // so the drop-down shows it for a blank value (pedigree-editor-choice-defaults D3).
+        if (mapped && item.initialOptions) {
+          descriptor.blankShows = item.initialOptions[0].value;
         }
         if (item.columns) {
           descriptor.columns = item.columns;

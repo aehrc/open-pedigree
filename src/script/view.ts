@@ -504,6 +504,8 @@ export default class View {
         if (markNew) {
           newPerson.getGraphics().markPermanently();
           this._currentMarkedNew.push(newPersons[i]);
+          // added in the editor (not loaded): its choices' marked defaults
+          editor.applyInitialAnswers(newPerson);
         }
       }
 
