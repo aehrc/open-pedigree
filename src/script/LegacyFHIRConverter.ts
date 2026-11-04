@@ -225,16 +225,20 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
       // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
       // for the parents placed only - one left out can't fail the import)
-      let chosen = chooseParentClaims(nextPerson.parentClaims || []);
-      // (a reference that doesn't resolve has no gender here; it fails below only if it's placed)
-      let genderOf = (node) => {
+      // A parent whose reference doesn't resolve is set aside before placing, so it can't take a
+      // real parent's slot (and fail the import).
+      let resolves = (node) => {
         try {
-          return newG.properties[findReferencedPerson(node, 'parent')].gender;
+          findReferencedPerson(node, 'parent');
+          return true;
         } catch (err) {
-          return null;
+          return false;
         }
       };
-      let parents = placeParents(chosen.claims, genderOf);
+      let claims = nextPerson.parentClaims || [];
+      let unresolved = new Set(claims.filter((c) => !resolves(c.node)).map((c) => c.node)).size;
+      let chosen = chooseParentClaims(claims.filter((c) => resolves(c.node)));
+      let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
       let placed = placedClaims(chosen, parents);
       for (const claim of placed.checked) {
         const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
@@ -245,7 +249,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       if (chosen.adopted) {
         newG.properties[personID].isAdopted = true;
       }
-      let leftOut = leftOutWarning(chosen, placed.dropped);
+      let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
       if (leftOut) {
         console.warn(leftOut);
       }
@@ -585,8 +589,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         parentClaims.push({
           node: parentId,
           gender: ('mother' === type) ? 'F' : ('father' === type) ? 'M' : null,
-          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /adopt/i.test(roleText)),
-          step: /^STP/.test(roleCode) || (!roleCode && /step/i.test(roleText))
+          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /\badopt/i.test(roleText)),
+          step: /^STP/.test(roleCode) || (!roleCode && /\bstep[- ]?(mother|father|parent)/i.test(roleText))
         });
       } else if (ex.url === 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling') {
         let type = undefined;

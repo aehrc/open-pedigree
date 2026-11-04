@@ -325,6 +325,26 @@ describe('LegacyFHIRConverter parents', () => {
     }
   });
 
+  it('doesn\'t let a broken reference take a parent\'s slot when the real parents are coded only as parents', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension = [parentExtension('NMTH', '#NOBODY'), parentExtension('PRN', '#FMH_6'), parentExtension('PRN', '#FMH_5')];
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('doesn\'t take a word merely containing "step" for a step-parent', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension[1] = {
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://snomed.info/sct', code: '72705000', display: 'Mother' }], text: 'Mother (stepwise interview)' } },
+          { url: 'reference', valueReference: { reference: '#FMH_6' } },
+        ],
+      };
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
   it('reads "adoptive" in a type\'s text alongside a coding\'s plain display', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension.push({

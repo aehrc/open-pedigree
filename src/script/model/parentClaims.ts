@@ -82,14 +82,15 @@ export function parentGenderConflict(claim, gender, reference) {
 
 /**
  * A console warning for the claimed parents left out - by chooseParentClaims, and `dropped` more
- * than two that placeParents didn't place - or null if none were.
+ * than two that placeParents didn't place - counted by person (a parent placed with another code
+ * left out isn't left out), or null if none were.
  */
 export function leftOutWarning(chosen, dropped = 0) {
-  const count = chosen.left.length + dropped;
+  const chosenNodes = new Set(chosen.claims.map((c) => c.node));
+  const count = new Set(chosen.left.filter((c) => !chosenNodes.has(c.node)).map((c) => c.node)).size + dropped;
   if (count === 0) {
     return null;
   }
-  return 'A child\'s ' + count + ' other parent(s) were left out: '
-    + (chosen.adopted ? 'the child is placed under their adoptive parents'
-      : chosen.left.length > 0 ? 'step-parents are a parent\'s partner' : 'a child has two parents in the editor');
+  return 'A child\'s ' + count + ' other parent(s) were left out: the editor shows two parents, adoptive ones'
+    + ' first, and step-parents only when there are no others';
 }
