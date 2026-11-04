@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.4](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.3...open-pedigree-v1.5.4) (2026-11-04)
+
+
+### Bug Fixes
+
+* a choice's marked default is a new person's answer, and a drop-down shows only the real answer ([#84](https://github.com/aehrc/open-pedigree/issues/84)) ([951b850](https://github.com/aehrc/open-pedigree/commit/951b850eb5a5ce42a7c8f211a57c30da8e7fdaa2))
+* keep a fetus's status and date of death, and an adoption, when a pedigree is opened again ([#85](https://github.com/aehrc/open-pedigree/issues/85)) ([634d2bb](https://github.com/aehrc/open-pedigree/commit/634d2bbf1917f4a937dc4f2f087a8fa368470d2a))
+* typing in any text or number field is one undo step, and pasted text is saved ([#83](https://github.com/aehrc/open-pedigree/issues/83)) ([f821788](https://github.com/aehrc/open-pedigree/commit/f821788112bfa01c81e31ebe77f690aca4df2535))
+
 ## [1.5.3](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.2...open-pedigree-v1.5.3) (2026-11-03)
 
 
