@@ -49,10 +49,13 @@ async function loadOneMan(page, { patientProvider } = {}) {
   return { id, errors };
 }
 
-function setProperty(page, nodeID, properties) {
-  return page.evaluate(([id, props]) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
-    { detail: { nodeID: id, properties: props } })), [nodeID, properties]);
+function setProperty(page, nodeID, properties, typed = false) {
+  return page.evaluate(([id, props, isTyped]) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
+    { detail: { nodeID: id, properties: props, ...(isTyped ? { typed: true } : {}) } })), [nodeID, properties, typed]);
 }
+
+// As the node form sends a key typed in a text, text-area or number field (marked typed).
+const typeInto = (page, nodeID, properties) => setProperty(page, nodeID, properties, true);
 
 const firstName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getFirstName(), id);
 const lastName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getLastName(), id);
@@ -104,7 +107,7 @@ test('typing a name is one undo step, as the name field sends a change on every 
   const size = () => page.evaluate(() => window.editor.getActionStack()._size());
   const before = await size();
   for (const typed of ['A', 'An', 'Ann']) {
-    await setProperty(page, id, { setFirstName: typed });
+    await typeInto(page, id, { setFirstName: typed });
   }
   expect(await size()).toBe(before + 1);
 
@@ -116,8 +119,9 @@ test('typing a name is one undo step, as the name field sends a change on every 
 });
 
 // Every field the node form sends on each key combines the same way: the identifier, and a
-// Questionnaire's text and number answers. A choice doesn't.
-test('typing in any text or number field is one undo step, and a choice is not combined', async ({ page }) => {
+// Questionnaire's text and number answers - typed with the keyboard, in the real form. A choice, a
+// number changed without a key (its spinner) and a change made by code aren't combined.
+test('typing in any text or number field is one undo step; a choice, a spinner and code are not combined', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
   page.on('dialog', (dialog) => dialog.dismiss());
@@ -140,32 +144,51 @@ test('typing in any text or number field is one undo step, and a choice is not c
     };
     window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: questionnaire });
     window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(0), 100, 100);
   });
   const size = () => page.evaluate(() => window.editor.getActionStack()._size());
-  const typing = {
-    setExternalID: ['P', 'P1', 'P12'],
-    setQuestionnaireAnswer_note: ['h', 'hi', 'hi!'],
-    setQuestionnaireAnswer_story: ['o', 'on', 'once'],
-    setQuestionnaireAnswer_count: [1, 12, 123],
-  };
-  for (const [setter, keys] of Object.entries(typing)) {
+  const field = (name, tag) => page.locator(`.menu-box .field-${name} ${tag}`).first();
+  const typed = [['external_id', 'input', 'P12'], ['note', 'input', 'hi!'], ['story', 'textarea', 'once'], ['count', 'input', '123']];
+  for (const [name, tag, text] of typed) {
     const before = await size();
-    for (const typed of keys) {
-      await setProperty(page, 0, { [setter]: typed });
-    }
-    expect(await size(), setter).toBe(before + 1);
+    // (the field's tab first, then focus it as a click would, then type)
+    await field(name, tag).evaluate((el) => {
+      const tab = el.closest('.content');
+      window.editor.getNodeMenu().tabHeaders[tab.id.replace(/^tab_/, '')].dispatchEvent(new Event('click'));
+      el.focus();
+    });
+    expect(await field(name, tag).evaluate((el) => el === document.activeElement), name).toBe(true);
+    await page.keyboard.type(text);
+    expect(await size(), name).toBe(before + 1);
   }
-  const before = await size();
-  await setProperty(page, 0, { setQuestionnaireAnswer_shade: 'light' });
-  await setProperty(page, 0, { setQuestionnaireAnswer_shade: 'dark' });
+  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('story'))).toBe('once');
+
+  // A choice: two picks, two steps.
+  let before = await size();
+  await page.evaluate(() => {
+    const select = document.querySelector('.menu-box .field-shade select');
+    for (const value of ['light', 'dark']) {
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+    }
+  });
   expect(await size()).toBe(before + 2);
 
-  // An undo of the count goes back to before it was typed (the choice steps first).
-  await undo(page);
-  await undo(page);
-  await undo(page);
-  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('count'))).toBeUndefined();
-  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('story'))).toBe('once');
+  // The count's spinner (a change with no key): each click is its own step.
+  before = await size();
+  await page.evaluate(() => {
+    const number = document.querySelector('.menu-box .field-count input');
+    for (const value of ['124', '125']) {
+      number.value = value;
+      number.dispatchEvent(new Event('change'));
+    }
+  });
+  expect(await size()).toBe(before + 2);
+
+  // The same setter set by code (e.g. an import) straight after typing isn't folded into it.
+  before = await size();
+  await setProperty(page, 0, { setQuestionnaireAnswer_note: 'imported' });
+  expect(await size()).toBe(before + 1);
   expect(errors).toEqual([]);
 });
 
@@ -192,7 +215,7 @@ test('a key typed after a change to several properties is its own step, so undo 
   // (as linking a patient sets the name with the rest)
   const { id, errors } = await loadOneMan(page);
   await setProperty(page, id, { setFirstName: 'Ann', setLastName: 'Lee', setGender: 'F' });
-  await setProperty(page, id, { setFirstName: 'Anna' });
+  await typeInto(page, id, { setFirstName: 'Anna' });
 
   await undo(page);
   expect([await firstName(page, id), await lastName(page, id), await gender(page, id)]).toEqual(['Ann', 'Lee', 'F']);
@@ -207,10 +230,10 @@ test('a key typed after a change to several properties is its own step, so undo 
 
 test('a name typed after an undo is a step of its own, so undo goes back to the name before it', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
-  await setProperty(page, id, { setFirstName: 'Ann' });
-  await setProperty(page, id, { setLastName: 'Lee' });
+  await typeInto(page, id, { setFirstName: 'Ann' });
+  await typeInto(page, id, { setLastName: 'Lee' });
   await undo(page);
-  await setProperty(page, id, { setFirstName: 'Bob' });
+  await typeInto(page, id, { setFirstName: 'Bob' });
 
   await undo(page);
   expect(await firstName(page, id)).toBe('Ann');
@@ -258,7 +281,7 @@ test('a linked patient\'s name found when a pedigree is opened is not an undo st
   });
   await expect.poll(() => firstName(page, id)).toBe('Test Person');
   const size = await page.evaluate(() => window.editor.getActionStack()._size());
-  await setProperty(page, id, { setFirstName: 'Tess' });
+  await typeInto(page, id, { setFirstName: 'Tess' });
   expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
 
   await undo(page);
@@ -272,11 +295,11 @@ test('a name typed again after the menu is closed and opened is a new undo step'
   const closeMenu = () => page.evaluate(() => window.editor.getNodeMenu().hide());
   await openMenu();
   for (const typed of ['A', 'An', 'Ann']) {
-    await setProperty(page, id, { setFirstName: typed });
+    await typeInto(page, id, { setFirstName: typed });
   }
   await closeMenu();
   await openMenu();
-  await setProperty(page, id, { setFirstName: 'Anne' });
+  await typeInto(page, id, { setFirstName: 'Anne' });
   await closeMenu();
 
   await undo(page);
@@ -304,10 +327,11 @@ test('a linked patient\'s name found when a pedigree is opened stays after an un
 
 test('a linked record\'s refresh is not combined with a name typed before it', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
-  await setProperty(page, id, { setFirstName: 'Ann' });
+  await typeInto(page, id, { setFirstName: 'Ann' });
   const size = await page.evaluate(() => window.editor.getActionStack()._size());
   await page.evaluate((nodeID) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
-    { detail: { nodeID, properties: { setFirstName: 'Anna' }, linkedRecordRefresh: true } })), id);
+    // (marked typed as well, so only the refresh rule keeps it apart)
+    { detail: { nodeID, properties: { setFirstName: 'Anna' }, linkedRecordRefresh: true, typed: true } })), id);
   expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
 
   await undo(page);

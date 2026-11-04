@@ -485,6 +485,11 @@ export default class NodeMenu {
           var properties: any = {};
           properties[method] = _this.fieldMap[field.name].crtValue;
           var fireEvent: any = { 'nodeID': target.getID(), 'properties': properties };
+          // A key typed in a text, text-area or number field: the undo stack combines a run of them
+          // into one step (ActionStack._combinableEvents). A spinner click or a picked value isn't.
+          if (event.type === 'keyup') {
+            fireEvent.typed = true;
+          }
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: fireEvent }));
         } else {
           var properties: any = {};
