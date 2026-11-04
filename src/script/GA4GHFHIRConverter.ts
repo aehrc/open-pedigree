@@ -28,9 +28,6 @@ function generateUUID() {
   return 'urn:uuid:' + uuidv4();
 }
 
-// (placeParents and chooseParentClaims are shared with the legacy importer)
-export { placeParents, chooseParentClaims };
-
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
@@ -258,7 +255,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         throw conflict;
       }
     }
-    if (chosen.adopted) {
+    // (a fetus can't be adopted in the editor)
+    if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
       newG.properties[personID].isAdopted = true;
     }
     const leftOut = leftOutWarning(chosen, placed.dropped);
@@ -394,13 +392,14 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
     return;
   }
 
-  if (rel === 'KIN:027' || rel === 'KIN:028' || rel === 'KIN:003' || rel === 'KIN:022') {
+  if (rel === 'KIN:027' || rel === 'KIN:028' || rel === 'KIN:003' || rel === 'KIN:022' || rel === 'KIN:023') {
     // NMTH, NFTH, NPRN or ADOPTPRN: kept as a claim, and the child's two parents are placed once
     // all are read (see placeParents), so a parent coded only as a parent (e.g. one of a same-sex
     // couple) isn't held to a mother's or father's gender
     const claims = firstNodeData.parentClaims || (firstNodeData.parentClaims = []);
+    // (KIN:023, a step-parent: used only when a child has no other parents, as in the legacy importer)
     claims.push({ node: secondNodeData.nodeId, gender: (rel === 'KIN:027') ? 'F' : (rel === 'KIN:028') ? 'M' : null,
-      adoptive: rel === 'KIN:022' });
+      adoptive: rel === 'KIN:022', step: rel === 'KIN:023' });
   } else if (rel === 'KIN:026' || rel === 'KIN:030' || rel === 'KIN:048'  || rel === 'KIN:049'){
     // SIGOTHR
     let isConsang = (rel === 'KIN:030' || rel === 'KIN:049');

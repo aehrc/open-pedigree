@@ -1,6 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -225,28 +225,45 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
       // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
       // for the parents placed only - one left out can't fail the import)
-      // A parent whose reference doesn't resolve is set aside before placing, so it can't take a
-      // real parent's slot (and fail the import).
+      // A parent whose reference matches nobody is set aside before placing, so it can't take a
+      // real parent's slot - unless they're needed: then the import fails as before. An ambiguous
+      // reference always fails it.
       let resolves = (node) => {
         try {
           findReferencedPerson(node, 'parent');
           return true;
         } catch (err) {
+          if (String(err).indexOf('ambiguous reference') !== -1) {
+            throw err;
+          }
           return false;
         }
       };
       let claims = nextPerson.parentClaims || [];
-      let unresolved = new Set(claims.filter((c) => !resolves(c.node)).map((c) => c.node)).size;
+      let missing = claims.filter((c) => !resolves(c.node));
+      let unresolved = new Set(missing.map((c) => c.node)).size;
       let chosen = chooseParentClaims(claims.filter((c) => resolves(c.node)));
       let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
       let placed = placedClaims(chosen, parents);
+      if (missing.length > 0) {
+        // needed: the child's adoptive parent, or one without whom fewer parents are placed than
+        // the child has (up to two)
+        let chosenAll = chooseParentClaims(claims);
+        let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
+        let placedCount = [parents.mother, parents.father].filter(Boolean).length;
+        let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
+        if (neededMissing && ((chosenAll.adopted && !chosen.adopted) || placedCount < wanted)) {
+          findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
+        }
+      }
       for (const claim of placed.checked) {
         const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
         if (conflict) {
           throw conflict;
         }
       }
-      if (chosen.adopted) {
+      // (a fetus can't be adopted in the editor)
+      if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
         newG.properties[personID].isAdopted = true;
       }
       let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
@@ -589,8 +606,8 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
         parentClaims.push({
           node: parentId,
           gender: ('mother' === type) ? 'F' : ('father' === type) ? 'M' : null,
-          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /\badopt/i.test(roleText)),
-          step: /^STP/.test(roleCode) || (!roleCode && /\bstep[- ]?(mother|father|parent)/i.test(roleText))
+          adoptive: /^ADOPT/.test(roleCode) || (!roleCode && /\badoptive\b/i.test(roleText)),
+          step: /^STP/.test(roleCode) || (!roleCode && /\bstep[- ]?(mother|father|parent|mom|mum|dad)/i.test(roleText))
         });
       } else if (ex.url === 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling') {
         let type = undefined;

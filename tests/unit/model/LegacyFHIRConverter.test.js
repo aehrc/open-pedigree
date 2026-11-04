@@ -358,6 +358,28 @@ describe('LegacyFHIRConverter parents', () => {
     expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
   });
 
+  it('still fails when a parent it needs can\'t be found', () => {
+    // the child's only parent
+    const only = legacyWith((byId) => { byId.FMH_0.extension = [parentExtension('NMTH', '#MISSING')]; });
+    expect(() => LegacyFHIRConverter.initFromFHIR(only)).toThrow(/not a valid/);
+    // the child's adoptive parent
+    const adoptive = legacyWith((byId) => { byId.FMH_0.extension.push(parentExtension('ADOPTM', '#MISSING')); });
+    expect(() => LegacyFHIRConverter.initFromFHIR(adoptive)).toThrow(/not a valid/);
+  });
+
+  it('doesn\'t take "not adopted" for adoptive', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension[1] = {
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { text: 'Mother (not adopted)' } },
+          { url: 'reference', valueReference: { reference: '#FMH_6' } },
+        ],
+      };
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
   it('reads "Adoptive mother" given only as text as adoptive', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension.push({

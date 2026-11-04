@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import GA4GHFHIRConverter, { placeParents, chooseParentClaims } from 'pedigree/GA4GHFHIRConverter';
+import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import { placeParents, chooseParentClaims } from 'pedigree/model/parentClaims';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
@@ -419,6 +420,33 @@ describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
     expect(graph.getParents(child).map((v) => `${graph.properties[v].fName}:${graph.properties[v].gender}`).sort()).toEqual(['Jane:F', 'John:M']);
   });
 
+});
+
+describe('GA4GHFHIRConverter adoption: fetus and step-parents', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('doesn\'t mark a fetus adopted, as the editor can\'t show one', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { fName: 'Fetus', lifeStatus: 'stillborn', isAdopted: true });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).toContain('KIN:022');
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const fetus = Object.values(graph.properties).find((p) => p.fName === 'Fetus');
+    expect(fetus.isAdopted).toBeFalsy();
+  });
+
+  it('places step-parents (KIN:023) when a child has no other parents', () => {
+    const gg = structuredClone(simpleGG);
+    let exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    for (const code of ['KIN:027', 'KIN:028', 'KIN:003']) {
+      exported = exported.split(`"code": "${code}"`).join('"code": "KIN:023"');
+    }
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
+    expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
+  });
 });
 
 describe('chooseParentClaims (D2)', () => {
