@@ -30,6 +30,8 @@ export default class Controller {
   handleClearGraph(event: any): void {
     var changeSet = editor.getGraph().clearAll();
     editor.getView().applyChanges(changeSet, true);
+    // the proband Clear leaves is kept, not new: give them the choices' marked defaults too
+    editor.applyInitialAnswers(editor.getView().getNode(0));
 
     editor.getWorkspace().centerAroundNode(0, false);
 

@@ -114,7 +114,7 @@ export const DEFAULT_QUESTIONNAIRE: any = {
         {
           linkId: 'childlessSelect', type: 'choice', text: 'Heredity options',
           answerOption: [
-            { valueCoding: { code: 'none', display: 'None' }, initialSelected: true },
+            { valueCoding: { code: 'none', display: 'None' } },
             { valueCoding: { code: 'childless', display: 'Childless' } },
             { valueCoding: { code: 'infertile', display: 'Infertile' } }
           ],

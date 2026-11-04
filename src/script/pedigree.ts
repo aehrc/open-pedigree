@@ -394,31 +394,53 @@ export default class PedigreeEditor {
     }
     var changed = false;
     config.items.forEach(function(item: any) {
-      if (!item.initialOptions) {
+      // (not an item whose answer only a linked record gives)
+      if (!item.initialOptions || item.linkedRecordSource) {
         return;
       }
-      if (item.mapping && item.mapping.kind === 'field') {
-        var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
-        if (!target || typeof node[target.setter] !== 'function' || !isBlankValue(node[target.getter]())) {
-          return;
+      try {
+        if (item.mapping && item.mapping.kind === 'field') {
+          // A mapped property that is never blank (gender, life status) keeps its own default.
+          var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
+          if (!target || typeof node[target.setter] !== 'function' || typeof node[target.getter] !== 'function'
+            || !isBlankValue(node[target.getter]())) {
+            return;
+          }
+          var values = item.initialOptions.map(function(option: any) { return option.value; });
+          node[target.setter](item.repeats ? values : values[0]);
+          changed = changed || !isBlankValue(node[target.getter]());
+        } else if (!item.mapping) {
+          if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
+            return;
+          }
+          var answers = item.initialOptions.map(function(option: any) {
+            return option.answer !== undefined ? option.answer : option.value;
+          });
+          node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
+          changed = true;
         }
-        var values = item.initialOptions.map(function(option: any) { return option.value; });
-        node[target.setter](item.repeats ? values : values[0]);
-        changed = true;
-      } else if (!item.mapping) {
-        if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
-          return;
-        }
-        var answers = item.initialOptions.map(function(option: any) {
-          return option.answer !== undefined ? option.answer : option.value;
-        });
-        node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
-        changed = true;
+      } catch (err) {
+        console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
       }
     });
     if (changed) {
       this.getGraph().setProperties(node.getID(), node.getProperties());
     }
+  }
+
+  /**
+   * Gives every person on the canvas their defaults (applyInitialAnswers), for a pedigree just
+   * started from a template, and updates the undo step that loaded it to include them.
+   */
+  applyInitialAnswersToAll(): void {
+    var view = this.getView();
+    var nodeMap = view.getNodeMap();
+    for (var id in nodeMap) {
+      if (nodeMap.hasOwnProperty(id)) {
+        this.applyInitialAnswers(nodeMap[id]);
+      }
+    }
+    this.getActionStack().updateCurrentState();
   }
 
   /**
@@ -727,10 +749,15 @@ export default class PedigreeEditor {
         if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
           descriptor.clearable = true;
         }
-        // A mapped item's marked default is what its property's blank means (e.g. heredity's "None"),
-        // so the drop-down shows it for a blank value (pedigree-editor-choice-defaults D3).
-        if (mapped && item.initialOptions) {
-          descriptor.blankShows = item.initialOptions[0].value;
+        // A mapped property that stores some codes as blank (heredity: anything but childless or
+        // infertile) shows the first such option for a blank value, e.g. "None"
+        // (pedigree-editor-choice-defaults D3).
+        var mappedTarget = mapped ? MAPS_TO_FIELD_TARGETS[item.mapping.field] : null;
+        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption) {
+          var blankOption = item.answerOption.find(function(opt: any) { return mappedTarget.isBlankCode(opt.value); });
+          if (blankOption) {
+            descriptor.blankShows = blankOption.value;
+          }
         }
         if (item.columns) {
           descriptor.columns = item.columns;
