@@ -139,7 +139,20 @@ export default class ActionStack {
     const setters1 = Object.keys(event1.memo.properties || {});
     const setters2 = Object.keys(event2.memo.properties || {});
     return setters1.length == 1 && setters2.length == 1 && setters1[0] == setters2[0] &&
-      ['setFirstName', 'setLastName', 'setComments'].indexOf(setters1[0]) != -1;
+      ActionStack._typedSetter(setters1[0]);
+  }
+
+  // Whether a setter is one the node form calls on every key: a name, the comments, or any other
+  // text, text-area or number field (the identifier, a Questionnaire's text or number answer).
+  static _typedSetter(setter: string): boolean {
+    if (['setFirstName', 'setLastName', 'setComments'].indexOf(setter) != -1) {
+      return true;
+    }
+    const menu = (window as any).editor && (window as any).editor.getNodeMenu && (window as any).editor.getNodeMenu();
+    const fields = (menu && menu.fieldMap) || {};
+    return Object.keys(fields).some(function(name) {
+      return fields[name]['function'] == setter && ['text', 'textarea', 'number'].indexOf(fields[name].type) != -1;
+    });
   }
 
   _size(): number {

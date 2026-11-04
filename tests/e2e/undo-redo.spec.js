@@ -115,6 +115,60 @@ test('typing a name is one undo step, as the name field sends a change on every 
   expect(errors).toEqual([]);
 });
 
+// Every field the node form sends on each key combines the same way: the identifier, and a
+// Questionnaire's text and number answers. A choice doesn't.
+test('typing in any text or number field is one undo step, and a choice is not combined', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('dialog', (dialog) => dialog.dismiss());
+  await page.goto('/localEditor.html');
+  await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('#work-area').forEach((el) => el.remove());
+    const questionnaire = {
+      ...window.OpenPedigree.defaultQuestionnaire,
+      item: [...window.OpenPedigree.defaultQuestionnaire.item, {
+        linkId: 'extra', type: 'group', text: 'Extra', item: [
+          { linkId: 'note', type: 'string', text: 'Note' },
+          { linkId: 'story', type: 'text', text: 'Story' },
+          { linkId: 'count', type: 'integer', text: 'Count' },
+          { linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [
+            { valueCoding: { code: 'light', display: 'Light' } }, { valueCoding: { code: 'dark', display: 'Dark' } }] },
+        ],
+      }],
+    };
+    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: questionnaire });
+    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
+  });
+  const size = () => page.evaluate(() => window.editor.getActionStack()._size());
+  const typing = {
+    setExternalID: ['P', 'P1', 'P12'],
+    setQuestionnaireAnswer_note: ['h', 'hi', 'hi!'],
+    setQuestionnaireAnswer_story: ['o', 'on', 'once'],
+    setQuestionnaireAnswer_count: [1, 12, 123],
+  };
+  for (const [setter, keys] of Object.entries(typing)) {
+    const before = await size();
+    for (const typed of keys) {
+      await setProperty(page, 0, { [setter]: typed });
+    }
+    expect(await size(), setter).toBe(before + 1);
+  }
+  const before = await size();
+  await setProperty(page, 0, { setQuestionnaireAnswer_shade: 'light' });
+  await setProperty(page, 0, { setQuestionnaireAnswer_shade: 'dark' });
+  expect(await size()).toBe(before + 2);
+
+  // An undo of the count goes back to before it was typed (the choice steps first).
+  await undo(page);
+  await undo(page);
+  await undo(page);
+  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('count'))).toBeUndefined();
+  expect(await page.evaluate(() => window.editor.getView().getNode(0).getQuestionnaireAnswer('story'))).toBe('once');
+  expect(errors).toEqual([]);
+});
+
 test('removing a person straight after renaming them is its own undo step', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
   await addSister(page, id);
