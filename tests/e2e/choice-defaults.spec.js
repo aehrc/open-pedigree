@@ -33,11 +33,11 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
           { linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark', true)] },
           { linkId: 'tags', type: 'choice', text: 'Tags', repeats: true,
             answerOption: [option('a', 'A', true), option('b', 'B'), option('c', 'C', true)] },
-          // heredity as a REDCap-derived drop-down codes it: '0' is stored as blank
+          // a heredity drop-down with "None" not first, and marked as a default
           { linkId: 'heredity_codes', type: 'choice', text: 'Heredity (codes)',
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
-            answerOption: [option('0', 'No'), option('childless', 'Childless'), option('infertile', 'Infertile')] },
+            answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('none', 'No', true)] },
         ],
       }],
     };
@@ -138,7 +138,7 @@ test('heredity shows None for a person with no status, in the default form', asy
   const [proband] = await people(page);
   expect(await page.evaluate((id) => window.editor.getView().getNode(id).getChildlessStatus(), proband)).toBeNull();
   expect(await shownOption(page, proband, 'childlessSelect')).toBe('None');
-  // and REDCap's own code for it
+  // wherever "None" is in the list
   expect(await shownOption(page, proband, 'heredity_codes')).toBe('No');
 });
 
@@ -154,12 +154,20 @@ test('a pedigree started from a template gets the defaults, in its undo step too
   for (const id of ids) {
     expect(codeOf(await answer(page, id, 'shade')), `person ${id}`).toBe('dark');
   }
-  expect(await page.evaluate(() => window.editor.getActionStack()._getCurrentState().serializedState)).toContain('"dark"');
+  // The template's undo step has every person's default.
+  const stepShades = await page.evaluate(() => {
+    const state = JSON.parse(window.editor.getActionStack()._getCurrentState().serializedState);
+    return state.GG.filter((n) => !n.rel && !n.chhub && n.prop && n.prop.gender !== undefined)
+      .map((n) => ((n.prop.questionnaireAnswers || {}).shade || {}).code);
+  });
+  expect(stepShades.length).toBe(ids.length);
+  expect(stepShades.every((code) => code === 'dark')).toBe(true);
 });
 
-test('the proband Clear leaves gets the defaults', async ({ page }) => {
-  await loadEditor(page);
+test('Clear leaves the kept proband\'s answers alone, defaults or not', async ({ page }) => {
+  await loadEditor(page, { mappedDefault: true });
   await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:graph:clear')));
   const [proband] = await people(page);
-  expect(codeOf(await answer(page, proband, 'shade'))).toBe('dark');
+  expect(await answer(page, proband, 'shade')).toBeUndefined();
+  expect(await page.evaluate((id) => window.editor.getView().getNode(id).getCarrierStatus(), proband)).toBe('');
 });

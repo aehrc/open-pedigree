@@ -51,10 +51,10 @@ export const MAPS_TO_FIELD_TARGETS: any = {
   'gestationAge':      { propertyBagKey: 'gestationAge',   getter: 'getGestationAge',    setter: 'setGestationAge' },
   'carrierStatus':     { propertyBagKey: 'carrierStatus',  getter: 'getCarrierStatus',   setter: 'setCarrierStatus' },
   'comments':          { propertyBagKey: 'comments',       getter: 'getComments',        setter: 'setComments' },
-  // isBlankCode: a choice code this property stores as blank (setChildlessStatus keeps only
-  // "childless" and "infertile"), so a drop-down shows that option for a blank value - e.g. "None".
+  // blankCode: the choice code that means this property's blank (setChildlessStatus stores "none" as
+  // null), so a drop-down shows that option for a blank value: "None".
   'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus',
-    isBlankCode: (code: any) => code !== 'childless' && code !== 'infertile' },
+    blankCode: 'none' },
   'isAdopted':         { propertyBagKey: 'isAdopted',      getter: 'getAdopted',         setter: 'setAdopted' },
   'monozygotic':       { propertyBagKey: 'monozygotic',    getter: 'getMonozygotic',     setter: 'setMonozygotic' },
   'evaluated':         { propertyBagKey: 'evaluated',      getter: 'getEvaluated',       setter: 'setEvaluated' },

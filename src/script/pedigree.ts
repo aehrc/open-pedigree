@@ -381,24 +381,25 @@ export default class PedigreeEditor {
   }
 
   /**
-   * Gives a person just added in the editor (View.applyChanges with markNew) each choice's marked
-   * default (answerOption.initialSelected) as their answer, where they have none: the property for
-   * a mapped item, through its own setter, else the Questionnaire answer. Then the graph takes the
-   * person's properties, as after any change, so the defaults are part of the step that added them
-   * (pedigree-editor-choice-defaults D2).
+   * Gives a new person - one added in the editor (View.applyChanges with markNew) or in a pedigree
+   * just started from a template, never one loaded, imported, restored or kept by Clear - each
+   * choice's marked default (answerOption.initialSelected) as their answer, where they have none:
+   * the property for a mapped item, through its own setter, else the Questionnaire answer. Then the
+   * graph takes the person's properties, as after any change (pedigree-editor-choice-defaults D2).
+   * A failure is logged: it never stops the drawing this runs in.
    */
   applyInitialAnswers(node: any): void {
     var config = this._questionnaireConfig;
     if (!config || !node || !node.getType || node.getType() !== 'Person') {
       return;
     }
-    var changed = false;
-    config.items.forEach(function(item: any) {
-      // (not an item whose answer only a linked record gives)
-      if (!item.initialOptions || item.linkedRecordSource) {
-        return;
-      }
-      try {
+    var tried = false;
+    try {
+      config.items.forEach(function(item: any) {
+        // (not an item whose answer only a linked record gives)
+        if (!item.initialOptions || item.linkedRecordSource) {
+          return;
+        }
         if (item.mapping && item.mapping.kind === 'field') {
           // A mapped property that is never blank (gender, life status) keeps its own default.
           var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
@@ -407,8 +408,8 @@ export default class PedigreeEditor {
             return;
           }
           var values = item.initialOptions.map(function(option: any) { return option.value; });
+          tried = true;
           node[target.setter](item.repeats ? values : values[0]);
-          changed = changed || !isBlankValue(node[target.getter]());
         } else if (!item.mapping) {
           if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
             return;
@@ -416,15 +417,19 @@ export default class PedigreeEditor {
           var answers = item.initialOptions.map(function(option: any) {
             return option.answer !== undefined ? option.answer : option.value;
           });
+          tried = true;
           node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
-          changed = true;
         }
+      });
+    } catch (err) {
+      console.warn('Couldn\'t give a new person their defaults', err);
+    }
+    if (tried) {
+      try {
+        this.getGraph().setProperties(node.getID(), node.getProperties());
       } catch (err) {
-        console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
+        console.warn('Couldn\'t record a new person\'s defaults', err);
       }
-    });
-    if (changed) {
-      this.getGraph().setProperties(node.getID(), node.getProperties());
     }
   }
 
@@ -749,15 +754,12 @@ export default class PedigreeEditor {
         if (item.fieldType === 'radio' && canBeUnanswered && !item.required) {
           descriptor.clearable = true;
         }
-        // A mapped property that stores some codes as blank (heredity: anything but childless or
-        // infertile) shows the first such option for a blank value, e.g. "None"
-        // (pedigree-editor-choice-defaults D3).
+        // A mapped property whose blank has a code (heredity's "none") shows that option for a blank
+        // value, e.g. "None" (pedigree-editor-choice-defaults D3).
         var mappedTarget = mapped ? MAPS_TO_FIELD_TARGETS[item.mapping.field] : null;
-        if (mappedTarget && mappedTarget.isBlankCode && item.answerOption) {
-          var blankOption = item.answerOption.find(function(opt: any) { return mappedTarget.isBlankCode(opt.value); });
-          if (blankOption) {
-            descriptor.blankShows = blankOption.value;
-          }
+        if (mappedTarget && mappedTarget.blankCode !== undefined && item.answerOption
+          && item.answerOption.some(function(opt: any) { return opt.value === mappedTarget.blankCode; })) {
+          descriptor.blankShows = mappedTarget.blankCode;
         }
         if (item.columns) {
           descriptor.columns = item.columns;

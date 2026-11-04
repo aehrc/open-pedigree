@@ -718,7 +718,7 @@ export default class NodeMenu {
       }
       var select = document.createElement('select');
       select.name = data.name;
-      // a mapped item's marked default, shown for a blank value (see _setFieldValue.select)
+      // a mapped property's blank code, shown for a blank value (see _setFieldValue.select)
       (select as any)._blankShows = data.blankShows;
       var selectSpan = document.createElement('span');
       selectSpan.appendChild(select);
@@ -1067,8 +1067,8 @@ export default class NodeMenu {
         return;
       }
       // Set once, by index. An option shows as chosen only when it's the answer
-      // (pedigree-editor-choice-defaults D3): the matching option; else, for a blank value, a mapped
-      // item's marked default (heredity's "None", which its property stores as blank); else the empty
+      // (pedigree-editor-choice-defaults D3): the matching option; else, for a blank value, the option
+      // coded as a mapped property's blank (MAPS_TO_FIELD_TARGETS blankCode: heredity's "None"); else the empty
       // '-' (or '') choice if the item has one (every unmapped single choice does - see
       // _buildFieldDescriptors in pedigree.ts); else none (index -1, shown blank), so that whichever
       // option is picked is a change.
