@@ -226,6 +226,21 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   expect(await answer('count')).toBe(125);
   expect(await size()).toBe(before + 2);
 
+  // While typed in, a field keeps the text typed ('-0.5' isn't rewritten as '0.5' at '-0', '1e5'
+  // isn't rewritten as '100000'); left, it shows what was stored.
+  const countText = () => page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').value);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('-0.5');
+  expect(await countText()).toBe('-0.5');
+  expect(await answer('count')).toBe(-0.5);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('1e5');
+  expect(await countText()).toBe('1e5');
+  expect(await answer('count')).toBe(100000);
+  expect(await focus('note', 'input')).toBe(true);
+  expect(await countText()).toBe('100000');
+  expect(await focus('count', 'input')).toBe(true);
+
   // A number part-way through ('7e') keeps the answer it had at '7', and left like that, shows it.
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type('7e');
