@@ -82,6 +82,21 @@ function refillLegendPicker(container: any, selectize: any, legend: any, ids: an
   }
 }
 
+// Input that isn't typing: a paste or yank, a drop or a drag within the field, a cut, the browser's
+// own undo/redo, a suggestion it put in (a remembered value, autocorrect: insertReplacementText).
+// Input with no type at all is a number field's arrow-key or spinner step, or autofill.
+var NOT_TYPED_INPUT = /^(insertFromPaste.*|insertFromYank|insertFromDrop|deleteByDrag|deleteByCut|insertReplacementText|history(Undo|Redo))$/;
+
+// An 'input' event that is typing (keys, Enter in a text area, an input method, word or line
+// deletion), as opposed to the cases above. In a number field only plain typing and deleting count,
+// however a browser types its arrow-key and spinner steps.
+function isTypedInput(event: any): boolean {
+  if (event.type !== 'input' || !event.inputType || NOT_TYPED_INPUT.test(event.inputType)) {
+    return false;
+  }
+  return !(event.target && event.target.type === 'number') || /^(insertText|delete)/.test(event.inputType);
+}
+
 // A radio choice's "reset" (see the radio generator) can't be used while the whole field is read-only
 // (disabled: true, not a list of options). Otherwise it can, as a drop-down's '-' can - including for
 // an answer whose option is now disabled or hidden, which is the one most worth clearing (undo brings
@@ -443,8 +458,20 @@ export default class NodeMenu {
     return result;
   }
 
-  _attachFieldEventListeners(field: any, eventNames: any, values?: any): any {
+  // options.typing: a text, text-area or number field, whose typed keys the undo stack combines
+  // into one step (see isTypedInput).
+  _attachFieldEventListeners(field: any, eventNames: any, options?: any): any {
     var _this = this;
+    var typingField = !!(options && options.typing);
+    if (typingField) {
+      // Left, a typing field shows what was stored (its text is kept while it's typed in: see
+      // _setCrtData).
+      field.addEventListener('blur', function() {
+        if (_this.targetNode && !_this._updating) {
+          _this.update();
+        }
+      });
+    }
     eventNames.forEach(function(eventName: any) {
       field.addEventListener(eventName, function(event: any) {
         if (_this._updating) {
@@ -456,6 +483,15 @@ export default class NodeMenu {
           return;
         }
 
+        // A number field part-way through being typed ('-', '1e') has no value yet: wait for it,
+        // rather than clear the answer. Left like that (its 'change'), it shows the answer again.
+        if (field.validity && field.validity.badInput) {
+          if (event.type === 'change') {
+            var kept = target.getSummary()[field.name].value;
+            field.value = (kept === null || kept === undefined) ? '' : kept;
+          }
+          return;
+        }
         var newValue = field._getValue && field._getValue() || undefined;
         if (Array.isArray(newValue)) {
           _this.fieldMap[field.name].crtValue = newValue[0];
@@ -485,6 +521,12 @@ export default class NodeMenu {
           var properties: any = {};
           properties[method] = _this.fieldMap[field.name].crtValue;
           var fireEvent: any = { 'nodeID': target.getID(), 'properties': properties };
+          // Text typed or deleted in a text, text-area or number field: the undo stack combines a run
+          // of it into one step (ActionStack._combinableEvents). A paste, the browser's own undo, an
+          // arrow-key or spinner step, or a picked value is a step of its own.
+          if (typingField && isTypedInput(event)) {
+            fireEvent.typed = true;
+          }
           document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: fireEvent }));
         } else {
           var properties: any = {};
@@ -500,7 +542,8 @@ export default class NodeMenu {
   update(): any {
     if (this.targetNode) {
       this._updating = true;   // needed to avoid infinite loop: update -> _attachFieldEventListeners -> update -> ...
-      this._setCrtData(this.targetNode.getSummary());
+      // (the field being typed in keeps its text: see _setCrtData)
+      this._setCrtData(this.targetNode.getSummary(), true);
       this.reposition();
       delete this._updating;
     }
@@ -576,8 +619,9 @@ export default class NodeMenu {
       (text as any)._getValue = function(this: any) {
         return [(this as any).value];
       }.bind(text);
-      //this._attachFieldEventListeners(text, ['keypress', 'keyup'], [true]);
-      this._attachFieldEventListeners(text, ['keyup'], [true]);
+      // 'input', not 'keyup': it also catches a paste, autofill or drop, and fires on this field
+      // even when the key is let go elsewhere (e.g. after Tab).
+      this._attachFieldEventListeners(text, ['input'], { typing: true });
       return result;
     },
     'textarea' : function(this: any, data: any): any {
@@ -590,7 +634,7 @@ export default class NodeMenu {
       (text as any)._getValue = function(this: any) {
         return [(this as any).value];
       }.bind(text);
-      this._attachFieldEventListeners(text, ['keyup'], [true]);
+      this._attachFieldEventListeners(text, ['input'], { typing: true });
       return result;
     },
     'date-picker' : function(this: any, data: any): any {
@@ -781,7 +825,7 @@ export default class NodeMenu {
         var parsed = Number((this as any).value);
         return [isNaN(parsed) ? null : parsed];
       }.bind(number);
-      this._attachFieldEventListeners(number, ['keyup', 'change'], [true]);
+      this._attachFieldEventListeners(number, ['input', 'change'], { typing: true });
       return result;
     },
     'heading' : function(this: any, data: any): any {
@@ -969,8 +1013,12 @@ export default class NodeMenu {
     });
   }
 
-  _setCrtData(data: any): any {
+  // keepFocusedText: leave the text of a text, text-area or number field that has focus as it is (an
+  // update after each typed change would otherwise write the stored value back into it mid-typing:
+  // '-0' as '0', '1e5' as '100000', a capitalised name, an input method's composition).
+  _setCrtData(data: any, keepFocusedText?: boolean): any {
     var _this = this;
+    var focused: any = keepFocusedText ? document.activeElement : null;
     Object.keys(this.fieldMap).forEach(function (name: any) {
       // A field in `data` with no value has none (the form's controls are reused between people,
       // so the last person's value mustn't stay); only a field `data` leaves out keeps its value.
@@ -979,7 +1027,12 @@ export default class NodeMenu {
         : _this.fieldMap[name].crtValue || _this.fieldMap[name]['default'];
       _this.fieldMap[name].inactive = (data && data[name] && (typeof(data[name].inactive) == 'boolean' || typeof(data[name].inactive) == 'object')) ? data[name].inactive : _this.fieldMap[name].inactive;
       _this.fieldMap[name].disabled = (data && data[name] && (typeof(data[name].disabled) == 'boolean' || typeof(data[name].disabled) == 'object')) ? data[name].disabled : _this.fieldMap[name].disabled;
-      (_this._setFieldValue as any)[_this.fieldMap[name].type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].crtValue);
+      var type = _this.fieldMap[name].type;
+      var typing = focused && (type === 'text' || type === 'textarea' || type === 'number')
+        && _this.fieldMap[name].element.contains(focused);
+      if (!typing) {
+        (_this._setFieldValue as any)[type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].crtValue);
+      }
       (_this._setFieldInactive as any)[_this.fieldMap[name].type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].inactive);
       (_this._setFieldDisabled as any)[_this.fieldMap[name].type].call(_this, _this.fieldMap[name].element, _this.fieldMap[name].disabled);
     });

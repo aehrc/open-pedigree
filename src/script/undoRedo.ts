@@ -136,10 +136,11 @@ export default class ActionStack {
     ) {
       return false;
     }
+    // Keys typed in the node form (it marks them typed), into the same single field.
     const setters1 = Object.keys(event1.memo.properties || {});
     const setters2 = Object.keys(event2.memo.properties || {});
-    return setters1.length == 1 && setters2.length == 1 && setters1[0] == setters2[0] &&
-      ['setFirstName', 'setLastName', 'setComments'].indexOf(setters1[0]) != -1;
+    return !!event1.memo.typed && !!event2.memo.typed &&
+      setters1.length == 1 && setters2.length == 1 && setters1[0] == setters2[0];
   }
 
   _size(): number {

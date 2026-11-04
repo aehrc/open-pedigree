@@ -105,7 +105,7 @@ test('editing a Custom-tab field persists across save/reload (internal JSON)', a
   await page.evaluate(() => {
     const input = document.querySelector('.field-notes input[type=text]');
     input.value = 'a clinical note';
-    input.dispatchEvent(new KeyboardEvent('keyup'));
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: 'e' }));
   });
   await page.waitForTimeout(200);
 

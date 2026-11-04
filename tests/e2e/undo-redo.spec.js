@@ -49,10 +49,13 @@ async function loadOneMan(page, { patientProvider } = {}) {
   return { id, errors };
 }
 
-function setProperty(page, nodeID, properties) {
-  return page.evaluate(([id, props]) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
-    { detail: { nodeID: id, properties: props } })), [nodeID, properties]);
+function setProperty(page, nodeID, properties, typed = false) {
+  return page.evaluate(([id, props, isTyped]) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
+    { detail: { nodeID: id, properties: props, ...(isTyped ? { typed: true } : {}) } })), [nodeID, properties, typed]);
 }
+
+// As the node form sends a key typed in a text, text-area or number field (marked typed).
+const typeInto = (page, nodeID, properties) => setProperty(page, nodeID, properties, true);
 
 const firstName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getFirstName(), id);
 const lastName = (page, id) => page.evaluate((nodeID) => window.editor.getView().getNode(nodeID).getLastName(), id);
@@ -104,7 +107,7 @@ test('typing a name is one undo step, as the name field sends a change on every 
   const size = () => page.evaluate(() => window.editor.getActionStack()._size());
   const before = await size();
   for (const typed of ['A', 'An', 'Ann']) {
-    await setProperty(page, id, { setFirstName: typed });
+    await typeInto(page, id, { setFirstName: typed });
   }
   expect(await size()).toBe(before + 1);
 
@@ -112,6 +115,138 @@ test('typing a name is one undo step, as the name field sends a change on every 
   expect(await firstName(page, id)).toBe('');
   await redo(page);
   expect(await firstName(page, id)).toBe('Ann');
+  expect(errors).toEqual([]);
+});
+
+// Every field the node form sends on each change combines typing the same way: the identifier, and
+// a Questionnaire's text and number answers - typed with the keyboard, in the real form, Enter in a
+// text area included. A paste, a choice, a number's arrow-key step and a change made by code aren't
+// combined, and a number part-way through being typed doesn't clear the answer.
+test('typing in any text or number field is one undo step; a paste, a choice, an arrow step and code are not combined', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('dialog', (dialog) => dialog.dismiss());
+  await page.goto('/localEditor.html');
+  await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('#work-area').forEach((el) => el.remove());
+    const questionnaire = {
+      ...window.OpenPedigree.defaultQuestionnaire,
+      item: [...window.OpenPedigree.defaultQuestionnaire.item, {
+        linkId: 'extra', type: 'group', text: 'Extra', item: [
+          { linkId: 'note', type: 'string', text: 'Note' },
+          { linkId: 'story', type: 'text', text: 'Story' },
+          { linkId: 'count', type: 'integer', text: 'Count' },
+          { linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [
+            { valueCoding: { code: 'light', display: 'Light' } }, { valueCoding: { code: 'dark', display: 'Dark' } }] },
+        ],
+      }],
+    };
+    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: questionnaire });
+    window.editor.getSaveLoadEngine().createGraphFromImportData('fam1 1 0 0 1 1', 'ped', {}, false, true);
+    window.editor.getNodeMenu().show(window.editor.getView().getNode(0), 100, 100);
+  });
+  const size = () => page.evaluate(() => window.editor.getActionStack()._size());
+  // Focuses a field of the node menu (its own box: the group menu has fields of the same names),
+  // on its tab, as a click would.
+  const focus = (name, tag) => page.evaluate(([n, t]) => {
+    const menu = window.editor.getNodeMenu();
+    const el = menu.menuBox.querySelector(`.field-${n} ${t}`);
+    menu.tabHeaders[el.closest('.content').id.replace(/^tab_/, '')].dispatchEvent(new Event('click'));
+    el.focus();
+    return el === document.activeElement;
+  }, [name, tag]);
+  const answer = (linkId) => page.evaluate((l) => window.editor.getView().getNode(0).getQuestionnaireAnswer(l), linkId);
+  const externalId = () => page.evaluate(() => window.editor.getView().getNode(0).getExternalID());
+
+  const typed = [['external_id', 'input', 'P12'], ['note', 'input', 'hi!'], ['story', 'textarea', 'once\nupon'], ['count', 'input', '123']];
+  for (const [name, tag, text] of typed) {
+    const before = await size();
+    expect(await focus(name, tag), name).toBe(true);
+    await page.keyboard.type(text);
+    expect(await size(), name).toBe(before + 1);
+  }
+  expect(await answer('story')).toBe('once\nupon');
+  expect(await answer('count')).toBe(123);
+
+  // Each undo takes a whole field's typing back; redo puts them back.
+  await undo(page);
+  expect(await answer('count')).toBeUndefined();
+  await undo(page);
+  expect(await answer('story')).toBeUndefined();
+  await undo(page);
+  expect(await answer('note')).toBeUndefined();
+  await undo(page);
+  expect(await externalId()).toBeFalsy();
+  for (let i = 0; i < 4; i++) {
+    await redo(page);
+  }
+  expect(await answer('count')).toBe(123);
+
+  // The same answer set by code (e.g. an import) straight after typing it isn't folded into it.
+  expect(await focus('note', 'input')).toBe(true);
+  await page.keyboard.type('?');
+  let before = await size();
+  await setProperty(page, 0, { setQuestionnaireAnswer_note: 'imported' });
+  expect(await size()).toBe(before + 1);
+  await undo(page);
+  expect(await answer('note')).toBe('hi!?');
+
+  // A paste straight after typing is saved, as a step of its own (undo goes back to the typed note).
+  expect(await focus('note', 'input')).toBe(true);
+  await page.keyboard.type('!');
+  await page.evaluate(() => {
+    const el = window.editor.getNodeMenu().menuBox.querySelector('.field-note input');
+    el.value = 'pasted';
+    el.dispatchEvent(new InputEvent('input', { inputType: 'insertFromPaste' }));
+  });
+  expect(await answer('note')).toBe('pasted');
+  await undo(page);
+  expect(await answer('note')).toBe('hi!?!');
+  await redo(page);
+  expect(await answer('note')).toBe('pasted');
+
+  // A choice: two picks, two steps.
+  before = await size();
+  await page.evaluate(() => {
+    const select = window.editor.getNodeMenu().menuBox.querySelector('.field-shade select');
+    for (const value of ['light', 'dark']) {
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+    }
+  });
+  expect(await size()).toBe(before + 2);
+
+  // The count's arrow keys step it: each step is its own.
+  expect(await focus('count', 'input')).toBe(true);
+  before = await size();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  expect(await answer('count')).toBe(125);
+  expect(await size()).toBe(before + 2);
+
+  // While typed in, a field keeps the text typed ('-0.5' isn't rewritten as '0.5' at '-0', '1e5'
+  // isn't rewritten as '100000'); left, it shows what was stored.
+  const countText = () => page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').value);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('-0.5');
+  expect(await countText()).toBe('-0.5');
+  expect(await answer('count')).toBe(-0.5);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('1e5');
+  expect(await countText()).toBe('1e5');
+  expect(await answer('count')).toBe(100000);
+  expect(await focus('note', 'input')).toBe(true);
+  expect(await countText()).toBe('100000');
+  expect(await focus('count', 'input')).toBe(true);
+
+  // A number part-way through ('7e') keeps the answer it had at '7', and left like that, shows it.
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('7e');
+  expect(await answer('count')).toBe(7);
+  await page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').dispatchEvent(new Event('change')));
+  expect(await page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').value)).toBe('7');
   expect(errors).toEqual([]);
 });
 
@@ -138,7 +273,7 @@ test('a key typed after a change to several properties is its own step, so undo 
   // (as linking a patient sets the name with the rest)
   const { id, errors } = await loadOneMan(page);
   await setProperty(page, id, { setFirstName: 'Ann', setLastName: 'Lee', setGender: 'F' });
-  await setProperty(page, id, { setFirstName: 'Anna' });
+  await typeInto(page, id, { setFirstName: 'Anna' });
 
   await undo(page);
   expect([await firstName(page, id), await lastName(page, id), await gender(page, id)]).toEqual(['Ann', 'Lee', 'F']);
@@ -153,10 +288,10 @@ test('a key typed after a change to several properties is its own step, so undo 
 
 test('a name typed after an undo is a step of its own, so undo goes back to the name before it', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
-  await setProperty(page, id, { setFirstName: 'Ann' });
-  await setProperty(page, id, { setLastName: 'Lee' });
+  await typeInto(page, id, { setFirstName: 'Ann' });
+  await typeInto(page, id, { setLastName: 'Lee' });
   await undo(page);
-  await setProperty(page, id, { setFirstName: 'Bob' });
+  await typeInto(page, id, { setFirstName: 'Bob' });
 
   await undo(page);
   expect(await firstName(page, id)).toBe('Ann');
@@ -204,7 +339,7 @@ test('a linked patient\'s name found when a pedigree is opened is not an undo st
   });
   await expect.poll(() => firstName(page, id)).toBe('Test Person');
   const size = await page.evaluate(() => window.editor.getActionStack()._size());
-  await setProperty(page, id, { setFirstName: 'Tess' });
+  await typeInto(page, id, { setFirstName: 'Tess' });
   expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
 
   await undo(page);
@@ -218,11 +353,11 @@ test('a name typed again after the menu is closed and opened is a new undo step'
   const closeMenu = () => page.evaluate(() => window.editor.getNodeMenu().hide());
   await openMenu();
   for (const typed of ['A', 'An', 'Ann']) {
-    await setProperty(page, id, { setFirstName: typed });
+    await typeInto(page, id, { setFirstName: typed });
   }
   await closeMenu();
   await openMenu();
-  await setProperty(page, id, { setFirstName: 'Anne' });
+  await typeInto(page, id, { setFirstName: 'Anne' });
   await closeMenu();
 
   await undo(page);
@@ -250,10 +385,11 @@ test('a linked patient\'s name found when a pedigree is opened stays after an un
 
 test('a linked record\'s refresh is not combined with a name typed before it', async ({ page }) => {
   const { id, errors } = await loadOneMan(page);
-  await setProperty(page, id, { setFirstName: 'Ann' });
+  await typeInto(page, id, { setFirstName: 'Ann' });
   const size = await page.evaluate(() => window.editor.getActionStack()._size());
   await page.evaluate((nodeID) => document.dispatchEvent(new CustomEvent('pedigree:node:setproperty',
-    { detail: { nodeID, properties: { setFirstName: 'Anna' }, linkedRecordRefresh: true } })), id);
+    // (marked typed as well, so only the refresh rule keeps it apart)
+    { detail: { nodeID, properties: { setFirstName: 'Anna' }, linkedRecordRefresh: true, typed: true } })), id);
   expect(await page.evaluate(() => window.editor.getActionStack()._size())).toBe(size + 1);
 
   await undo(page);
