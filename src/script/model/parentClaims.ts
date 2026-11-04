@@ -54,11 +54,42 @@ export function chooseParentClaims(claims) {
   return { claims: claims, adopted: false, left: [] };
 }
 
-/** A console warning for the claims chooseParentClaims left out, or null if none were. */
-export function leftOutWarning(chosen) {
-  if (chosen.left.length === 0) {
+/** The fetal life statuses: a fetus is exported and read back as one (GA4GH Patient.deceasedString). */
+export const FETAL_STATUSES = ['stillborn', 'miscarriage', 'aborted', 'unborn'];
+
+/**
+ * The claims for the parents placeParents placed - every code each of them has, so each is checked
+ * against their gender - and how many other claimed parents it didn't place (more than two).
+ */
+export function placedClaims(chosen, slots) {
+  const nodes = new Set([slots.mother, slots.father].filter(Boolean).map((c) => c.node));
+  return {
+    checked: chosen.claims.filter((c) => nodes.has(c.node)),
+    dropped: new Set(chosen.claims.filter((c) => !nodes.has(c.node)).map((c) => c.node)).size,
+  };
+}
+
+/** Why a parent's code contradicts their gender, or null if it doesn't (see placeParents). */
+export function parentGenderConflict(claim, gender, reference) {
+  if (claim.gender === 'F' && gender === 'M') {
+    return 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + reference + ')';
+  }
+  if (claim.gender === 'M' && gender === 'F') {
+    return 'Unable to import pedigree: a person declared as female is also declared as being a father (' + reference + ')';
+  }
+  return null;
+}
+
+/**
+ * A console warning for the claimed parents left out - by chooseParentClaims, and `dropped` more
+ * than two that placeParents didn't place - or null if none were.
+ */
+export function leftOutWarning(chosen, dropped = 0) {
+  const count = chosen.left.length + dropped;
+  if (count === 0) {
     return null;
   }
-  return 'A child\'s ' + chosen.left.length + ' other parent(s) were left out: '
-    + (chosen.adopted ? 'the child is placed under their adoptive parents' : 'step-parents are a parent\'s partner');
+  return 'A child\'s ' + count + ' other parent(s) were left out: '
+    + (chosen.adopted ? 'the child is placed under their adoptive parents'
+      : chosen.left.length > 0 ? 'step-parents are a parent\'s partner' : 'a child has two parents in the editor');
 }

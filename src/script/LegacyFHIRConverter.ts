@@ -1,6 +1,6 @@
 import BaseGraph from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { placeParents, chooseParentClaims, leftOutWarning } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -226,23 +226,29 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
       // for the parents placed only - one left out can't fail the import)
       let chosen = chooseParentClaims(nextPerson.parentClaims || []);
-      for (const claim of chosen.claims) {
-        const parentGender = newG.properties[findReferencedPerson(claim.node, 'parent')].gender;
-        if (claim.gender === 'F' && parentGender === 'M') {
-          throw 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + claim.node + ')';
+      // (a reference that doesn't resolve has no gender here; it fails below only if it's placed)
+      let genderOf = (node) => {
+        try {
+          return newG.properties[findReferencedPerson(node, 'parent')].gender;
+        } catch (err) {
+          return null;
         }
-        if (claim.gender === 'M' && parentGender === 'F') {
-          throw 'Unable to import pedigree: a person declared as female is also declared as being a father (' + claim.node + ')';
+      };
+      let parents = placeParents(chosen.claims, genderOf);
+      let placed = placedClaims(chosen, parents);
+      for (const claim of placed.checked) {
+        const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
+        if (conflict) {
+          throw conflict;
         }
       }
       if (chosen.adopted) {
         newG.properties[personID].isAdopted = true;
       }
-      let leftOut = leftOutWarning(chosen);
+      let leftOut = leftOutWarning(chosen, placed.dropped);
       if (leftOut) {
         console.warn(leftOut);
       }
-      let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
       let motherLink = parents.mother ? parents.mother.node : null;
       let fatherLink = parents.father ? parents.father.node : null;
 
@@ -513,7 +519,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
                 break;
               } else if (codings[k].display) {
-                roleText = roleText || codings[k].display;
+                roleText = roleText + ' ' + codings[k].display;
                 if (motherRegex.test(codings[k].display)) {
                   type = 'mother';
                 } else if (fatherRegex.test(codings[k].display)) {
@@ -521,7 +527,7 @@ LegacyFHIRConverter.extractDataFromFMH = function(familyHistoryResource,
                 }
               }
             }
-            roleText = roleText || subEx.valueCodeableConcept.text || '';
+            roleText = roleText + ' ' + (subEx.valueCodeableConcept.text || '');
             if (type == null && subEx.valueCodeableConcept.text) {
               if (motherRegex
                 .test(subEx.valueCodeableConcept.text)) {

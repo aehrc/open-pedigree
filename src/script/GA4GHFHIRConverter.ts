@@ -4,7 +4,7 @@ import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questio
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
-import { placeParents, chooseParentClaims, leftOutWarning } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
 export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
@@ -31,16 +31,6 @@ function generateUUID() {
 // (placeParents and chooseParentClaims are shared with the legacy importer)
 export { placeParents, chooseParentClaims };
 
-/** Why a parent's code contradicts their gender, or null if it doesn't (see placeParents). */
-function parentGenderConflict(claim, gender, reference) {
-  if (claim.gender === 'F' && gender === 'M') {
-    return 'Unable to import pedigree: a person declared as male is also declared as being a mother (' + reference + ')';
-  }
-  if (claim.gender === 'M' && gender === 'F') {
-    return 'Unable to import pedigree: a person declared as female is also declared as being a father (' + reference + ')';
-  }
-  return null;
-}
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
@@ -258,9 +248,11 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     let personID = getPersonID(nextPerson);
 
     const chosen = chooseParentClaims(nextPerson.parentClaims || []);
+    const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
+    const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
     // parent left out can't fail the import)
-    for (const claim of chosen.claims) {
+    for (const claim of placed.checked) {
       const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
       if (conflict) {
         throw conflict;
@@ -269,11 +261,10 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     if (chosen.adopted) {
       newG.properties[personID].isAdopted = true;
     }
-    const leftOut = leftOutWarning(chosen);
+    const leftOut = leftOutWarning(chosen, placed.dropped);
     if (leftOut) {
       console.warn(leftOut);
     }
-    const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
 
@@ -1022,7 +1013,6 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   }
   // A fetus's date of death (see the export), read only for a fetus: on anyone else it would make
   // them deceased.
-  const FETAL_STATUSES = ['stillborn', 'miscarriage', 'aborted', 'unborn'];
   if (patientResource.extension && FETAL_STATUSES.indexOf((properties as any).lifeStatus) !== -1) {
     const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION);
     const fetusDodSplit = fetusDod && typeof fetusDod.valueDate === 'string' ? dateTimeSplitter.exec(fetusDod.valueDate) : null;
@@ -1582,7 +1572,7 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   // A fetus is written as one whatever else it has: deceased[x] holds one value, and the fetal status
   // wins over a date of death, which goes in an extension (pedigree-editor-fetus-and-adoption-fidelity
   // D1). Before, a fetus with a date of death was written as a born, deceased person.
-  let isFetus = lifeStatus === 'stillborn' || lifeStatus === 'miscarriage' || lifeStatus === 'aborted' || lifeStatus === 'unborn';
+  let isFetus = FETAL_STATUSES.indexOf(lifeStatus) !== -1;
   let fetusDateOfDeath: any = null;
   if (privacySetting === 'all') {
     if (toLocalIsoDate(nodeProperties['dob'])) {

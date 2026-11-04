@@ -316,6 +316,28 @@ describe('LegacyFHIRConverter parents', () => {
     expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
   });
 
+  it('doesn\'t fail on a third parent it doesn\'t place: a man coded as mother, or a broken reference', () => {
+    for (const third of ['#FMH_1', '#NOBODY']) { // Arthur (male), and nobody
+      const text = legacyWith((byId) => {
+        byId.FMH_0.extension.push(parentExtension('NMTH', third));
+      });
+      expect(maya(LegacyFHIRConverter.initFromFHIR(text)), third).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+    }
+  });
+
+  it('reads "adoptive" in a type\'s text alongside a coding\'s plain display', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push({
+        url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent',
+        extension: [
+          { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://snomed.info/sct', code: '72705000', display: 'Mother' }], text: 'Adoptive mother' } },
+          { url: 'reference', valueReference: { reference: '#FMH_2' } },
+        ],
+      });
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
+  });
+
   it('reads "Adoptive mother" given only as text as adoptive', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension.push({

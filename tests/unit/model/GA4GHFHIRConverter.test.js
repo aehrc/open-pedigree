@@ -415,7 +415,10 @@ describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
     const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
     const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
     expect(graph.properties[child].isAdopted).toBe(true);
+    // under the adoptive parents, John as father: the KIN:027 claim on him was left out
+    expect(graph.getParents(child).map((v) => `${graph.properties[v].fName}:${graph.properties[v].gender}`).sort()).toEqual(['Jane:F', 'John:M']);
   });
+
 });
 
 describe('chooseParentClaims (D2)', () => {
