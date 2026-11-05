@@ -244,7 +244,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
-    const chosen = chooseParentClaims(nextPerson.parentClaims || []);
+    const fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
+    const chosen = chooseParentClaims(nextPerson.parentClaims || [], fetus);
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
@@ -255,8 +256,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         throw conflict;
       }
     }
-    // (a fetus can't be adopted in the editor)
-    if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+    // (never for a fetus: chooseParentClaims places its biological parents)
+    if (chosen.adopted && newG.properties[personID]) {
       newG.properties[personID].isAdopted = true;
     }
     const leftOut = leftOutWarning(chosen, placed.dropped);
@@ -397,7 +398,9 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
     // all are read (see placeParents), so a parent coded only as a parent (e.g. one of a same-sex
     // couple) isn't held to a mother's or father's gender
     const claims = firstNodeData.parentClaims || (firstNodeData.parentClaims = []);
-    // (KIN:023, a step-parent: used only when a child has no other parents, as in the legacy importer)
+    // (KIN:023, a step-parent: placed only when a child has no other parents - unplaced, it would be
+    // disconnected and the import would fail. The editor has no step relationship, so it's saved back
+    // as a parent.)
     claims.push({ node: secondNodeData.nodeId, gender: (rel === 'KIN:027') ? 'F' : (rel === 'KIN:028') ? 'M' : null,
       adoptive: rel === 'KIN:022', step: rel === 'KIN:023' });
   } else if (rel === 'KIN:026' || rel === 'KIN:030' || rel === 'KIN:048'  || rel === 'KIN:049'){

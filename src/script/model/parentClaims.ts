@@ -40,11 +40,19 @@ export function placeParents(claims, genderOf) {
  * or `step` (legacy STP*). Any adoptive claim: the adoptive claims only, and the child is adopted - the
  * editor shows an adopted child under the parents who adopted them, and exports it so. Else the
  * claims that aren't step-parents, if any (a step-parent is a parent's partner); else all of them.
- * `left` are the claims not placed.
+ * `left` are the claims not placed. For a fetus (`fetus`), its biological claims come first, as a fetus
+ * can't be adopted in the editor; with none, it's placed under the others, not adopted.
  */
-export function chooseParentClaims(claims) {
+export function chooseParentClaims(claims, fetus = false) {
+  // A fetus can't be adopted in the editor: its biological parents, if it has any, as anyone else's.
+  if (fetus) {
+    const biological = claims.filter((c) => !c.adoptive && !c.step);
+    if (biological.length > 0) {
+      return { claims: biological, adopted: false, left: claims.filter((c) => c.adoptive || c.step) };
+    }
+  }
   const adoptive = claims.filter((c) => c.adoptive);
-  if (adoptive.length > 0) {
+  if (adoptive.length > 0 && !fetus) {
     return { claims: adoptive, adopted: true, left: claims.filter((c) => !c.adoptive) };
   }
   const notStep = claims.filter((c) => !c.step);
@@ -91,6 +99,6 @@ export function leftOutWarning(chosen, dropped = 0) {
   if (count === 0) {
     return null;
   }
-  return 'A child\'s ' + count + ' other parent(s) were left out: the editor shows two parents, adoptive ones'
-    + ' first, and step-parents only when there are no others';
+  return 'A child\'s ' + count + ' other parent(s) were left out: the editor shows two parents - adoptive ones'
+    + ' first (but a fetus\'s biological ones), and step-parents only when there are no others';
 }

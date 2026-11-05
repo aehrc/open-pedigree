@@ -225,34 +225,47 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
       // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
       // for the parents placed only - one left out can't fail the import)
-      // A parent whose reference matches nobody is set aside before placing, so it can't take a
-      // real parent's slot - unless they're needed: then the import fails as before. An ambiguous
-      // reference always fails it.
+      // A parent whose reference can't be resolved (matching nobody, or more than one person) is set
+      // aside before placing, so it can't take a real parent's slot - unless they're needed: then
+      // the import fails as before, with the reference's own error.
+      let ambiguous = new Set();
       let resolves = (node) => {
         try {
           findReferencedPerson(node, 'parent');
           return true;
         } catch (err) {
           if (String(err).indexOf('ambiguous reference') !== -1) {
-            throw err;
+            ambiguous.add(node);
           }
           return false;
         }
       };
+      let fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
       let claims = nextPerson.parentClaims || [];
-      let missing = claims.filter((c) => !resolves(c.node));
+      let found = claims.filter((c) => resolves(c.node));
+      let missing = claims.filter((c) => found.indexOf(c) === -1);
       let unresolved = new Set(missing.map((c) => c.node)).size;
-      let chosen = chooseParentClaims(claims.filter((c) => resolves(c.node)));
+      let chosen = chooseParentClaims(found, fetus);
       let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
       let placed = placedClaims(chosen, parents);
       if (missing.length > 0) {
-        // needed: the child's adoptive parent, or one without whom fewer parents are placed than
-        // the child has (up to two)
-        let chosenAll = chooseParentClaims(claims);
+        // needed: one without whom fewer parents are placed than the child has (up to two), or whose
+        // absence has another kind of parent (biological, adoptive, step) stand in for the kind the
+        // child would have
+        let chosenAll = chooseParentClaims(claims, fetus);
         let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
         let placedCount = [parents.mother, parents.father].filter(Boolean).length;
         let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
-        if (neededMissing && ((chosenAll.adopted && !chosen.adopted) || placedCount < wanted)) {
+        let kind = (c) => (c.adoptive ? 'adoptive' : c.step ? 'step' : 'biological');
+        let kindsWanted = new Set(chosenAll.claims.map(kind));
+        let standsIn = chosen.claims.some((c) => !kindsWanted.has(kind(c)));
+        // An ambiguous reference names someone who exists: if they'd be chosen, they're needed (no
+        // one else quietly takes their slot).
+        let ambiguousChosen = missing.find((c) => ambiguous.has(c.node) && chosenAll.claims.indexOf(c) !== -1);
+        if (ambiguousChosen) {
+          findReferencedPerson(ambiguousChosen.node, 'parent'); // throws: ambiguous reference
+        }
+        if (neededMissing && (placedCount < wanted || standsIn)) {
           findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
         }
       }
@@ -262,13 +275,13 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           throw conflict;
         }
       }
-      // (a fetus can't be adopted in the editor)
-      if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+      // (never for a fetus: chooseParentClaims places its biological parents)
+      if (chosen.adopted && newG.properties[personID]) {
         newG.properties[personID].isAdopted = true;
       }
       let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
       if (leftOut) {
-        console.warn(leftOut);
+        console.warn(leftOut + (unresolved > 0 ? ' (' + unresolved + ' of them a reference that couldn\'t be resolved)' : ''));
       }
       let motherLink = parents.mother ? parents.mother.node : null;
       let fatherLink = parents.father ? parents.father.node : null;
