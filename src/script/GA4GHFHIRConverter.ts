@@ -257,7 +257,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }
     }
     // (never for a fetus: chooseParentClaims places its biological parents)
-    if (chosen.adopted) {
+    if (chosen.adopted && newG.properties[personID]) {
       newG.properties[personID].isAdopted = true;
     }
     const leftOut = leftOutWarning(chosen, placed.dropped);

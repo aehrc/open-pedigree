@@ -443,6 +443,7 @@ export default class PedigreeEditor {
             done[item.linkId] = true;
           }
         } catch (err) {
+          done[item.linkId] = true; // (not tried again on the next pass)
           console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
         }
       });

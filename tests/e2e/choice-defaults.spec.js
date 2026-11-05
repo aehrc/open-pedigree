@@ -36,6 +36,11 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
             enableWhen: [{ question: 'gate', operator: '=', answerCoding: { code: 'yes' } }],
             answerOption: [option('g1', 'G1', true), option('g2', 'G2')] },
           { linkId: 'gate', type: 'choice', text: 'Gate', answerOption: [option('yes', 'Yes', true), option('no', 'No')] },
+          // and the other way round: the gate first
+          { linkId: 'gate2', type: 'choice', text: 'Gate 2', answerOption: [option('yes', 'Yes', true), option('no', 'No')] },
+          { linkId: 'gated2', type: 'choice', text: 'Gated 2',
+            enableWhen: [{ question: 'gate2', operator: '=', answerCoding: { code: 'yes' } }],
+            answerOption: [option('h1', 'H1', true), option('h2', 'H2')] },
           { linkId: 'tags', type: 'choice', text: 'Tags', repeats: true,
             answerOption: [option('a', 'A', true), option('b', 'B'), option('c', 'C', true)] },
           // heredity as a REDCap drop-down codes it (the module's README: anything but childless or
@@ -110,6 +115,7 @@ test('a person added in the editor gets the marked defaults; a loaded person doe
     expect(await answer(page, id, 'fetal_note'), `person ${id}`).toBeUndefined();
     // but one shown by another item's default
     expect(codeOf(await answer(page, id, 'gated')), `person ${id}`).toBe('g1');
+    expect(codeOf(await answer(page, id, 'gated2')), `person ${id}`).toBe('h1');
     expect(await shownOption(page, id, 'shade')).toBe('Dark');
   }
   // The proband, loaded before, still has no answer.
