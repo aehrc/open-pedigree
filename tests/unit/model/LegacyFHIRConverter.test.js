@@ -374,6 +374,22 @@ describe('LegacyFHIRConverter parents', () => {
     expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/not a valid/);
   });
 
+  it('places a fetus under its biological parents, not its adoptive ones, and not adopted', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.deceasedString = 'stillborn';
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2'));
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
+  });
+
+  it('doesn\'t let an adoptive parent stand in for a fetus\'s biological mother it can\'t find', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.deceasedString = 'stillborn';
+      byId.FMH_0.extension = [parentExtension('NMTH', '#MISSING'), parentExtension('ADOPTM', '#FMH_2')];
+    });
+    expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/not a valid/);
+  });
+
   it('doesn\'t take "not adopted" for adoptive', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension[1] = {

@@ -236,22 +236,26 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           return false;
         }
       };
-      let fetus = FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
+      let fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
       let claims = nextPerson.parentClaims || [];
-      let missing = claims.filter((c) => !resolves(c.node));
+      let found = claims.filter((c) => resolves(c.node));
+      let missing = claims.filter((c) => found.indexOf(c) === -1);
       let unresolved = new Set(missing.map((c) => c.node)).size;
-      let chosen = chooseParentClaims(claims.filter((c) => resolves(c.node)), fetus);
+      let chosen = chooseParentClaims(found, fetus);
       let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
       let placed = placedClaims(chosen, parents);
       if (missing.length > 0) {
-        // needed: the child's adoptive parent, one without whom fewer parents are placed than the
-        // child has (up to two), or a real parent a step-parent would otherwise stand in for
+        // needed: one without whom fewer parents are placed than the child has (up to two), or whose
+        // absence has another kind of parent (biological, adoptive, step) stand in for the kind the
+        // child would have
         let chosenAll = chooseParentClaims(claims, fetus);
         let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
         let placedCount = [parents.mother, parents.father].filter(Boolean).length;
         let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
-        let stepStandsIn = chosenAll.claims.some((c) => !c.step) && chosen.claims.length > 0 && chosen.claims.every((c) => c.step);
-        if (neededMissing && ((chosenAll.adopted && !chosen.adopted) || placedCount < wanted || stepStandsIn)) {
+        let kind = (c) => (c.adoptive ? 'adoptive' : c.step ? 'step' : 'biological');
+        let kindsWanted = new Set(chosenAll.claims.map(kind));
+        let standsIn = chosen.claims.some((c) => !kindsWanted.has(kind(c)));
+        if (neededMissing && (placedCount < wanted || standsIn)) {
           findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
         }
       }
@@ -261,8 +265,8 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           throw conflict;
         }
       }
-      // (a fetus can't be adopted in the editor)
-      if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+      // (never for a fetus: chooseParentClaims places its biological parents)
+      if (chosen.adopted) {
         newG.properties[personID].isAdopted = true;
       }
       let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);

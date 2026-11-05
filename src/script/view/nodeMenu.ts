@@ -468,8 +468,12 @@ export default class NodeMenu {
       // Left, a typing field shows what was stored (its text is kept while it's typed in: see
       // _setCrtData).
       field.addEventListener('blur', function() {
+        // the window losing focus (alt-tab, a dialog) leaves the field as it is
+        if (!document.hasFocus()) {
+          return;
+        }
         // typing in it again later is a new undo step
-        editor.getActionStack().startNewStep();
+        _this._startNewUndoStep();
         if (_this.targetNode && !_this._updating) {
           _this.update();
         }

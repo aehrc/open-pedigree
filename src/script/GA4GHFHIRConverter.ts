@@ -244,8 +244,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
-    const chosen = chooseParentClaims(nextPerson.parentClaims || [],
-      FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1);
+    const fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
+    const chosen = chooseParentClaims(nextPerson.parentClaims || [], fetus);
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
@@ -256,8 +256,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         throw conflict;
       }
     }
-    // (a fetus can't be adopted in the editor)
-    if (chosen.adopted && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) === -1) {
+    // (never for a fetus: chooseParentClaims places its biological parents)
+    if (chosen.adopted) {
       newG.properties[personID].isAdopted = true;
     }
     const leftOut = leftOutWarning(chosen, placed.dropped);

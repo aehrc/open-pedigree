@@ -395,48 +395,58 @@ export default class PedigreeEditor {
     }
     var tried = false;
     var summary: any = null;
-    config.items.forEach(function(item: any) {
-      // (not an item whose answer only a linked record gives)
-      if (!item.initialOptions || item.linkedRecordSource) {
-        return;
-      }
-      // nor one hidden for this person (enableWhen), e.g. a fetus-only item for someone born
-      try {
-        summary = summary || node.getSummary();
-      } catch (err) {
-        summary = {};
-      }
-      if (summary[item.linkId] && summary[item.linkId].inactive === true) {
-        return;
-      }
-      // one item's failure doesn't keep the others from their defaults
-      try {
-        if (item.mapping && item.mapping.kind === 'field') {
-          // A mapped property that is never blank (gender, life status) keeps its own default.
-          var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
-          if (!target || typeof node[target.setter] !== 'function' || typeof node[target.getter] !== 'function'
-            || !isBlankValue(node[target.getter]())) {
-            return;
-          }
-          // (a mapped property holds one value, even for a repeating item)
-          tried = true;
-          node[target.setter](item.initialOptions[0].value);
-          summary = null; // (another item may show only with this answer)
-        } else if (!item.mapping) {
-          if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
-            return;
-          }
-          var answers = item.initialOptions.map(function(option: any) {
-            return option.answer !== undefined ? option.answer : option.value;
-          });
-          tried = true;
-          node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
-          summary = null; // (another item may show only with this answer)
+    // Passes until nothing more applies: a default can show an item (enableWhen) earlier in the list.
+    var done: any = {};
+    var applied = true;
+    for (var pass = 0; applied && pass <= config.items.length; pass++) {
+      applied = false;
+      config.items.forEach(function(item: any) {
+        // (not an item whose answer only a linked record gives)
+        if (!item.initialOptions || item.linkedRecordSource || done[item.linkId]) {
+          return;
         }
-      } catch (err) {
-        console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
-      }
-    });
+        // nor one hidden for this person (enableWhen), e.g. a fetus-only item for someone born
+        try {
+          summary = summary || node.getSummary();
+        } catch (err) {
+          summary = {};
+        }
+        if (summary[item.linkId] && summary[item.linkId].inactive === true) {
+          return;
+        }
+        // one item's failure doesn't keep the others from their defaults
+        try {
+          if (item.mapping && item.mapping.kind === 'field') {
+            // A mapped property that is never blank (gender, life status) keeps its own default.
+            var target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
+            if (!target || typeof node[target.setter] !== 'function' || typeof node[target.getter] !== 'function'
+              || !isBlankValue(node[target.getter]())) {
+              return;
+            }
+            // (a mapped property holds one value, even for a repeating item)
+            tried = true;
+            node[target.setter](item.initialOptions[0].value);
+            summary = null; // (another item may show only with this answer)
+            applied = true;
+            done[item.linkId] = true;
+          } else if (!item.mapping) {
+            if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
+              return;
+            }
+            var answers = item.initialOptions.map(function(option: any) {
+              return option.answer !== undefined ? option.answer : option.value;
+            });
+            tried = true;
+            node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
+            summary = null; // (another item may show only with this answer)
+            applied = true;
+            done[item.linkId] = true;
+          }
+        } catch (err) {
+          console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);
+        }
+      });
+    }
     if (tried) {
       try {
         this.getGraph().setProperties(node.getID(), node.getProperties());

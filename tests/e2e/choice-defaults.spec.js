@@ -31,11 +31,11 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
             extension: [{ url: mapping, valueCode: 'mapsToField' }],
             answerOption: [option('carrier', 'Carrier', withMappedDefault), option('affected', 'Affected'), option('presymptomatic', 'Pre-symptomatic')] },
           { linkId: 'shade', type: 'choice', text: 'Shade', answerOption: [option('light', 'Light'), option('dark', 'Dark', true)] },
-          // shown only with the gate's default answer, and a default of its own
-          { linkId: 'gate', type: 'choice', text: 'Gate', answerOption: [option('yes', 'Yes', true), option('no', 'No')] },
+          // shown only with the gate's default answer (the gate comes after it), and a default of its own
           { linkId: 'gated', type: 'choice', text: 'Gated',
             enableWhen: [{ question: 'gate', operator: '=', answerCoding: { code: 'yes' } }],
             answerOption: [option('g1', 'G1', true), option('g2', 'G2')] },
+          { linkId: 'gate', type: 'choice', text: 'Gate', answerOption: [option('yes', 'Yes', true), option('no', 'No')] },
           { linkId: 'tags', type: 'choice', text: 'Tags', repeats: true,
             answerOption: [option('a', 'A', true), option('b', 'B'), option('c', 'C', true)] },
           // heredity as a REDCap drop-down codes it (the module's README: anything but childless or
