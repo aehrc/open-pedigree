@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.5](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.4...open-pedigree-v1.5.5) (2026-11-05)
+
+
+### Bug Fixes
+
+* follow-ups from the review of 1.5.4 - fetus parents, needed references, dependent defaults, typing ([#87](https://github.com/aehrc/open-pedigree/issues/87)) ([a2ce89c](https://github.com/aehrc/open-pedigree/commit/a2ce89cb7781ceda1bed5e5cc749e927105f9408))
+
 ## [1.5.4](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.3...open-pedigree-v1.5.4) (2026-11-04)
 
 
