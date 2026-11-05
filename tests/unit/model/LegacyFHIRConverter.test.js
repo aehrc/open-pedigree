@@ -390,6 +390,26 @@ describe('LegacyFHIRConverter parents', () => {
     expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/not a valid/);
   });
 
+  it('fails on an ambiguous reference to a parent it would place, rather than put another in that slot', () => {
+    // Arthur and Ray are both "Pat" now: a reference to "Pat" is ambiguous
+    const text = legacyWith((byId) => {
+      byId.FMH_1.name = 'Pat Example';
+      byId.FMH_3.name = 'Pat Hartley';
+      byId.FMH_0.extension = [parentExtension('NFTH', '#Pat'), parentExtension('NMTH', '#FMH_6'), parentExtension('PRN', '#FMH_5')];
+    });
+    expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/ambiguous/);
+  });
+
+  it('leaves out an ambiguous reference to a parent it wouldn\'t place', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_1.name = 'Pat Example';
+      byId.FMH_3.name = 'Pat Hartley';
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2'));
+      byId.FMH_0.extension.push(parentExtension('NFTH', '#Pat'));
+    });
+    expect(maya(LegacyFHIRConverter.initFromFHIR(text)).adopted).toBe(true);
+  });
+
   it('doesn\'t take "not adopted" for adoptive', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension[1] = {

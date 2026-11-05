@@ -228,11 +228,15 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       // A parent whose reference can't be resolved (matching nobody, or more than one person) is set
       // aside before placing, so it can't take a real parent's slot - unless they're needed: then
       // the import fails as before, with the reference's own error.
+      let ambiguous = new Set();
       let resolves = (node) => {
         try {
           findReferencedPerson(node, 'parent');
           return true;
         } catch (err) {
+          if (String(err).indexOf('ambiguous reference') !== -1) {
+            ambiguous.add(node);
+          }
           return false;
         }
       };
@@ -255,6 +259,12 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         let kind = (c) => (c.adoptive ? 'adoptive' : c.step ? 'step' : 'biological');
         let kindsWanted = new Set(chosenAll.claims.map(kind));
         let standsIn = chosen.claims.some((c) => !kindsWanted.has(kind(c)));
+        // An ambiguous reference names someone who exists: if they'd be chosen, they're needed (no
+        // one else quietly takes their slot).
+        let ambiguousChosen = missing.find((c) => ambiguous.has(c.node) && chosenAll.claims.indexOf(c) !== -1);
+        if (ambiguousChosen) {
+          findReferencedPerson(ambiguousChosen.node, 'parent'); // throws: ambiguous reference
+        }
         if (neededMissing && (placedCount < wanted || standsIn)) {
           findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
         }
@@ -271,7 +281,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       }
       let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
       if (leftOut) {
-        console.warn(leftOut);
+        console.warn(leftOut + (unresolved > 0 ? ' (' + unresolved + ' of them a reference that couldn\'t be resolved)' : ''));
       }
       let motherLink = parents.mother ? parents.mother.node : null;
       let fatherLink = parents.father ? parents.father.node : null;
