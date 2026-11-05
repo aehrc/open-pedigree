@@ -226,6 +226,21 @@ test('typing in any text or number field is one undo step; a paste, a choice, an
   expect(await answer('count')).toBe(125);
   expect(await size()).toBe(before + 2);
 
+  // Typing in a field again after leaving it is a step of its own.
+  expect(await focus('note', 'input')).toBe(true);
+  before = await size();
+  await page.keyboard.type('A');
+  expect(await focus('story', 'textarea')).toBe(true);
+  expect(await focus('note', 'input')).toBe(true);
+  await page.keyboard.type('B');
+  expect(await size()).toBe(before + 2);
+
+  // A change made by code to the field being typed in (a linked record's refresh) shows in it.
+  expect(await focus('note', 'input')).toBe(true);
+  await setProperty(page, 0, { setQuestionnaireAnswer_note: 'refreshed' });
+  expect(await page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-note input').value)).toBe('refreshed');
+  expect(await focus('count', 'input')).toBe(true);
+
   // While typed in, a field keeps the text typed ('-0.5' isn't rewritten as '0.5' at '-0', '1e5'
   // isn't rewritten as '100000'); left, it shows what was stored.
   const countText = () => page.evaluate(() => window.editor.getNodeMenu().menuBox.querySelector('.field-count input').value);

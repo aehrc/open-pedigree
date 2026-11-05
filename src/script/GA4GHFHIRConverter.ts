@@ -244,7 +244,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let personID = getPersonID(nextPerson);
 
-    const chosen = chooseParentClaims(nextPerson.parentClaims || []);
+    const chosen = chooseParentClaims(nextPerson.parentClaims || [],
+      FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1);
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
@@ -397,7 +398,9 @@ GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
     // all are read (see placeParents), so a parent coded only as a parent (e.g. one of a same-sex
     // couple) isn't held to a mother's or father's gender
     const claims = firstNodeData.parentClaims || (firstNodeData.parentClaims = []);
-    // (KIN:023, a step-parent: used only when a child has no other parents, as in the legacy importer)
+    // (KIN:023, a step-parent: placed only when a child has no other parents - unplaced, it would be
+    // disconnected and the import would fail. The editor has no step relationship, so it's saved back
+    // as a parent.)
     claims.push({ node: secondNodeData.nodeId, gender: (rel === 'KIN:027') ? 'F' : (rel === 'KIN:028') ? 'M' : null,
       adoptive: rel === 'KIN:022', step: rel === 'KIN:023' });
   } else if (rel === 'KIN:026' || rel === 'KIN:030' || rel === 'KIN:048'  || rel === 'KIN:049'){

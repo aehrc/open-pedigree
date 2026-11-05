@@ -121,6 +121,7 @@ export default class NodeMenu {
   targetNode: any;
   _onscreen: any;
   _updating: any;
+  _changingField: any;
   _updateDisorderColor: any;
   _updateGeneColor: any;
   _updateQuestionnaireLegendColor: any;
@@ -467,6 +468,8 @@ export default class NodeMenu {
       // Left, a typing field shows what was stored (its text is kept while it's typed in: see
       // _setCrtData).
       field.addEventListener('blur', function() {
+        // typing in it again later is a new undo step
+        editor.getActionStack().startNewStep();
         if (_this.targetNode && !_this._updating) {
           _this.update();
         }
@@ -527,7 +530,13 @@ export default class NodeMenu {
           if (typingField && isTypedInput(event)) {
             fireEvent.typed = true;
           }
-          document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: fireEvent }));
+          // the update this change causes leaves this field's text as typed (see _setCrtData)
+          _this._changingField = field;
+          try {
+            document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: fireEvent }));
+          } finally {
+            _this._changingField = null;
+          }
         } else {
           var properties: any = {};
           properties[method] = _this.fieldMap[field.name].crtValue;
@@ -1017,12 +1026,13 @@ export default class NodeMenu {
     });
   }
 
-  // keepFocusedText: leave the text of a text, text-area or number field that has focus as it is (an
-  // update after each typed change would otherwise write the stored value back into it mid-typing:
-  // '-0' as '0', '1e5' as '100000', a capitalised name, an input method's composition).
+  // keepFocusedText: in the update a field's own change causes, leave that text, text-area or number
+  // field's text as it is (the stored value written back mid-typing would turn '-0' into '0', '1e5'
+  // into '100000', capitalise a name, or break an input method's composition). Any other update - a
+  // linked record's refresh while it has focus - shows the stored value.
   _setCrtData(data: any, keepFocusedText?: boolean): any {
     var _this = this;
-    var focused: any = keepFocusedText ? document.activeElement : null;
+    var focused: any = keepFocusedText ? this._changingField : null;
     Object.keys(this.fieldMap).forEach(function (name: any) {
       // A field in `data` with no value has none (the form's controls are reused between people,
       // so the last person's value mustn't stay); only a field `data` leaves out keeps its value.

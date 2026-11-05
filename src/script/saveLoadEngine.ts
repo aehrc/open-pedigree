@@ -123,7 +123,8 @@ export default class SaveLoadEngine {
     return editor.getGraph().toJSON();
   }
 
-  createGraphFromSerializedData(JSONString: any, noUndo?: any, centerAround0?: any): void {
+  // Returns whether the pedigree loaded (false when its data couldn't be read: the graph is cleared).
+  createGraphFromSerializedData(JSONString: any, noUndo?: any, centerAround0?: any): boolean {
     console.log('---- load: parsing data ----', JSONString);
     document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
@@ -135,7 +136,7 @@ export default class SaveLoadEngine {
       alert('Error loading the graph');
       document.dispatchEvent(new CustomEvent('pedigree:graph:clear'));
       document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
-      return;
+      return false;
     }
 
     if (editor.getView().applyChanges(changeSet, false)) {
@@ -153,7 +154,10 @@ export default class SaveLoadEngine {
     this._resolveLinkedPatientNames();
 
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
+
+    return true;
   }
+
 
   // A name found here isn't an undo step: the user didn't make it, and a step made after an undo or
   // redo reloaded a state would drop the steps that could be redone. It goes into the current

@@ -421,6 +421,7 @@ export default class PedigreeEditor {
           // (a mapped property holds one value, even for a repeating item)
           tried = true;
           node[target.setter](item.initialOptions[0].value);
+          summary = null; // (another item may show only with this answer)
         } else if (!item.mapping) {
           if (!isBlankValue(node.getQuestionnaireAnswer(item.linkId))) {
             return;
@@ -430,6 +431,7 @@ export default class PedigreeEditor {
           });
           tried = true;
           node.setQuestionnaireAnswer(item.linkId, item.repeats ? answers : answers[0]);
+          summary = null; // (another item may show only with this answer)
         }
       } catch (err) {
         console.warn('Couldn\'t give a new person the default for ' + item.linkId, err);

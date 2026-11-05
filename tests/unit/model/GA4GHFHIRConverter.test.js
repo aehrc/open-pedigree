@@ -437,7 +437,7 @@ describe('GA4GHFHIRConverter adoption: fetus and step-parents', () => {
     expect(fetus.isAdopted).toBeFalsy();
   });
 
-  it('places step-parents (KIN:023) when a child has no other parents', () => {
+  it('places step-parents (KIN:023) when a child has no other parents, so the pedigree opens', () => {
     const gg = structuredClone(simpleGG);
     let exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
     for (const code of ['KIN:027', 'KIN:028', 'KIN:003']) {
@@ -447,6 +447,7 @@ describe('GA4GHFHIRConverter adoption: fetus and step-parents', () => {
     const child = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.getParents(v).length === 2);
     expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
   });
+
 });
 
 describe('chooseParentClaims (D2)', () => {
@@ -457,6 +458,15 @@ describe('chooseParentClaims (D2)', () => {
   it('takes the claims that aren\'t step-parents when there are any', () => {
     const claims = [{ node: 1, gender: 'F', step: true }, { node: 2, gender: 'M' }];
     expect(chooseParentClaims(claims)).toEqual({ claims: [claims[1]], adopted: false, left: [claims[0]] });
+  });
+  it('takes a fetus\'s biological parents over its adoptive ones (a fetus can\'t be adopted)', () => {
+    const claims = [{ node: 1, gender: 'F' }, { node: 2, gender: null, adoptive: true }, { node: 3, gender: 'M' }];
+    expect(chooseParentClaims(claims, true)).toEqual({ claims: [claims[0], claims[2]], adopted: false, left: [claims[1]] });
+  });
+  it('takes a fetus\'s adoptive parents, not adopted, when they are all it has', () => {
+    const claims = [{ node: 2, gender: null, adoptive: true }];
+    expect(chooseParentClaims(claims, true).adopted).toBe(false);
+    expect(chooseParentClaims(claims, true).claims).toEqual(claims);
   });
   it('takes step-parents when they are all there is', () => {
     const claims = [{ node: 1, gender: 'F', step: true }];

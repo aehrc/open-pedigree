@@ -367,6 +367,13 @@ describe('LegacyFHIRConverter parents', () => {
     expect(() => LegacyFHIRConverter.initFromFHIR(adoptive)).toThrow(/not a valid/);
   });
 
+  it('doesn\'t let a step-parent stand in for a real parent it can\'t find', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension = [parentExtension('NMTH', '#MISSING'), parentExtension('STPFTH', '#FMH_1')];
+    });
+    expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/not a valid/);
+  });
+
   it('doesn\'t take "not adopted" for adoptive', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension[1] = {

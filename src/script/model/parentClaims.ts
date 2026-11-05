@@ -42,9 +42,16 @@ export function placeParents(claims, genderOf) {
  * claims that aren't step-parents, if any (a step-parent is a parent's partner); else all of them.
  * `left` are the claims not placed.
  */
-export function chooseParentClaims(claims) {
+export function chooseParentClaims(claims, fetus = false) {
+  // A fetus can't be adopted in the editor: its biological parents, if it has any, as anyone else's.
+  if (fetus) {
+    const biological = claims.filter((c) => !c.adoptive && !c.step);
+    if (biological.length > 0) {
+      return { claims: biological, adopted: false, left: claims.filter((c) => c.adoptive || c.step) };
+    }
+  }
   const adoptive = claims.filter((c) => c.adoptive);
-  if (adoptive.length > 0) {
+  if (adoptive.length > 0 && !fetus) {
     return { claims: adoptive, adopted: true, left: claims.filter((c) => !c.adoptive) };
   }
   const notStep = claims.filter((c) => !c.step);
