@@ -17,6 +17,11 @@ describe('PedigreeImport.validateBaseGraph', () => {
       .toThrow(DISCONNECTED);
   });
 
+  it('says where, as validate gives it, for a real disconnected pedigree', () => {
+    expect(() => PedigreeImport.initFromPED('fam 1 0 0 1 1\nfam 2 0 0 2 1', false, false, true))
+      .toThrow(/^Unsupported pedigree: .* disconnected from each other \(disconnected component detected \(\[id: \d+, .*type: [A-Z]+\]\)\)$/);
+  });
+
   it('says who is disconnected, without the internal "Assertion failed"', () => {
     expect(() => PedigreeImport.validateBaseGraph(failingWith('Assertion failed: disconnected component detected (person 7)')))
       .toThrow(DISCONNECTED + ' (disconnected component detected (person 7))');

@@ -1,6 +1,7 @@
 import { isInt } from 'pedigree/model/helpers';
 import BaseGraph from 'pedigree/model/baseGraph';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 
 var PedigreeImport = function () {
@@ -141,7 +142,7 @@ PedigreeImport.initFromPhenotipsInternal = function(inputG) {
     }
   }
 
-  newG.validate();
+  validateImportedGraph(newG);
 
   return newG;
 };
@@ -609,29 +610,12 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
 
 /* ===============================================================================================
  *
- * Validates the generated basegraph and throws one of the following exceptions:
- *
- *  1) "Unsupported pedigree: some components of the imported pedigree are disconnected from each other (<who>)"
- *  2) "Unable to import pedigree (<the reason validate gave>)"
- *
- * The method is a wrapper around the internal validate method, which may throw many exceptions
- * which change from version to version
+ * Validates the generated basegraph: see validateImportedGraph for the exceptions it throws.
  *
  * ===============================================================================================
  */
 PedigreeImport.validateBaseGraph = function(newG) {
-  try {
-    newG.validate();
-  } catch( err) {
-    // validate throws strings, but anything it calls may throw an Error
-    var reason = ((err && err.message) ? err.message : String(err)).replace(/^Assertion failed: /, '');
-    if (reason.indexOf('disconnected component') !== -1) {
-      // (the reason names the person cut off from the rest)
-      throw 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other (' + reason + ')';
-    } else {
-      throw 'Unable to import pedigree (' + reason + ')';
-    }
-  }
+  validateImportedGraph(newG);
 };
 
 /* ===============================================================================================

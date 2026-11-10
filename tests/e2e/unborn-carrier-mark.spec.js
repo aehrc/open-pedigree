@@ -102,7 +102,8 @@ test('the "P" and the mark are redrawn when either status changes', async ({ pag
   const born = await page.evaluate((nodeOfSrc) => {
     const g = eval(nodeOfSrc)('3').getGraphics();
     const p = g.getUnbornShape();
-    return { pDrawn: !!(p && p.node), dotOffset: Math.round(g._carrierGraphic.attr('cy') - g.getY()) };
+    // (cleared, not just removed from the canvas: the shape lists getUnbornShape() among its parts)
+    return { pDrawn: p !== null, dotOffset: Math.round(g._carrierGraphic.attr('cy') - g.getY()) };
   }, NODE_OF);
   expect(born).toEqual({ pDrawn: false, dotOffset: 0 });
 

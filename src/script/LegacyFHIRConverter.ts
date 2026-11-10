@@ -1,4 +1,5 @@
 import BaseGraph from 'pedigree/model/baseGraph';
+import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
@@ -362,7 +363,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       }
     }
 
-    newG.validate();
+    validateImportedGraph(newG);
 
     return newG;
   } else {

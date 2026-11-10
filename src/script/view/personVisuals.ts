@@ -488,10 +488,9 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   updateCarrierGraphic(): any {
     this.drawCarrierGraphic();
-    // An unborn person's "P" makes room for the mark (see drawUnbornShape): redraw it to suit.
-    if (this.getNode().getLifeStatus() == 'unborn') {
-      this.drawUnbornShape();
-    }
+    // An unborn person's "P" makes room for the mark (see drawUnbornShape): redraw it to suit (for
+    // anyone else this clears it).
+    this.drawUnbornShape();
   }
 
   drawCarrierGraphic(): any {
@@ -545,7 +544,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
       }
       if (editor.isReadOnlyMode()) {
         this._carrierGraphic.toFront();
-      } else {
+      } else if (this.getHoverBox()) {
         this._carrierGraphic.insertBefore(this.getHoverBox().getFrontElements());
       }
     } else {
@@ -685,8 +684,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
       this.updateSBLabel();
     }
     // An unborn person's "P" is drawn with the carrier mark, which moves to make room for it (and
-    // back): on a change to or from unborn, redraw both - unless setGenderGraphics just did.
-    if ((status == 'unborn' || oldStatus == 'unborn') && oldShapeType == newShapeType) {
+    // back): redraw both - unless setGenderGraphics just did.
+    if (oldShapeType == newShapeType) {
       this.updateCarrierGraphic();
     }
     this.updateAgeLabel();
