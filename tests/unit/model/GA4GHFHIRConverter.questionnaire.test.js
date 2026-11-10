@@ -712,6 +712,46 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(codings(saved).observations).toContainEqual({ coding: [{ system: SNOMED, code: '271807003', display: 'Eruption of skin' }] });
   });
 
+  // redcap_pedigree_editor#8: a v0.4 pedigree has no QuestionnaireResponses, and its gene was
+  // coded in the gene system of its day
+  function savedWithoutQuestionnaireResponses(geneCS, gene = '7551') {
+    useTerminology([SNOMED, SNOMED, geneCS]);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: [gene] });
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    saved.entry = saved.entry.filter((e) => e.resource.resourceType !== 'QuestionnaireResponse');
+    return JSON.stringify(saved);
+  }
+
+  it.each(['http://www.genenames.org/geneId', 'http://www.genenames.org', 'http://www.ncbi.nlm.nih.gov/gene'])(
+    'reads a gene in an earlier gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS) => {
+      const before = savedWithoutQuestionnaireResponses(geneCS);
+      const { john, saved } = openAndSave(before, SNOMEDCT);
+      expect(john.candidateGenes).toEqual(['MYBPC3']);
+      expect(john.hpoTerms).toEqual(['271807003']);
+      // and it's written back with its own coding
+      expect(codings(saved).observations).toContainEqual({ coding: [{ system: geneCS, code: '7551', display: 'MYBPC3' }] });
+    });
+
+  it('reads an HGNC id in a code system it doesn\'t know as a gene', () => {
+    NAMES['HGNC:1097'] = 'BRAF';
+    try {
+      const { john } = openAndSave(savedWithoutQuestionnaireResponses('urn:example:genes', 'HGNC:1097'), SNOMEDCT);
+      expect(john.candidateGenes).toEqual(['BRAF']);
+      expect(john.hpoTerms).toEqual(['271807003']);
+    } finally {
+      delete NAMES['HGNC:1097'];
+    }
+  });
+
+  it('reads a gene as a phenotype only if the Questionnaire has no genes', () => {
+    const items = parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items.filter((i) => i.linkId !== 'candidate_genes');
+    const before = savedWithoutQuestionnaireResponses('http://www.genenames.org/geneId');
+    const { john } = openAndSave(before, SNOMEDCT, items);
+    expect(john.candidateGenes).toBeUndefined();
+    expect(john.hpoTerms).toEqual(['271807003', 'MYBPC3']);
+  });
+
   it('leaves a custom legend item\'s answer to its own item, not the phenotypes', () => {
     const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
     const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };

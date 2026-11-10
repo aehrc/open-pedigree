@@ -752,8 +752,36 @@ GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, no
   if (answers.hpo_positive || answers.candidate_genes) {
     return null;
   }
+  // A gene saved before QuestionnaireResponses (or under an earlier gene terminology) is told by
+  // its code system, or failing that an HGNC id as its code (redcap_pedigree_editor#8).
+  if (inUse.includes('candidate_genes') && isGeneCoding(codeableConcept)) {
+    return 'candidate_genes';
+  }
   return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
 };
+
+// Code systems for genes, including the ones earlier versions of the editor and its hosts used by
+// default: a coding in one of these is a gene, whatever the gene terminology is now.
+export const KNOWN_GENE_CODE_SYSTEMS = [
+  'http://www.genenames.org',
+  'http://www.genenames.org/geneId',
+  'https://www.genenames.org',
+  'https://www.genenames.org/geneId',
+  'http://purl.bioontology.org/ontology/HGNC/hgnc.owl',
+  'http://www.ncbi.nlm.nih.gov/gene',
+  'https://www.ncbi.nlm.nih.gov/gene',
+  'http://www.ensembl.org',
+  'https://www.ensembl.org',
+];
+
+const HGNC_ID = /^HGNC:[0-9]+$/;
+
+// Whether any coding of a CodeableConcept is a gene: in a known gene code system, or coded by an
+// HGNC id.
+function isGeneCoding(codeableConcept) {
+  return ((codeableConcept && codeableConcept.coding) || []).some((coding) =>
+    KNOWN_GENE_CODE_SYSTEMS.includes(coding.system) || (typeof coding.code === 'string' && HGNC_ID.test(coding.code)));
+}
 
 // Whether a CodeableConcept is listed in the person's QuestionnaireResponse only under items other
 // than the given ones: another legend item's answer.
