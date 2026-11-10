@@ -4,6 +4,7 @@ import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questio
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
+import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
@@ -305,7 +306,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     newG.addEdge(chhubID, personID, defaultEdgeWeight);
   }
 
-  newG.validate();
+  validateImportedGraph(newG);
 
   // set any partner relationships
   for (const nextPerson of nodeData){

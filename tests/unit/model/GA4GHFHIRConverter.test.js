@@ -471,3 +471,17 @@ describe('chooseParentClaims (D2)', () => {
     expect(chooseParentClaims(claims)).toEqual({ claims, adopted: false, left: [] });
   });
 });
+
+describe('GA4GHFHIRConverter import errors', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('reports a disconnected pedigree in the same words as the other importers', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
+    // no relationships: three unconnected people
+    exported.entry = exported.entry.filter((e) => e.resource.resourceType !== 'FamilyMemberHistory');
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)))
+      .toThrow(/^Unsupported pedigree: some components of the imported pedigree are disconnected from each other \(disconnected component detected/);
+  });
+});

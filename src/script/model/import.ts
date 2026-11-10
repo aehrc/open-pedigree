@@ -1,6 +1,7 @@
 import { isInt } from 'pedigree/model/helpers';
 import BaseGraph from 'pedigree/model/baseGraph';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 
 var PedigreeImport = function () {
@@ -141,7 +142,7 @@ PedigreeImport.initFromPhenotipsInternal = function(inputG) {
     }
   }
 
-  newG.validate();
+  validateImportedGraph(newG);
 
   return newG;
 };
@@ -609,26 +610,12 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
 
 /* ===============================================================================================
  *
- * Validates the generated basegraph and throws one of the following exceptions:
- *
- *  1) "Unsupported pedigree: some components of the imported pedigree are disconnected from each other"
- *  2) "Unable to import pedigree"
- *
- * The method is a wrapper around the internal vlaidate method, which may throw many exceptions
- * which change form version to version
+ * Validates the generated basegraph: see validateImportedGraph for the exceptions it throws.
  *
  * ===============================================================================================
  */
 PedigreeImport.validateBaseGraph = function(newG) {
-  try {
-    newG.validate();
-  } catch( err) {
-    if (err.indexOf('disconnected component')) {
-      throw 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other';
-    } else {
-      throw 'Unable to import pedigree';
-    }
-  }
+  validateImportedGraph(newG);
 };
 
 /* ===============================================================================================
