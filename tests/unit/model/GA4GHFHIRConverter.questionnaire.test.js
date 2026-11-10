@@ -729,6 +729,8 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     ['https://www.genenames.org/geneId', '7551'],
     ['http://www.ncbi.nlm.nih.gov/gene', '4607'],
     ['http://www.ensembl.org', 'ENSG00000134571'],
+    ['http://www.genenames.org/', '7551'],
+    ['http://identifiers.org/hgnc', '7551'],
   ])('reads a gene in another gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS, code) => {
     const added = !(code in NAMES);
     NAMES[code] = NAMES[code] || 'MYBPC3';
@@ -776,6 +778,28 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(john.hpoTerms).toEqual(['271807003']);
   });
 
+  it('keeps a gene its QuestionnaireResponse doesn\'t list, when it lists the person\'s other genes', () => {
+    // (kept rather than left out: left out, it would be gone from the next save)
+    useTerminology([SNOMED, SNOMED, 'http://www.genenames.org/geneId']);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    NAMES['1097'] = 'BRAF';
+    try {
+      Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: ['7551', '1097'] });
+      const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+      for (const qr of saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse')) {
+        const genes = qr.item.find((i) => i.linkId === 'candidate_genes');
+        if (genes) {
+          genes.answer = genes.answer.filter((a) => a.valueCoding.code !== '1097');
+        }
+      }
+      const { john } = openAndSave(JSON.stringify(saved), SNOMEDCT);
+      expect(john.candidateGenes.sort()).toEqual(['BRAF', 'MYBPC3']);
+    } finally {
+      delete NAMES['1097'];
+    }
+  });
+
+  // (as the gene's own coding is kept and written back, a gene shown as a phenotype is saved as it was)
   it('reads a gene as a phenotype only if the Questionnaire has no genes', () => {
     const items = parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items.filter((i) => i.linkId !== 'candidate_genes');
     const before = savedWithoutQuestionnaireResponses('http://www.genenames.org/geneId');

@@ -760,14 +760,16 @@ GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, no
   return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
 };
 
-// Code systems for genes, including those earlier versions of the editor and its hosts used by
-// default (the legacy converter's): a coding in one of these is a gene, whatever the gene
-// terminology is now.
+// Code systems for genes: a coding in one of these is a gene, whatever the gene terminology is now.
+// The editor's own, past (LEGACY_GENE_SYSTEMS, which the legacy converter also translates) and
+// present (HGNC_SYSTEM), and other common gene code systems. Compared without a trailing '/'.
 const KNOWN_GENE_CODE_SYSTEMS = [
   ...LEGACY_GENE_SYSTEMS,
   HGNC_SYSTEM,
   'https://www.genenames.org',
   'https://www.genenames.org/geneId',
+  'http://identifiers.org/hgnc',
+  'https://identifiers.org/hgnc',
   'http://www.ncbi.nlm.nih.gov/gene',
   'https://www.ncbi.nlm.nih.gov/gene',
   'http://www.ensembl.org',
@@ -781,7 +783,8 @@ const HGNC_ID = /^HGNC:[0-9]+$/i;
 // HGNC id.
 function isGeneCoding(codeableConcept) {
   return ((codeableConcept && codeableConcept.coding) || []).some((coding) =>
-    KNOWN_GENE_CODE_SYSTEMS.includes(coding.system) || (typeof coding.code === 'string' && HGNC_ID.test(coding.code.trim())));
+    (typeof coding.system === 'string' && KNOWN_GENE_CODE_SYSTEMS.includes(coding.system.replace(/\/+$/, '')))
+    || (typeof coding.code === 'string' && HGNC_ID.test(coding.code.trim())));
 }
 
 // Whether a CodeableConcept is listed in the person's QuestionnaireResponse only under items other
