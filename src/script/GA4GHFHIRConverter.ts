@@ -270,9 +270,10 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     }
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
-    // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION): with any parent placed, their
-    // relationship codes say whether the person is adopted, and the extension is left alone.
-    if (nextPerson.adoptedWithoutParents && motherLink == null && fatherLink == null && !fetus && newG.properties[personID]) {
+    // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION): with any parent relationship
+    // in the file (placed or not), those codes say whether the person is adopted, and the extension
+    // is left alone.
+    if (nextPerson.adoptedWithoutParents && (nextPerson.parentClaims || []).length === 0 && !fetus && newG.properties[personID]) {
       newG.properties[personID].isAdopted = true;
     }
 
