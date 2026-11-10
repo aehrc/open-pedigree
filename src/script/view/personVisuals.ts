@@ -422,7 +422,12 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   drawUnbornShape(): any {
     this._unbornShape && this._unbornShape.remove();
     if(this.getNode().getLifeStatus() == 'unborn') {
-      this._unbornShape = editor.getPaper().text(this.getX(), this.getY(), 'P').attr(PedigreeEditorParameters.attributes.unbornShape);
+      if (this.hasCarrierMark()) {
+        this._unbornShape = editor.getPaper().text(this.getX(), this.getY() - this._radius * 0.4, 'P')
+          .attr(PedigreeEditorParameters.attributes.unbornShapeWithCarrierMark);
+      } else {
+        this._unbornShape = editor.getPaper().text(this.getX(), this.getY(), 'P').attr(PedigreeEditorParameters.attributes.unbornShape);
+      }
       if(!editor.isUnsupportedBrowser()) {
         this._unbornShape.insertBefore(this.getHoverBox().getFrontElements());
       }
@@ -479,17 +484,44 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    * @method updateCarrierGraphic
    */
   updateCarrierGraphic(): any {
+    this.drawCarrierGraphic();
+    // An unborn person's "P" makes room for the mark (see drawUnbornShape): redraw it to suit.
+    if (this.getNode().getLifeStatus() == 'unborn' && this.getHoverBox()) {
+      this.drawUnbornShape();
+    }
+  }
+
+  /**
+   * True if this Person shows a carrier dot or a pre-symptomatic bar inside the shape.
+   *
+   * @method hasCarrierMark
+   */
+  hasCarrierMark(): boolean {
+    var status = this.getNode().getCarrierStatus();
+    var lifeStatus = this.getNode().getLifeStatus();
+    if (lifeStatus == 'aborted' || lifeStatus == 'miscarriage') {
+      return status == 'carrier';
+    }
+    return status == 'carrier' || status == 'presymptomatic';
+  }
+
+  drawCarrierGraphic(): any {
     var x: any;
     var y: any;
 
     this._carrierGraphic && this._carrierGraphic.remove();
     var status = this.getNode().getCarrierStatus();
+    // an unborn person's "P" takes the upper half of the shape, the mark goes in the lower half
+    var unborn = this.getNode().getLifeStatus() == 'unborn';
 
     if (status != '' && status != 'affected') {
       if (status == 'carrier') {
         if (this.getNode().getLifeStatus() == 'aborted' || this.getNode().getLifeStatus() == 'miscarriage') {
           x = this.getX();
           y = this.getY() - this._radius/2;
+        } else if (unborn) {
+          x = this.getX();
+          y = this.getY() + this._radius * 0.45;
         } else {
           x = this.getX();
           y = this.getY();
@@ -502,9 +534,16 @@ export default class PersonVisuals extends AbstractPersonVisuals {
         }
         editor.getPaper().setStart();
         var startX = (this.getX()-PedigreeEditorParameters.attributes.presymptomaticShapeWidth/2);
-        var startY = this.getY()-this._radius;
-        editor.getPaper().rect(startX, startY, PedigreeEditorParameters.attributes.presymptomaticShapeWidth, this._radius*2).attr(PedigreeEditorParameters.attributes.presymptomaticShape);
-        if (this.getNode().getGender() == 'U') {
+        // unborn: the bar runs from just below the "P" to the bottom of the shape
+        var startY = unborn ? this.getY() + this._radius * 0.05 : this.getY()-this._radius;
+        editor.getPaper().rect(startX, startY, PedigreeEditorParameters.attributes.presymptomaticShapeWidth, this.getY() + this._radius - startY).attr(PedigreeEditorParameters.attributes.presymptomaticShape);
+        if (this.getNode().getGender() == 'U' && unborn) {
+          // only the bottom point of the diamond: the bar stops short of the top
+          var bottomY = this.getY()+this._radius;
+          editor.getPaper().path('M '+startX + ' ' + bottomY +
+                                           'L ' + (this.getX()) + ' ' + (this.getY()+this._radius*1.1) +
+                                           'L ' + (startX + PedigreeEditorParameters.attributes.presymptomaticShapeWidth) + ' ' + bottomY + 'Z').attr(PedigreeEditorParameters.attributes.presymptomaticShape);
+        } else if (this.getNode().getGender() == 'U') {
           editor.getPaper().path('M '+startX + ' ' + startY +
                                            'L ' + (this.getX()) + ' ' + (this.getY()-this._radius*1.1) +
                                            'L ' + (startX + PedigreeEditorParameters.attributes.presymptomaticShapeWidth) + ' ' + (startY) + 'Z').attr(PedigreeEditorParameters.attributes.presymptomaticShape);
@@ -657,6 +696,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
       this.updateSBLabel();
     } else if (status == 'unborn') {
       this.drawUnbornShape();
+    }
+    // the carrier mark moves to make room for the "P" (and back): redraw it on a change to or from unborn
+    if (status == 'unborn' || oldStatus == 'unborn') {
+      this.updateCarrierGraphic();
     }
     this.updateAgeLabel();
   }

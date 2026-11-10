@@ -20,6 +20,9 @@ PedigreeEditorParameters.attributes = {
   twinMonozygothicLineShiftY: 24,
   curvedLinesCornerRadius: 25,
   unbornShape: {'font-size': 50, 'font-family': 'Cambria'},
+  // the "P" of an unborn person who also has a carrier dot or pre-symptomatic bar: smaller and in the
+  // upper half of the shape, leaving the lower half for the mark
+  unbornShapeWithCarrierMark: {'font-size': 30, 'font-family': 'Cambria'},
   carrierShape: {fill : '#333333'},
   carrierDotRadius: 8,
   presymptomaticShape: {fill : '#777777', 'stroke': '#777777'},
