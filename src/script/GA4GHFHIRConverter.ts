@@ -770,6 +770,9 @@ const KNOWN_GENE_CODE_SYSTEMS = [
   'https://www.genenames.org/geneId',
   'http://identifiers.org/hgnc',
   'https://identifiers.org/hgnc',
+  'http://purl.bioontology.org/ontology/HGNC',
+  // HGNC's OID
+  'urn:oid:2.16.840.1.113883.6.281',
   'http://www.ncbi.nlm.nih.gov/gene',
   'https://www.ncbi.nlm.nih.gov/gene',
   'http://www.ensembl.org',

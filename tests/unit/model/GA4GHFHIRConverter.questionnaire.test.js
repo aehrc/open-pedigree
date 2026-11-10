@@ -731,6 +731,7 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     ['http://www.ensembl.org', 'ENSG00000134571'],
     ['http://www.genenames.org/', '7551'],
     ['http://identifiers.org/hgnc', '7551'],
+    ['urn:oid:2.16.840.1.113883.6.281', '7551'],
   ])('reads a gene in another gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS, code) => {
     const added = !(code in NAMES);
     NAMES[code] = NAMES[code] || 'MYBPC3';
