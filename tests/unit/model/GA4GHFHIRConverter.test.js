@@ -452,6 +452,32 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     expect(again).not.toContain('KIN:022');
   });
 
+  it('ignores an adopted extension on a fetus', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.lifeStatus = 'stillborn';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
+    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+  });
+
+  it('leaves a person with one parent in the pedigree unadopted, whatever the extension says', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.fName = 'Kid';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const resources = exported.entry.map((e) => e.resource);
+    const ref = (name) => resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === name).id;
+    const kid = ref('Kid');
+    resources.find((r) => r.id === kid).extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    // without Jane: only John is placed
+    const jane = ref('Jane');
+    exported.entry = exported.entry.filter((e) => !JSON.stringify(e.resource).includes(jane)
+      || e.resource.resourceType === 'Composition');
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+  });
+
   it('reads an adopted extension saying false as not adopted', () => {
     const graph = withAdoptedExtension('John', false);
     expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
