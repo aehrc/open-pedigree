@@ -723,25 +723,57 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     return JSON.stringify(saved);
   }
 
-  it.each(['http://www.genenames.org/geneId', 'http://www.genenames.org', 'http://www.ncbi.nlm.nih.gov/gene'])(
-    'reads a gene in an earlier gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS) => {
-      const before = savedWithoutQuestionnaireResponses(geneCS);
+  it.each([
+    ['http://www.genenames.org/geneId', '7551'],
+    ['http://www.genenames.org', '7551'],
+    ['https://www.genenames.org/geneId', '7551'],
+    ['http://www.ncbi.nlm.nih.gov/gene', '4607'],
+    ['http://www.ensembl.org', 'ENSG00000134571'],
+  ])('reads a gene in another gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS, code) => {
+    const added = !(code in NAMES);
+    NAMES[code] = NAMES[code] || 'MYBPC3';
+    try {
+      const before = savedWithoutQuestionnaireResponses(geneCS, code);
       const { john, saved } = openAndSave(before, SNOMEDCT);
       expect(john.candidateGenes).toEqual(['MYBPC3']);
       expect(john.hpoTerms).toEqual(['271807003']);
       // and it's written back with its own coding
-      expect(codings(saved).observations).toContainEqual({ coding: [{ system: geneCS, code: '7551', display: 'MYBPC3' }] });
-    });
+      expect(codings(saved).observations).toContainEqual({ coding: [{ system: geneCS, code, display: 'MYBPC3' }] });
+    } finally {
+      if (added) {
+        delete NAMES[code];
+      }
+    }
+  });
 
-  it('reads an HGNC id in a code system it doesn\'t know as a gene', () => {
-    NAMES['HGNC:1097'] = 'BRAF';
+  it('reads a gene in today\'s HGNC system as a gene under a terminology with another gene system', () => {
+    const { john } = openAndSave(savedWithoutQuestionnaireResponses(HGNC), [SNOMED, SNOMED, 'urn:example:genes']);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+  });
+
+  it.each(['HGNC:1097', 'hgnc:1097', ' HGNC:1097 '])('reads an HGNC id (%j) in a code system it doesn\'t know as a gene', (code) => {
+    NAMES[code] = 'BRAF';
     try {
-      const { john } = openAndSave(savedWithoutQuestionnaireResponses('urn:example:genes', 'HGNC:1097'), SNOMEDCT);
+      const { john } = openAndSave(savedWithoutQuestionnaireResponses('urn:example:genes', code), SNOMEDCT);
       expect(john.candidateGenes).toEqual(['BRAF']);
       expect(john.hpoTerms).toEqual(['271807003']);
     } finally {
-      delete NAMES['HGNC:1097'];
+      delete NAMES[code];
     }
+  });
+
+  it('keeps a gene its QuestionnaireResponse doesn\'t list, when it lists the person\'s phenotypes', () => {
+    useTerminology([SNOMED, SNOMED, 'http://www.genenames.org/geneId']);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: ['7551'] });
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    for (const qr of saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse')) {
+      qr.item = qr.item.filter((i) => i.linkId !== 'candidate_genes');
+    }
+    const { john } = openAndSave(JSON.stringify(saved), SNOMEDCT);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(john.hpoTerms).toEqual(['271807003']);
   });
 
   it('reads a gene as a phenotype only if the Questionnaire has no genes', () => {

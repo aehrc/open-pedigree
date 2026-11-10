@@ -3,7 +3,7 @@ import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
-import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
+import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
@@ -738,49 +738,50 @@ function codingKey(coding) {
 // code-less Observation with a valueCodeableConcept that matched none of the editor's code systems
 // belongs to, or null. Phenotypes, genes and custom legend items are all saved in that shape; the
 // person's QuestionnaireResponse lists each one's coding under its item (indexLegendAnswers), so it
-// says which - another item's is restored from the QuestionnaireResponse itself. One listed nowhere,
-// for a person whose QuestionnaireResponse lists no phenotypes or genes (or who has none: saved
-// before custom legends existed), is a phenotype, the likelier - left out, as every phenotype is,
-// if the Questionnaire has none.
+// says which - another item's is restored from the QuestionnaireResponse itself. One listed nowhere
+// is a gene if it's coded as one (a known gene code system, or an HGNC id - e.g. a gene saved before
+// QuestionnaireResponses, in that day's gene system: redcap_pedigree_editor#8). Otherwise, for a
+// person whose QuestionnaireResponse lists no phenotypes or genes (or who has none: saved before
+// custom legends existed), it's a phenotype, the likelier - left out, as every phenotype is, if the
+// Questionnaire has none.
 GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
   const inUse = ['hpo_positive', 'candidate_genes'].filter((linkId) => this._hasReservedLegendItem(linkId, 'legendObservation'));
   const listedUnder = this._itemsListing(codeableConcept, nodeData);
   if (listedUnder.length > 0) {
     return inUse.find((linkId) => listedUnder.includes(linkId)) || null;
   }
+  if (inUse.includes('candidate_genes') && isGeneCoding(codeableConcept)) {
+    return 'candidate_genes';
+  }
   const answers = nodeData.legendAnswers || {};
   if (answers.hpo_positive || answers.candidate_genes) {
     return null;
   }
-  // A gene saved before QuestionnaireResponses (or under an earlier gene terminology) is told by
-  // its code system, or failing that an HGNC id as its code (redcap_pedigree_editor#8).
-  if (inUse.includes('candidate_genes') && isGeneCoding(codeableConcept)) {
-    return 'candidate_genes';
-  }
   return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
 };
 
-// Code systems for genes, including the ones earlier versions of the editor and its hosts used by
-// default: a coding in one of these is a gene, whatever the gene terminology is now.
-export const KNOWN_GENE_CODE_SYSTEMS = [
-  'http://www.genenames.org',
-  'http://www.genenames.org/geneId',
+// Code systems for genes, including those earlier versions of the editor and its hosts used by
+// default (the legacy converter's): a coding in one of these is a gene, whatever the gene
+// terminology is now.
+const KNOWN_GENE_CODE_SYSTEMS = [
+  ...LEGACY_GENE_SYSTEMS,
+  HGNC_SYSTEM,
   'https://www.genenames.org',
   'https://www.genenames.org/geneId',
-  'http://purl.bioontology.org/ontology/HGNC/hgnc.owl',
   'http://www.ncbi.nlm.nih.gov/gene',
   'https://www.ncbi.nlm.nih.gov/gene',
   'http://www.ensembl.org',
   'https://www.ensembl.org',
 ];
 
-const HGNC_ID = /^HGNC:[0-9]+$/;
+// (as the legacy converter reads HGNC ids)
+const HGNC_ID = /^HGNC:[0-9]+$/i;
 
 // Whether any coding of a CodeableConcept is a gene: in a known gene code system, or coded by an
 // HGNC id.
 function isGeneCoding(codeableConcept) {
   return ((codeableConcept && codeableConcept.coding) || []).some((coding) =>
-    KNOWN_GENE_CODE_SYSTEMS.includes(coding.system) || (typeof coding.code === 'string' && HGNC_ID.test(coding.code)));
+    KNOWN_GENE_CODE_SYSTEMS.includes(coding.system) || (typeof coding.code === 'string' && HGNC_ID.test(coding.code.trim())));
 }
 
 // Whether a CodeableConcept is listed in the person's QuestionnaireResponse only under items other

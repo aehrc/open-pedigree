@@ -28,8 +28,8 @@ const Graph: any = BaseGraph;
 // genenames.org and hp.owl before. Today's defaults differ (hp.owl, hgnc.owl), so these are recognised as well
 // as the editor's own.
 const LEGACY_PHENOTYPE_SYSTEMS = ['http://purl.obolibrary.org/obo/hp.fhir', 'http://purl.obolibrary.org/obo/hp.owl'];
-const LEGACY_GENE_SYSTEMS = ['http://www.genenames.org/geneId', 'http://www.genenames.org'];
-const HGNC_SYSTEM = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
+export const LEGACY_GENE_SYSTEMS = ['http://www.genenames.org/geneId', 'http://www.genenames.org'];
+export const HGNC_SYSTEM = 'http://purl.bioontology.org/ontology/HGNC/hgnc.owl';
 const HPO_SYSTEM = 'http://purl.obolibrary.org/obo/hp.owl';
 const GA4GH_PEDIGREE_PROFILE = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree';
 
