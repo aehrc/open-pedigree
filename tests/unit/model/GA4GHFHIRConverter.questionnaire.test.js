@@ -712,6 +712,103 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
     expect(codings(saved).observations).toContainEqual({ coding: [{ system: SNOMED, code: '271807003', display: 'Eruption of skin' }] });
   });
 
+  // redcap_pedigree_editor#8: a v0.4 pedigree has no QuestionnaireResponses, and its gene was
+  // coded in the gene system of its day
+  function savedWithoutQuestionnaireResponses(geneCS, gene = '7551') {
+    useTerminology([SNOMED, SNOMED, geneCS]);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: [gene] });
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    saved.entry = saved.entry.filter((e) => e.resource.resourceType !== 'QuestionnaireResponse');
+    return JSON.stringify(saved);
+  }
+
+  it.each([
+    ['http://www.genenames.org/geneId', '7551'],
+    ['http://www.genenames.org', '7551'],
+    ['https://www.genenames.org/geneId', '7551'],
+    ['http://www.ncbi.nlm.nih.gov/gene', '4607'],
+    ['http://www.ensembl.org', 'ENSG00000134571'],
+    ['http://www.genenames.org/', '7551'],
+    ['http://identifiers.org/hgnc', '7551'],
+    ['urn:oid:2.16.840.1.113883.6.281', '7551'],
+  ])('reads a gene in another gene system (%s), saved without QuestionnaireResponses, as a gene', (geneCS, code) => {
+    const added = !(code in NAMES);
+    NAMES[code] = NAMES[code] || 'MYBPC3';
+    try {
+      const before = savedWithoutQuestionnaireResponses(geneCS, code);
+      const { john, saved } = openAndSave(before, SNOMEDCT);
+      expect(john.candidateGenes).toEqual(['MYBPC3']);
+      expect(john.hpoTerms).toEqual(['271807003']);
+      // and it's written back with its own coding
+      expect(codings(saved).observations).toContainEqual({ coding: [{ system: geneCS, code, display: 'MYBPC3' }] });
+    } finally {
+      if (added) {
+        delete NAMES[code];
+      }
+    }
+  });
+
+  it('reads a gene in today\'s HGNC system as a gene under a terminology with another gene system', () => {
+    const { john } = openAndSave(savedWithoutQuestionnaireResponses(HGNC), [SNOMED, SNOMED, 'urn:example:genes']);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+  });
+
+  it.each(['HGNC:1097', 'hgnc:1097', ' HGNC:1097 '])('reads an HGNC id (%j) in a code system it doesn\'t know as a gene', (code) => {
+    NAMES[code] = 'BRAF';
+    try {
+      const { john } = openAndSave(savedWithoutQuestionnaireResponses('urn:example:genes', code), SNOMEDCT);
+      expect(john.candidateGenes).toEqual(['BRAF']);
+      expect(john.hpoTerms).toEqual(['271807003']);
+    } finally {
+      delete NAMES[code];
+    }
+  });
+
+  it('keeps a gene its QuestionnaireResponse doesn\'t list, when it lists the person\'s phenotypes', () => {
+    useTerminology([SNOMED, SNOMED, 'http://www.genenames.org/geneId']);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: ['7551'] });
+    const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+    for (const qr of saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse')) {
+      qr.item = qr.item.filter((i) => i.linkId !== 'candidate_genes');
+    }
+    const { john } = openAndSave(JSON.stringify(saved), SNOMEDCT);
+    expect(john.candidateGenes).toEqual(['MYBPC3']);
+    expect(john.hpoTerms).toEqual(['271807003']);
+  });
+
+  it('keeps a gene its QuestionnaireResponse doesn\'t list, when it lists the person\'s other genes', () => {
+    // (kept rather than left out: left out, it would be gone from the next save)
+    useTerminology([SNOMED, SNOMED, 'http://www.genenames.org/geneId']);
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));
+    NAMES['1097'] = 'BRAF';
+    try {
+      Object.assign(baseGraph.properties[0], { hpoTerms: ['271807003'], candidateGenes: ['7551', '1097'] });
+      const saved = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: baseGraph }, 'all', null, null));
+      for (const qr of saved.entry.map((e) => e.resource).filter((r) => r.resourceType === 'QuestionnaireResponse')) {
+        const genes = qr.item.find((i) => i.linkId === 'candidate_genes');
+        if (genes) {
+          genes.answer = genes.answer.filter((a) => a.valueCoding.code !== '1097');
+        }
+      }
+      const { john } = openAndSave(JSON.stringify(saved), SNOMEDCT);
+      expect(john.candidateGenes.sort()).toEqual(['BRAF', 'MYBPC3']);
+    } finally {
+      delete NAMES['1097'];
+    }
+  });
+
+  // (as the gene's own coding is kept and written back, a gene shown as a phenotype is saved as it was)
+  it('reads a gene as a phenotype only if the Questionnaire has no genes', () => {
+    const items = parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items.filter((i) => i.linkId !== 'candidate_genes');
+    const before = savedWithoutQuestionnaireResponses('http://www.genenames.org/geneId');
+    const { john } = openAndSave(before, SNOMEDCT, items);
+    expect(john.candidateGenes).toBeUndefined();
+    expect(john.hpoTerms).toEqual(['271807003', 'MYBPC3']);
+  });
+
   it('leaves a custom legend item\'s answer to its own item, not the phenotypes', () => {
     const items = [...parseQuestionnaire(DEFAULT_QUESTIONNAIRE).items, TUMOUR_SITE];
     const lung = { system: SNOMED, code: '39607008', display: 'Lung structure' };

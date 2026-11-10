@@ -3,7 +3,7 @@ import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
-import LegacyFHIRConverter, { hasGA4GHPedigreeProfile } from 'pedigree/LegacyFHIRConverter';
+import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
@@ -738,15 +738,20 @@ function codingKey(coding) {
 // code-less Observation with a valueCodeableConcept that matched none of the editor's code systems
 // belongs to, or null. Phenotypes, genes and custom legend items are all saved in that shape; the
 // person's QuestionnaireResponse lists each one's coding under its item (indexLegendAnswers), so it
-// says which - another item's is restored from the QuestionnaireResponse itself. One listed nowhere,
-// for a person whose QuestionnaireResponse lists no phenotypes or genes (or who has none: saved
-// before custom legends existed), is a phenotype, the likelier - left out, as every phenotype is,
-// if the Questionnaire has none.
+// says which - another item's is restored from the QuestionnaireResponse itself. One listed nowhere
+// is a gene if it's coded as one (a known gene code system, or an HGNC id - e.g. a gene saved before
+// QuestionnaireResponses, in that day's gene system: redcap_pedigree_editor#8). Otherwise, for a
+// person whose QuestionnaireResponse lists no phenotypes or genes (or who has none: saved before
+// custom legends existed), it's a phenotype, the likelier - left out, as every phenotype is, if the
+// Questionnaire has none.
 GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, nodeData) {
   const inUse = ['hpo_positive', 'candidate_genes'].filter((linkId) => this._hasReservedLegendItem(linkId, 'legendObservation'));
   const listedUnder = this._itemsListing(codeableConcept, nodeData);
   if (listedUnder.length > 0) {
     return inUse.find((linkId) => listedUnder.includes(linkId)) || null;
+  }
+  if (inUse.includes('candidate_genes') && isGeneCoding(codeableConcept)) {
+    return 'candidate_genes';
   }
   const answers = nodeData.legendAnswers || {};
   if (answers.hpo_positive || answers.candidate_genes) {
@@ -754,6 +759,36 @@ GA4GHFHIRConverter._legendOfUnclaimedObservation = function (codeableConcept, no
   }
   return inUse.includes('hpo_positive') ? 'hpo_positive' : null;
 };
+
+// Code systems for genes: a coding in one of these is a gene, whatever the gene terminology is now.
+// The editor's own, past (LEGACY_GENE_SYSTEMS, which the legacy converter also translates) and
+// present (HGNC_SYSTEM), and other common gene code systems. Compared without a trailing '/'.
+const KNOWN_GENE_CODE_SYSTEMS = [
+  ...LEGACY_GENE_SYSTEMS,
+  HGNC_SYSTEM,
+  'https://www.genenames.org',
+  'https://www.genenames.org/geneId',
+  'http://identifiers.org/hgnc',
+  'https://identifiers.org/hgnc',
+  'http://purl.bioontology.org/ontology/HGNC',
+  // HGNC's OID
+  'urn:oid:2.16.840.1.113883.6.281',
+  'http://www.ncbi.nlm.nih.gov/gene',
+  'https://www.ncbi.nlm.nih.gov/gene',
+  'http://www.ensembl.org',
+  'https://www.ensembl.org',
+];
+
+// (as the legacy converter reads HGNC ids)
+const HGNC_ID = /^HGNC:[0-9]+$/i;
+
+// Whether any coding of a CodeableConcept is a gene: in a known gene code system, or coded by an
+// HGNC id.
+function isGeneCoding(codeableConcept) {
+  return ((codeableConcept && codeableConcept.coding) || []).some((coding) =>
+    (typeof coding.system === 'string' && KNOWN_GENE_CODE_SYSTEMS.includes(coding.system.replace(/\/+$/, '')))
+    || (typeof coding.code === 'string' && HGNC_ID.test(coding.code.trim())));
+}
 
 // Whether a CodeableConcept is listed in the person's QuestionnaireResponse only under items other
 // than the given ones: another legend item's answer.
