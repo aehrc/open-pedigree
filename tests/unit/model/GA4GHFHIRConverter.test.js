@@ -384,6 +384,35 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     expect(graph.properties[child].isAdopted).toBe(true);
     expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
   });
+
+  // redcap_pedigree_editor#7: no adoptive parents drawn, so no KIN:022 to carry the adoption
+  it('keeps a person adopted when their parents aren\'t in the pedigree', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const john = patients(exported).find((p) => p.name && p.name[0].given[0] === 'John');
+    expect(john.extension).toContainEqual({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    expect(exported).not.toContain('KIN:022');
+
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const read = Object.values(graph.properties).find((p) => p.fName === 'John');
+    expect(read.isAdopted).toBe(true);
+    // and only John: the others aren't adopted
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted).map((p) => p.fName)).toEqual(['John']);
+  });
+
+  it('writes no adopted extension for someone who isn\'t adopted', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null);
+    expect(exported).not.toContain('/StructureDefinition/adopted');
+  });
+
+  it('keeps the adoption with reduced privacy, as the adoptive-parent relationships are', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null);
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted).length).toBe(1);
+  });
 });
 
 describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {

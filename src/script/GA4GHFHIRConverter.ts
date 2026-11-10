@@ -31,6 +31,10 @@ function generateUUID() {
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
+// An adopted person, written on the Patient whether or not their parents are drawn. Adoptive parents
+// (KIN:022) also mark a child adopted, but someone adopted with no parents in the pedigree has no
+// relationship to carry it.
+const ADOPTED_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted';
 
 var GA4GHFHIRConverter = function () {
 };
@@ -1022,6 +1026,13 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
       (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
     }
   }
+  // An adopted person, whether or not their adoptive parents are in the pedigree (a fetus can't be).
+  if (patientResource.extension && FETAL_STATUSES.indexOf((properties as any).lifeStatus) === -1) {
+    const adopted = patientResource.extension.find((ext: any) => ext.url === ADOPTED_EXTENSION);
+    if (adopted && adopted.valueBoolean === true) {
+      (properties as any).isAdopted = true;
+    }
+  }
 
   return result;
 };
@@ -1610,6 +1621,9 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   );
   if (fetusDateOfDeath) {
     patientResource.extension.push({ 'url': FETUS_DATE_OF_DEATH_EXTENSION, 'valueDate': fetusDateOfDeath });
+  }
+  if (nodeProperties.isAdopted) {
+    patientResource.extension.push({ 'url': ADOPTED_EXTENSION, 'valueBoolean': true });
   }
 
   // twin groups are numbered from 0
