@@ -611,7 +611,7 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
  *
  * Validates the generated basegraph and throws one of the following exceptions:
  *
- *  1) "Unsupported pedigree: some components of the imported pedigree are disconnected from each other"
+ *  1) "Unsupported pedigree: some components of the imported pedigree are disconnected from each other (<who>)"
  *  2) "Unable to import pedigree (<the reason validate gave>)"
  *
  * The method is a wrapper around the internal validate method, which may throw many exceptions
@@ -624,9 +624,10 @@ PedigreeImport.validateBaseGraph = function(newG) {
     newG.validate();
   } catch( err) {
     // validate throws strings, but anything it calls may throw an Error
-    var reason = (err && err.message) ? err.message : String(err);
+    var reason = ((err && err.message) ? err.message : String(err)).replace(/^Assertion failed: /, '');
     if (reason.indexOf('disconnected component') !== -1) {
-      throw 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other';
+      // (the reason names the person cut off from the rest)
+      throw 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other (' + reason + ')';
     } else {
       throw 'Unable to import pedigree (' + reason + ')';
     }

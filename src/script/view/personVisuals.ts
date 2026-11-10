@@ -422,13 +422,16 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   drawUnbornShape(): any {
     this._unbornShape && this._unbornShape.remove();
     if(this.getNode().getLifeStatus() == 'unborn') {
-      if (this.hasCarrierMark()) {
+      if (this._carrierGraphic) {
+        // a carrier dot or pre-symptomatic bar is drawn in the lower half (see drawCarrierGraphic):
+        // a smaller "P" in the upper half, sized to the shape
         this._unbornShape = editor.getPaper().text(this.getX(), this.getY() - this._radius * 0.4, 'P')
-          .attr(PedigreeEditorParameters.attributes.unbornShapeWithCarrierMark);
+          .attr(PedigreeEditorParameters.attributes.unbornShape)
+          .attr({'font-size': Math.round(this._radius * 0.75)});
       } else {
         this._unbornShape = editor.getPaper().text(this.getX(), this.getY(), 'P').attr(PedigreeEditorParameters.attributes.unbornShape);
       }
-      if(!editor.isUnsupportedBrowser()) {
+      if(!editor.isUnsupportedBrowser() && this.getHoverBox()) {
         this._unbornShape.insertBefore(this.getHoverBox().getFrontElements());
       }
     } else {
@@ -486,23 +489,9 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   updateCarrierGraphic(): any {
     this.drawCarrierGraphic();
     // An unborn person's "P" makes room for the mark (see drawUnbornShape): redraw it to suit.
-    if (this.getNode().getLifeStatus() == 'unborn' && this.getHoverBox()) {
+    if (this.getNode().getLifeStatus() == 'unborn') {
       this.drawUnbornShape();
     }
-  }
-
-  /**
-   * True if this Person shows a carrier dot or a pre-symptomatic bar inside the shape.
-   *
-   * @method hasCarrierMark
-   */
-  hasCarrierMark(): boolean {
-    var status = this.getNode().getCarrierStatus();
-    var lifeStatus = this.getNode().getLifeStatus();
-    if (lifeStatus == 'aborted' || lifeStatus == 'miscarriage') {
-      return status == 'carrier';
-    }
-    return status == 'carrier' || status == 'presymptomatic';
   }
 
   drawCarrierGraphic(): any {
@@ -694,11 +683,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     } else if (status == 'stillborn') {
       this.drawDeadShape();
       this.updateSBLabel();
-    } else if (status == 'unborn') {
-      this.drawUnbornShape();
     }
-    // the carrier mark moves to make room for the "P" (and back): redraw it on a change to or from unborn
-    if (status == 'unborn' || oldStatus == 'unborn') {
+    // An unborn person's "P" is drawn with the carrier mark, which moves to make room for it (and
+    // back): on a change to or from unborn, redraw both - unless setGenderGraphics just did.
+    if ((status == 'unborn' || oldStatus == 'unborn') && oldShapeType == newShapeType) {
       this.updateCarrierGraphic();
     }
     this.updateAgeLabel();

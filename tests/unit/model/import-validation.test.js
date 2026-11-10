@@ -17,6 +17,11 @@ describe('PedigreeImport.validateBaseGraph', () => {
       .toThrow(DISCONNECTED);
   });
 
+  it('says who is disconnected, without the internal "Assertion failed"', () => {
+    expect(() => PedigreeImport.validateBaseGraph(failingWith('Assertion failed: disconnected component detected (person 7)')))
+      .toThrow(DISCONNECTED + ' (disconnected component detected (person 7))');
+  });
+
   it('imports a connected pedigree', () => {
     expect(() => PedigreeImport.initFromPED('fam 1 0 0 1 1\nfam 2 0 0 2 1\nfam 3 1 2 1 1', false, false, true))
       .not.toThrow();
@@ -24,7 +29,7 @@ describe('PedigreeImport.validateBaseGraph', () => {
 
   it('gives any other validation failure as itself, not as disconnected', () => {
     expect(() => PedigreeImport.validateBaseGraph(failingWith('Assertion failed: person 3 has two sets of parents')))
-      .toThrow('Unable to import pedigree (Assertion failed: person 3 has two sets of parents)');
+      .toThrow('Unable to import pedigree (person 3 has two sets of parents)');
   });
 
   it('handles an Error object, not only a thrown string', () => {

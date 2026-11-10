@@ -106,9 +106,16 @@ test('the "P" and the mark are redrawn when either status changes', async ({ pag
   }, NODE_OF);
   expect(born).toEqual({ pDrawn: false, dotOffset: 0 });
 
-  // exactly one "P" per unborn person is left on the canvas (none orphaned by the redraws)
+  // to a miscarriage and back (the shape itself is redrawn): the dot and the small "P" come back right
+  await set('5', { carrierStatus: 'carrier' });
+  await set('5', { lifeStatus: 'miscarriage' });
+  expect((await marks(page))['5']).toEqual({ pSize: null, hasMark: true, overlap: false });
+  await set('5', { lifeStatus: 'unborn' });
+  expect((await marks(page))['5']).toEqual({ pSize: 30, hasMark: true, overlap: false });
+
+  // exactly one "P" per unborn person (children 4 and 5) is left on the canvas (none orphaned by the redraws)
   await set('4', { lifeStatus: 'unborn' });
   const pCount = await page.evaluate(() => [...document.querySelectorAll('#canvas svg text')]
     .filter((t) => t.textContent === 'P').length);
-  expect(pCount).toBe(1);
+  expect(pCount).toBe(2);
 });
