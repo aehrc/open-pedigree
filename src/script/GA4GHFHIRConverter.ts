@@ -32,6 +32,10 @@ function generateUUID() {
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
+// An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
+// are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
+// to carry it (redcap_pedigree_editor#7).
+const ADOPTED_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted';
 
 var GA4GHFHIRConverter = function () {
 };
@@ -267,6 +271,12 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     }
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
+    // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION): with any parent relationship
+    // in the file (placed or not), those codes say whether the person is adopted, and the extension
+    // is left alone.
+    if (nextPerson.adoptedWithoutParents && (nextPerson.parentClaims || []).length === 0 && !fetus && newG.properties[personID]) {
+      newG.properties[personID].isAdopted = true;
+    }
 
     if (motherLink == null && fatherLink == null) {
       continue;
@@ -1023,6 +1033,11 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
       (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
     }
   }
+  // Adopted, with no parents in the pedigree: applied once the person's parents are known (initFromFHIR)
+  const adopted = patientResource.extension && patientResource.extension.find((ext: any) => ext.url === ADOPTED_EXTENSION);
+  if (adopted && adopted.valueBoolean === true) {
+    (result as any).adoptedWithoutParents = true;
+  }
 
   return result;
 };
@@ -1409,6 +1424,11 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   }
   nodeIndexToRef[index] = ref;
   pedigreeIndividuals[index] = this.buildPedigreeIndividual(ref, nodeProperties, privacySetting);
+  // (written whatever the privacy setting, as an adopted child's KIN:022 relationships are)
+  if (pedigree.GG.isAdopted(index) && pedigree.GG.getParents(index).length === 0
+    && FETAL_STATUSES.indexOf(nodeProperties.lifeStatus) === -1) {
+    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION, 'valueBoolean': true });
+  }
 
 
   this.addConditions(nodeProperties, ref, condtions);

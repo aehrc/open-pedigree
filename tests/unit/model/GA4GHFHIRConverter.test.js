@@ -384,6 +384,104 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     expect(graph.properties[child].isAdopted).toBe(true);
     expect(graph.getParents(child).map((v) => graph.properties[v].fName).sort()).toEqual(['Jane', 'John']);
   });
+
+  // redcap_pedigree_editor#7: no adoptive parents drawn, so no KIN:022 to carry the adoption
+  it('keeps a person adopted when their parents aren\'t in the pedigree', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const john = patients(exported).find((p) => p.name && p.name[0].given[0] === 'John');
+    expect(john.extension).toContainEqual({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    expect(exported).not.toContain('KIN:022');
+
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const read = Object.values(graph.properties).find((p) => p.fName === 'John');
+    expect(read.isAdopted).toBe(true);
+    // and only John: the others aren't adopted
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted).map((p) => p.fName)).toEqual(['John']);
+  });
+
+  it('writes no adopted extension for someone who isn\'t adopted', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null);
+    expect(exported).not.toContain('/StructureDefinition/adopted');
+  });
+
+  it('keeps the adoption with reduced privacy, as the adoptive-parent relationships are', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null);
+    expect(patients(exported).filter((p) => (p.extension || []).some((e) => e.url.endsWith('/StructureDefinition/adopted'))).length).toBe(1);
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    // (no names with this setting: John is the one with no parents and a partner)
+    const adopted = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v) && graph.properties[v].isAdopted);
+    expect(adopted.length).toBe(1);
+    expect(graph.getParents(adopted[0])).toEqual([]);
+    expect(graph.properties[adopted[0]].gender).toBe('M');
+  });
+
+  it('writes the adoption of a child with parents only as their adoptive-parent relationships', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).toContain('KIN:022');
+    expect(exported).not.toContain('/StructureDefinition/adopted');
+  });
+
+  it('writes no adopted extension for a fetus', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[0].prop, { isAdopted: true, lifeStatus: 'stillborn' });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).not.toContain('/StructureDefinition/adopted');
+  });
+
+  // the extension and a person's parents' relationship codes, disagreeing (a file from elsewhere)
+  const withAdoptedExtension = (who, valueBoolean) => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.fName = 'Kid';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const patient = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === who);
+    patient.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean });
+    return GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+  };
+
+  it('leaves a person with birth parents in the pedigree unadopted, whatever the extension says', () => {
+    const graph = withAdoptedExtension('Kid', true);
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+    // and their parents are still written as birth parents
+    const again = GA4GHFHIRConverter.exportAsFHIR({ GG: graph }, 'all', null, null);
+    expect(again).not.toContain('KIN:022');
+  });
+
+  it('ignores an adopted extension on a fetus', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.lifeStatus = 'stillborn';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
+    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+  });
+
+  it('leaves a person with one parent in the pedigree unadopted, whatever the extension says', () => {
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.fName = 'Kid';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const resources = exported.entry.map((e) => e.resource);
+    const ref = (name) => resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === name).id;
+    const kid = ref('Kid');
+    resources.find((r) => r.id === kid).extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    // without Jane: only John is placed
+    const jane = ref('Jane');
+    exported.entry = exported.entry.filter((e) => !JSON.stringify(e.resource).includes(jane)
+      || e.resource.resourceType === 'Composition');
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+  });
+
+  it('reads an adopted extension saying false as not adopted', () => {
+    const graph = withAdoptedExtension('John', false);
+    expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+  });
 });
 
 describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
