@@ -1117,6 +1117,10 @@ GA4GHFHIRConverter._collectTermCodings = function (pedigree) {
 };
 
 GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
+  // (no setting, or one this export doesn't know: the strictest, so nothing personal goes out by mistake)
+  if (['all', 'nopersonal', 'minimal'].indexOf(privacySetting) === -1) {
+    privacySetting = 'minimal';
+  }
   // let exportObj = [];
   let today = new Date();
   let time = ((today.getHours() < 10) ? '0' : '') + today.getHours() + ':' + ((today.getMinutes() < 10) ? '0' : '') + today.getMinutes() + ':'
@@ -2059,8 +2063,8 @@ GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, nodePropertie
 // ID, dates and gestational age; with the stricter option, comments too.
 const PERSONAL_PROPERTY_KEYS = ['fName', 'lName', 'lNameAtB', 'externalID', 'dob', 'dod', 'gestationAge'];
 const FREE_TEXT_PROPERTY_KEYS = ['comments'];
-const DATE_ITEM_TYPES = ['date', 'dateTime', 'time'];
-const FREE_TEXT_ITEM_TYPES = ['string', 'text', 'url'];
+const DATE_ITEM_TYPES = ['date'];
+const FREE_TEXT_ITEM_TYPES = ['string', 'text'];
 
 /** Whether a Questionnaire item's answer goes into a GA4GH export with this privacy setting. */
 GA4GHFHIRConverter.isAnswerExported = function (item, privacySetting) {
@@ -2109,8 +2113,9 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, p
     }
     let values = Array.isArray(value) ? value : [value];
     if (privacySetting === 'minimal' && item.itemType === 'open-choice') {
-      // (an answer typed in, not picked, is free text)
-      values = values.filter((v) => v && v.code);
+      // (an answer typed in, not picked from the item's options, is free text)
+      const picked = (item.answerOption || []).map((o: any) => o.answer);
+      values = values.filter((v) => v && (v.code || picked.indexOf(v) !== -1));
       if (values.length === 0) {
         continue;
       }

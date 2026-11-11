@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import PedigreeImport from 'pedigree/model/import';
+import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
 // The GA4GH export's privacy options, as the export dialog's SVG/PDF ones: 'nopersonal' leaves out
 // names, external IDs and dates (and what identifies the person elsewhere); 'minimal' also leaves
@@ -72,6 +74,17 @@ describe('GA4GH export privacy: the QuestionnaireResponse', () => {
     expect(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'nopersonal').item[0].answer).toHaveLength(2);
   });
 
+  it('keeps an answer picked from an open-choice item\'s text options with the stricter option', () => {
+    vi.stubGlobal('editor', makeMockEditor({
+      canonicalUrl: questionnaireConfig.canonicalUrl,
+      items: [{ linkId: 'ancestry', itemType: 'open-choice', fieldType: 'questionnaire-choice-picker', repeats: true, mapping: null,
+        answerOption: [{ value: 'Ashkenazi', display: 'Ashkenazi', answer: 'Ashkenazi' }] }],
+    }));
+    const props = { questionnaireAnswers: { ancestry: ['Ashkenazi', 'my gran said Cornish'] } };
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'minimal');
+    expect(qr.item).toEqual([{ linkId: 'ancestry', answer: [{ valueString: 'Ashkenazi' }] }]);
+  });
+
   it('writes answers for a Questionnaire this editor doesn\'t know only with all data', () => {
     const pending = { questionnaire: 'http://example.org/Questionnaire/other', item: [{ linkId: 'x', answer: [{ valueString: 'Zebedee' }] }] };
     const props = { unrenderedQuestionnaireResponses: [pending] };
@@ -109,5 +122,25 @@ describe('GA4GH export privacy: the person and their comments', () => {
     expect(comments('all')).toBe(1);
     expect(comments('nopersonal')).toBe(1);
     expect(comments('minimal')).toBe(0);
+  });
+});
+
+describe('GA4GH export privacy: no setting', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', makeMockEditor(questionnaireConfig));
+  });
+
+  it('is the strictest, for the person and their answers alike', () => {
+    const gg = JSON.parse(JSON.stringify(simpleGG));
+    gg[0].prop.questionnaireAnswers = { notes: 'lives with Ann' };
+    gg[0].prop.comments = 'seen at clinic';
+    const exportWith = (setting) => GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(gg))) }, setting, null, null);
+    for (const setting of [undefined, 'something else']) {
+      expect(exportWith(setting)).not.toMatch(/John|Jane|lives with Ann|seen at clinic/);
+    }
+    const all = exportWith('all');
+    expect(all).toMatch(/John/);
+    expect(all).toMatch(/lives with Ann/);
+    expect(all).toMatch(/seen at clinic/);
   });
 });

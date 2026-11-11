@@ -12,7 +12,8 @@ const PERSON = {
   setFirstName: 'Zebedee', setLastName: 'Quarrington', setExternalID: 'MRN998877',
   setBirthDate: '1961-03-04', setLifeStatus: 'deceased', setDeathDate: '2020-06-01', setComments: 'seen at clinic',
 };
-const SECRETS = { name: 'Zebedee', surname: 'Quarrington', externalId: 'MRN998877', birthYear: '1961', deathYear: '2020', comments: 'seen at clinic', patientRef: 'Patient/4242' };
+// (whole dates: a bare year can turn up inside a random UUID)
+const SECRETS = { name: 'Zebedee', surname: 'Quarrington', externalId: 'MRN998877', birthDate: '1961-03-04', deathDate: '2020-06-01', comments: 'seen at clinic', patientRef: 'Patient/4242' };
 
 async function open(page) {
   page.on('dialog', (dialog) => dialog.accept());
