@@ -1,4 +1,4 @@
-import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
+import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, romanize, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
 import BaseGraph, { isPlaceholderProperties, placeholderProperties } from 'pedigree/model/baseGraph';
 import PositionedGraph from 'pedigree/model/positionedGraph';
 import PedigreeImport from 'pedigree/model/import';
@@ -77,6 +77,34 @@ DynamicPositionedGraph.prototype = {
   getGeneration: function( id ) {
     var minRank = Math.min.apply(null, this.DG.ranks);
     return (this.DG.ranks[id] - minRank)/2 + 1;
+  },
+
+  /**
+   * Generation numbers, as a pedigree is numbered on paper: generations I, II, III from the top,
+   * and people numbered 1..n from the left within each (II-3). Taken from the drawing, so an edit
+   * can renumber: generations are the ranks that hold real people (so no gaps), and the order is
+   * by x-position. A placeholder (the hidden child of a couple with no children) is left out.
+   *
+   * @return {Object} person ID => {generation, number, label}
+   */
+  getGenerationNumbers: function() {
+    var rows = {};
+    for (var v = 0; v <= this.DG.GG.getMaxRealVertexId(); v++) {
+      if (!this.isPerson(v) || this.isPlaceholder(v)) {
+        continue;
+      }
+      var rank = this.DG.ranks[v];
+      (rows[rank] = rows[rank] || []).push(v);
+    }
+    var result = {};
+    var ranks = Object.keys(rows).map(Number).sort((a, b) => a - b);
+    for (var g = 0; g < ranks.length; g++) {
+      var people = rows[ranks[g]].sort((a, b) => this.DG.positions[a] - this.DG.positions[b]);
+      for (var n = 0; n < people.length; n++) {
+        result[people[n]] = { 'generation': g + 1, 'number': n + 1, 'label': romanize(g + 1) + '-' + (n + 1) };
+      }
+    }
+    return result;
   },
 
   getOrderWithinGeneration: function( id ) {

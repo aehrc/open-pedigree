@@ -22,6 +22,7 @@ const LINKED_RECORD_CHANGED_TOOLTIP = 'This person\'s linked record has changed 
 
 export default class PersonVisuals extends AbstractPersonVisuals {
   _nameLabel: any;
+  _generationLabel: any;
   _stillBirthLabel: any;
   _ageLabel: any;
   _externalIDLabel: any;
@@ -41,6 +42,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     //console.log("person visuals");
     super(node, x, y);
     this._nameLabel = null;
+    this._generationLabel = null;
     this._stillBirthLabel = null;
     this._ageLabel = null;
     this._externalIDLabel = null;
@@ -191,6 +193,28 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    *
    * @method updateNameLabel
    */
+  /**
+   * Shows this Person's generation number (II-3) under their name, or none (see
+   * View.updateGenerationNumbering).
+   *
+   * @method setGenerationLabel
+   * @param {String} text the label, or null
+   */
+  setGenerationLabel(text: any): void {
+    if (this._generationLabel ? this._generationLabel.attr('text') === text : !text) {
+      return;
+    }
+    this._generationLabel && this._generationLabel.remove();
+    this._generationLabel = text
+      ? editor.getPaper().text(this.getX(), this.getY() + PedigreeEditorParameters.attributes.radius, text).attr(PedigreeEditorParameters.attributes.pedNumberLabel)
+      : null;
+    this.drawLabels();
+  }
+
+  getGenerationLabel(): any {
+    return this._generationLabel;
+  }
+
   updateNameLabel(): any {
     this._nameLabel && this._nameLabel.remove();
     var text =  '';
@@ -741,6 +765,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     var labels = editor.getPaper().set();
     this.getSBLabel() && labels.push(this.getSBLabel());
     this.getNameLabel() && labels.push(this.getNameLabel());
+    this.getGenerationLabel() && labels.push(this.getGenerationLabel());
     this.getAgeLabel() && labels.push(this.getAgeLabel());
     this.getExternalIDLabel() && labels.push(this.getExternalIDLabel());
     this.getCommentsLabel() && labels.push(this.getCommentsLabel());

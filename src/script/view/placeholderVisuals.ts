@@ -3,7 +3,7 @@ import PersonVisuals from 'pedigree/view/personVisuals';
 // Every PersonVisuals method that draws: after any of them, whatever it drew is hidden again.
 const DRAWING_METHODS = [
   'drawAdoptedShape', 'drawCarrierGraphic', 'drawDeadShape', 'drawLabels', 'drawUnbornShape',
-  'setGenderGraphics', 'setHighlightBox', 'setLinkedRecordChangedMark', 'setPos', 'setSelected',
+  'setGenderGraphics', 'setGenerationLabel', 'setHighlightBox', 'setLinkedRecordChangedMark', 'setPos', 'setSelected',
   'updateAgeLabel', 'updateCarrierGraphic', 'updateChildlessShapes', 'updateChildlessStatusLabel',
   'updateCommentsLabel', 'updateDisorderShapes', 'updateEvaluationLabel', 'updateExternalIDLabel',
   'updateIDLabel', 'updateLifeStatusShapes', 'updateNameLabel', 'updateSBLabel',

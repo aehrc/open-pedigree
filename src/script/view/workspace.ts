@@ -207,6 +207,11 @@ export default class Workspace {
           { key : 'clear',  label : 'Clear all', icon : 'times-circle'}
         ]
       }, {
+        name : 'view',
+        items: [
+          { key : 'numbering', label : 'Numbers', icon : 'list-ol'}
+        ]
+      }, {
         name : 'output',
         items: [
           { key : 'export',    label : 'Export', icon : 'file-export'},

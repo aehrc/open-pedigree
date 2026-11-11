@@ -229,6 +229,15 @@ export default class PedigreeEditor {
     importButton && importButton.addEventListener('click', function(event: any) {
       editor.getImportSelector().show();
     });
+    // generation numbering (II-3): view state only, so not an undo step and not saved
+    var numberingButton = document.getElementById('action-numbering');
+    numberingButton && numberingButton.addEventListener('click', function(event: any) {
+      var view = editor.getView();
+      view.setGenerationNumbering(!view.isGenerationNumberingOn());
+      numberingButton.classList.toggle('active', view.isGenerationNumberingOn());
+      numberingButton.setAttribute('aria-pressed', String(view.isGenerationNumberingOn()));
+    });
+
     var exportButton = document.getElementById('action-export');
     exportButton && exportButton.addEventListener('click', function(event: any) {
       editor.getExportSelector().show();

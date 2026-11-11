@@ -1,5 +1,5 @@
 import Raphael from 'pedigree/raphael';
-import { arrayContains, Timer } from 'pedigree/model/helpers';
+import { arrayContains, romanize, Timer } from 'pedigree/model/helpers';
 import Partnership from 'pedigree/view/partnership';
 import Person from 'pedigree/view/person';
 import PersonGroup from 'pedigree/view/personGroup';
@@ -9,6 +9,9 @@ import { drawCornerCurve, drawLevelChangeCurve } from 'pedigree/view/graphicHelp
 
 export default class View {
   _nodeMap: any;
+  // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
+  _generationNumbering: boolean;
+  _generationNumerals: any;
   hoverModeZones: any;
   _currentMarkedNew: any[];
   _currentGrownNodes: any[];
@@ -26,6 +29,8 @@ export default class View {
     this.preGenerateGraphics();
 
     this._nodeMap = {};
+    this._generationNumbering = false;
+    this._generationNumerals = null;
 
     this.hoverModeZones = editor.getPaper().set();
 
@@ -289,6 +294,64 @@ export default class View {
     return node;
   }
 
+  /**
+   * Whether generation numbering (II-3) is switched on: view state only, off when the editor
+   * opens, never saved or undone.
+   */
+  isGenerationNumberingOn(): boolean {
+    return this._generationNumbering;
+  }
+
+  setGenerationNumbering(on: boolean): void {
+    this._generationNumbering = !!on;
+    this.updateGenerationNumbering();
+  }
+
+  // Whether the numbering is drawn now.
+  isGenerationNumberingShown(): boolean {
+    return this._generationNumbering;
+  }
+
+  /**
+   * Draws generation numbering as it now stands, or clears it: each person's label (II-3) and
+   * each generation's Roman numeral at the left of its row. Redrawn whole, after every change.
+   */
+  updateGenerationNumbering(): void {
+    this._generationNumerals && this._generationNumerals.remove();
+    this._generationNumerals = null;
+    var graph = editor.getGraph();
+    var shown = this.isGenerationNumberingShown();
+    var numbers = shown ? graph.getGenerationNumbers() : {};
+    var rows: any = {};
+    for (var nodeID in this._nodeMap) {
+      if (!this._nodeMap.hasOwnProperty(nodeID) || !graph.isPerson(nodeID)) {
+        continue;
+      }
+      var node = this._nodeMap[nodeID];
+      var number = numbers[nodeID];
+      node.getGraphics().setGenerationLabel(number ? number.label : null);
+      if (number) {
+        var row = rows[number.generation] = rows[number.generation] || { x: Infinity, y: node.getGraphics().getY() };
+        row.x = Math.min(row.x, node.getGraphics().getX());
+      }
+    }
+    if (!shown) {
+      return;
+    }
+    // (one column, at the left of the whole pedigree, as on paper)
+    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - PedigreeEditorParameters.attributes.radius * 2.5;
+    var paper = editor.getPaper();
+    paper.setStart();
+    for (var generation in rows) {
+      if (rows.hasOwnProperty(generation)) {
+        paper.text(leftX, rows[generation].y, romanize(Number(generation)))
+          .attr(PedigreeEditorParameters.attributes.pedNumberLabel).attr({ 'font-weight': 'bold' });
+      }
+    }
+    this._generationNumerals = paper.setFinish();
+    this._generationNumerals.toBack();
+  }
+
   moveNode(id: any, animate?: any): void {
     var positionedGraph = editor.getGraph();
     var graphPos = positionedGraph.getPosition(id);
@@ -539,6 +602,9 @@ export default class View {
           }
         }
       }
+
+      // (an edit can renumber everyone)
+      this.updateGenerationNumbering();
 
       timer.printSinceLast('=== highlight & update handles runtime: ');
       timer2.printSinceLast('=== Total apply changes runtime: ');
