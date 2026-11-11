@@ -229,7 +229,8 @@ PedigreeExport.exportAsDADA2X = function(pedigree, pedigreeImagesString) {
  * ===============================================================================================
  */
 
-PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPatientReference = null,
+// (no privacy setting: the strictest - see GA4GHFHIRConverter._exportAsFHIR)
+PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = undefined, fhirPatientReference = null,
   pedigreeImage = null){
   return GA4GHFHIRConverter.exportAsFHIR(pedigree, privacySetting, fhirPatientReference, pedigreeImage);
 };

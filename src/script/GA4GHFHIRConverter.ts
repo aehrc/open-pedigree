@@ -1117,6 +1117,13 @@ GA4GHFHIRConverter._collectTermCodings = function (pedigree) {
 };
 
 GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
+  // (no setting, or one this export doesn't know: the strictest, so nothing personal goes out by mistake)
+  if (['all', 'nopersonal', 'minimal'].indexOf(privacySetting) === -1) {
+    if (privacySetting !== undefined && privacySetting !== null) {
+      console.warn('GA4GH export: unknown privacy setting ' + JSON.stringify(privacySetting) + ', exporting as \'minimal\'');
+    }
+    privacySetting = 'minimal';
+  }
   // let exportObj = [];
   let today = new Date();
   let time = ((today.getHours() < 10) ? '0' : '') + today.getHours() + ':' + ((today.getMinutes() < 10) ? '0' : '') + today.getMinutes() + ':'
@@ -1467,10 +1474,13 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   const nodeProperties = pedigree.GG.properties[index];
   const externalId = nodeProperties['externalID'];
   let ref;
-  if (nodeProperties['linkedPatientRef'] && nodeProperties['linkedPatientRef'].startsWith('Patient/')) {
+  // (a reference to the person in another system identifies them: only with all data, as names are)
+  if (privacySetting === 'all' && nodeProperties['linkedPatientRef'] && nodeProperties['linkedPatientRef'].startsWith('Patient/')) {
     ref = nodeProperties['linkedPatientRef'];
+  } else if (privacySetting === 'all' && knownFhirPatienReference && externalId && knownFhirPatienReference[externalId]) {
+    ref = knownFhirPatienReference[externalId];
   } else {
-    ref = (knownFhirPatienReference && externalId && knownFhirPatienReference[externalId]) ? knownFhirPatienReference[externalId] : generateUUID();
+    ref = generateUUID();
   }
   nodeIndexToRef[index] = ref;
   pedigreeIndividuals[index] = this.buildPedigreeIndividual(ref, nodeProperties, privacySetting);
@@ -1483,12 +1493,12 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
 
   this.addConditions(nodeProperties, ref, condtions);
 
-  this.addObservations(nodeProperties, ref, observations);
+  this.addObservations(nodeProperties, ref, observations, privacySetting);
 
   // Build the QuestionnaireResponse first, then derive mapsToCondition/mapsToObservation
   // resources from ITS item[] (not from nodeProperties directly) - mirroring how import
   // derives properties from an incoming QuestionnaireResponse's item[]. See design D12.
-  const questionnaireResponse = this.addQuestionnaireResponse(nodeProperties, ref, questionnaireResponses);
+  const questionnaireResponse = this.addQuestionnaireResponse(nodeProperties, ref, questionnaireResponses, privacySetting);
   this.deriveResourcesFromQuestionnaireResponse(questionnaireResponse, ref, condtions, observations);
 
   let relationshipsToBuild = {};
@@ -1632,7 +1642,8 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
       patientResource.gender = 'unknown';
     }
   }
-  if (nodeProperties.externalID) {
+  // (an external ID, such as a medical record number, identifies the person: only with all data)
+  if (privacySetting === 'all' && nodeProperties.externalID) {
     patientResource.identifier = [
       {
         "system": 'https://github.com/aehrc/open-pedigree?externalID',
@@ -1779,7 +1790,7 @@ GA4GHFHIRConverter.addConditions = function (nodeProperties, ref, condtions) {
   condtions[ref] = conditionsForRef;
 };
 
-GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations) {
+GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations, privacySetting = 'minimal') {
   let observationsForRef = [];
   const phenotypePrefix = 'phenotype: ';
   const genePrefix = 'gene: ';
@@ -1904,8 +1915,8 @@ GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations
       observationsForRef.push(fhirObservation);
     }
   }
-  // add comments as an observation
-  if (nodeProperties['comments']) {
+  // add comments as an observation (not with the stricter privacy option, which leaves out free text)
+  if (nodeProperties['comments'] && privacySetting !== 'minimal') {
     let fhirObservation = {
       'resourceType': 'Observation',
       'id': generateUUID(),
@@ -2050,7 +2061,42 @@ GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, nodePropertie
   });
 };
 
-GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
+// Properties an answer can map to that a privacy option leaves out of the GA4GH export, as it leaves
+// them out of the person resource and the de-identified SVG: without all data, names, the external
+// ID, dates and gestational age; with the stricter option, comments too.
+const PERSONAL_PROPERTY_KEYS = ['fName', 'lName', 'lNameAtB', 'externalID', 'dob', 'dod', 'gestationAge'];
+const FREE_TEXT_PROPERTY_KEYS = ['comments'];
+// Item types whose answers say nothing personal by themselves. With a privacy option, any other type
+// is left out (dates, and any type the parser comes to support), except free text, which only the
+// stricter option leaves out.
+const SAFE_ITEM_TYPES = ['boolean', 'integer', 'decimal', 'choice', 'open-choice'];
+const FREE_TEXT_ITEM_TYPES = ['string', 'text'];
+const CHOICE_ITEM_TYPES = ['choice', 'open-choice'];
+
+/** Whether a Questionnaire item's answer goes into a GA4GH export with this privacy setting. */
+GA4GHFHIRConverter.isAnswerExported = function (item, privacySetting) {
+  if (privacySetting === 'all') {
+    return true;
+  }
+  if (item.mapping && item.mapping.kind === 'field') {
+    var key = MAPS_TO_FIELD_TARGETS[item.mapping.field] && MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey;
+    if (PERSONAL_PROPERTY_KEYS.indexOf(key) !== -1) {
+      return false;
+    }
+    if (FREE_TEXT_PROPERTY_KEYS.indexOf(key) !== -1) {
+      return privacySetting !== 'minimal';
+    }
+  }
+  if (SAFE_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+    return true;
+  }
+  if (FREE_TEXT_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+    return privacySetting !== 'minimal';
+  }
+  return false;
+};
+
+GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, privacySetting = 'minimal') {
   var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
   if (!questionnaireConfig) {
     return null;
@@ -2069,10 +2115,18 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
     } else {
       value = storedAnswers[item.linkId];
     }
-    if (isBlankValue(value)) {
+    if (isBlankValue(value) || !this.isAnswerExported(item, privacySetting)) {
       continue;
     }
-    const values = Array.isArray(value) ? value : [value];
+    let values = Array.isArray(value) ? value : [value];
+    if (privacySetting === 'minimal' && CHOICE_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+      // (an answer typed in, or imported, rather than picked from the item's options, is free text)
+      const picked = (item.answerOption || []).map((o: any) => o.answer);
+      values = values.filter((v) => v !== null && v !== undefined && ((typeof v === 'object' && v.code) || picked.indexOf(v) !== -1));
+      if (values.length === 0) {
+        continue;
+      }
+    }
     items.push({
       'linkId': item.linkId,
       'answer': values.map((v) => this.answerToFhirValue(item.itemType, v))
@@ -2091,13 +2145,14 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties) {
   };
 };
 
-GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses) {
-  const qr = this.buildQuestionnaireResponse(ref, nodeProperties);
+GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses, privacySetting = 'minimal') {
+  const qr = this.buildQuestionnaireResponse(ref, nodeProperties, privacySetting);
   questionnaireResponses[ref] = qr ? [qr] : [];
   // A QuestionnaireResponse loaded for a Questionnaire this editor never had goes back out as it
   // came - its entries are already FHIR - rather than through answerToFhirValue as if they were
   // answers (which wrote each one as "[object Object]").
-  for (const pending of (nodeProperties['unrenderedQuestionnaireResponses'] || [])) {
+  // (only with all data: their answers can't be told apart, so none can be vetted for privacy)
+  for (const pending of (privacySetting === 'all' ? (nodeProperties['unrenderedQuestionnaireResponses'] || []) : [])) {
     if (pending && pending.item && pending.item.length > 0) {
       questionnaireResponses[ref].push({
         'resourceType': 'QuestionnaireResponse',
