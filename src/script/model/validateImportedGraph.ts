@@ -30,6 +30,6 @@ export default function validateImportedGraph(newG: any): void {
       // (the reason gives the first part of the graph found cut off from the rest)
       throw 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other (' + reason + ')';
     }
-    throw 'Unable to import pedigree (' + reason + ')';
+    throw importError(err);
   }
 }

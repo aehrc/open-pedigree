@@ -554,7 +554,7 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
       continue;
     }
 
-    var id = nextUnusedID++;
+    var id: any = nextUnusedID++;
     if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
       nextUnusedID--;
       id = pedigree.GG.properties[i]['externalID'].replace(/\s/g, '_');
@@ -564,6 +564,10 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
     }
     if (maxLength && id.length > maxLength) {
       id = id.substring(0, maxLength);
+    }
+    // (an ordinary person never gets a placeholder's reserved ID, which reads back as a placeholder)
+    if (typeof id === 'string' && id.startsWith(PLACEHOLDER_ID_PREFIX)) {
+      id = '_' + id;
     }
     while ( usedIDs.hasOwnProperty(id) ) {
       if (!maxLength || id.length < maxLength) {

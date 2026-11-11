@@ -342,10 +342,19 @@ DynamicPositionedGraph.prototype = {
     }
 
     var parentRel = this.getParentRelationship(v);
-    if (parentRel !== null && this.isChildless(parentRel)) {
+    return parentRel !== null && this.childrenMustBeAdopted(parentRel);
+  },
+
+  /**
+   * Whether a child of this couple (or person) is adopted: the couple, or either partner, is marked
+   * childless or infertile. (A partner's mark used to reach the child made with them; now a partner
+   * is added without a child, it reaches the couple's children.)
+   */
+  childrenMustBeAdopted: function( parentId ) {
+    if (this.isChildless(parentId)) {
       return true;
     }
-    return false;
+    return this.isRelationship(parentId) && this.DG.GG.getParents(parentId).some((p) => this.isChildless(p));
   },
 
   hasRelationships: function( v ) {

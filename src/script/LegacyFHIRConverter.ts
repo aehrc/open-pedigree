@@ -1,5 +1,5 @@
 import BaseGraph, { addPlaceholderChild } from 'pedigree/model/baseGraph';
-import validateImportedGraph from 'pedigree/model/validateImportedGraph';
+import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
@@ -325,48 +325,53 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     }
 
 
-    for (const nextPerson of nodeData){
-      if (nextPerson.partners){
-        let nextPersonId = getPersonID(nextPerson);
-        for (let i=0; i < nextPerson.partners.length; i++){
-          // (Both partners usually carry the extension; setting the same flags twice is harmless.)
-          const partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');
-          const partnerType = nextPerson.partners[i].type;
-          let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
-          if (!relNode && nextPersonId !== partnerId) {
-            // a couple with no shared child: their only child is a placeholder
-            // (DynamicPositionedGraph.isPlaceholder)
-            addPlaceholderChild(newG, relationshipTracker.createOrGetChildhub(nextPersonId, partnerId), defaultEdgeWeight);
-            relNode = newG.getRelationshipNode(nextPersonId, partnerId);
-          }
-          if (!partnerType.consangr && !partnerType.broken){
-            // nothing to set
-            continue;
-          }
+    // (anything the partners trip over is reported as validation would: see importError)
+    try {
+      for (const nextPerson of nodeData){
+        if (nextPerson.partners){
+          let nextPersonId = getPersonID(nextPerson);
+          for (let i=0; i < nextPerson.partners.length; i++){
+            // (Both partners usually carry the extension; setting the same flags twice is harmless.)
+            const partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');
+            const partnerType = nextPerson.partners[i].type;
+            let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+            if (!relNode && nextPersonId !== partnerId) {
+              // a couple with no shared child: their only child is a placeholder
+              // (DynamicPositionedGraph.isPlaceholder)
+              addPlaceholderChild(newG, relationshipTracker.createOrGetChildhub(nextPersonId, partnerId), defaultEdgeWeight);
+              relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+            }
+            if (!partnerType.consangr && !partnerType.broken){
+              // nothing to set
+              continue;
+            }
 
-          if (relNode){
-            let relProperties = newG.properties[relNode];
-            if (partnerType.consangr){
-              if (relProperties['consangr'] !== 'Y'){
-                relProperties['consangr'] = 'Y';
-                // check if we can make it 'A'
-                let nextGreatGrandParents = newG.getParentGenerations(nextPersonId, 3);
-                let partnerGreatGrandParents = newG.getParentGenerations(partnerId, 3);
-                for (let elem of nextGreatGrandParents) {
-                  if (partnerGreatGrandParents.has(elem)) {
-                    // found common
-                    relProperties['consangr'] = 'A';
-                    break;
+            if (relNode){
+              let relProperties = newG.properties[relNode];
+              if (partnerType.consangr){
+                if (relProperties['consangr'] !== 'Y'){
+                  relProperties['consangr'] = 'Y';
+                  // check if we can make it 'A'
+                  let nextGreatGrandParents = newG.getParentGenerations(nextPersonId, 3);
+                  let partnerGreatGrandParents = newG.getParentGenerations(partnerId, 3);
+                  for (let elem of nextGreatGrandParents) {
+                    if (partnerGreatGrandParents.has(elem)) {
+                      // found common
+                      relProperties['consangr'] = 'A';
+                      break;
+                    }
                   }
                 }
               }
-            }
-            if (partnerType.broken){
-              relProperties['broken'] = true;
+              if (partnerType.broken){
+                relProperties['broken'] = true;
+              }
             }
           }
         }
       }
+    } catch (err) {
+      throw importError(err);
     }
 
     validateImportedGraph(newG);

@@ -631,9 +631,10 @@ function isPlaceholderPedID(pedID) {
 }
 
 /*
- * A row read as a placeholder stays one only as the export writes it: someone's child, with no
- * partners or children, no data but its sex, and not the proband. Any other is an ordinary person
- * of unknown sex; and a placeholder whose couple has other children isn't needed, so goes.
+ * A row read as a placeholder stays one only as the export writes it: someone's child, of unknown
+ * sex, with no partners or children, no other data, and not the proband. Any other is an ordinary
+ * person, with the sex and ID its row gave; and a placeholder whose couple has other children
+ * (e.g. from a second GEDCOM family record for the same couple) isn't needed, so goes.
  */
 function keepValidPlaceholders(newG) {
   for (var v = newG.getMaxRealVertexId(); v >= 0; v--) {
@@ -1036,6 +1037,7 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     }
   }
 
+  keepValidPlaceholders(newG);
   PedigreeImport.validateBaseGraph(newG);
 
   return newG;

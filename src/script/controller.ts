@@ -2,17 +2,6 @@ import { cloneObject, isBlankValue, Timer } from 'pedigree/model/helpers';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
-// Whether a child given to this couple (or person) is adopted: the couple, or either partner, is
-// marked childless or infertile. (A partner's mark used to reach the child made with them; now a
-// partner is added without a child, it reaches the couple's children instead.)
-function childrenAreAdopted(parentID: any): boolean {
-  var graph = editor.getGraph();
-  if (graph.isChildless(parentID)) {
-    return true;
-  }
-  return graph.isRelationship(parentID) && graph.DG.GG.getParents(parentID).some((p: any) => graph.isChildless(p));
-}
-
 // A node's ID once a change set's removals are applied (its removedInternally IDs, as the view
 // renumbers them).
 function idAfterRemovals(id: any, changeSet: any): any {
@@ -326,7 +315,7 @@ export default class Controller {
       return;
     }
 
-    if (childrenAreAdopted(parentID)) {
+    if (editor.getGraph().childrenMustBeAdopted(parentID)) {
       editor.getController().handleSetProperty( { 'detail': { 'nodeID': personID, 'properties': { 'setAdopted': true }, 'noUndoRedo': true } } );
     }
 
@@ -490,7 +479,7 @@ export default class Controller {
     var numTwins = event.detail.twins ? event.detail.twins : 1;
 
     var childParams = cloneObject(event.detail.childParams);
-    if (childrenAreAdopted(partnershipID)) {
+    if (editor.getGraph().childrenMustBeAdopted(partnershipID)) {
       childParams['isAdopted'] = true;
     }
 

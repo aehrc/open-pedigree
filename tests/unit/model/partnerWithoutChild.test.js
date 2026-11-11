@@ -206,6 +206,14 @@ describe('a couple with no children in formats that record only parents', () => 
     expect(read.properties[v].placeholder).toBeUndefined();
   });
 
+  it('never writes an ordinary person with a placeholder\'s reserved ID', () => {
+    // an ordinary person whose ID (from a row read as one) is a reserved one
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 2 1\nf _placeholder_1 0 0 1 2\nf 5 _placeholder_1 3 1 1', false, false, true);
+    const text = PedigreeExport.exportAsPED({ GG: read }, 'external');
+    expect(text).not.toMatch(/ _placeholder_1 /);
+    expect(text).toMatch(/ __placeholder_1 /);
+  });
+
   it('leaves out a placeholder row whose couple has other children', () => {
     const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf _placeholder_1 1 2 0 -9', false, false, true);
     expect(placeholderCount(read)).toBe(0);
@@ -231,5 +239,35 @@ describe('a couple with no children from GEDCOM', () => {
     const placeholders = persons.filter((v) => read.properties[v].placeholder === true);
     expect(placeholders.length).toBe(1);
     expect(read.properties[placeholders[0]].comments).toBeUndefined();
+  });
+
+  it('leaves no placeholder when another family record gives the same couple a child', () => {
+    const gedcom = ['0 HEAD', '1 CHAR UTF-8',
+      '0 @I1@ INDI', '1 NAME John /Smith/', '1 SEX M',
+      '0 @I2@ INDI', '1 NAME Jane /Smith/', '1 SEX F',
+      '0 @I3@ INDI', '1 NAME Kid /Smith/', '1 SEX F', '1 FAMC @F1@',
+      '0 @F1@ FAM', '1 HUSB @I1@', '1 WIFE @I2@', '1 CHIL @I3@',
+      '0 @F2@ FAM', '1 HUSB @I1@', '1 WIFE @I2@',
+      '0 TRLR'].join('\n');
+    const read = PedigreeImport.initFromGEDCOM(gedcom, false, true);
+    expect(read.properties.filter((p, v) => read.isPerson(v) && p.placeholder === true)).toEqual([]);
+    expect(read.properties.filter((p, v) => read.isPerson(v)).length).toBe(3);
+  });
+});
+
+describe('adoption for a couple with no children', () => {
+  it('locks a child of a couple with an infertile partner as adopted', () => {
+    const graph = graphFromPED('f 1 0 0 1 1');
+    graph.setProperties(person(graph, '1'), { ...graph.getProperties(person(graph, '1')), childlessStatus: 'infertile' });
+    const { rel } = newCouple(graph, graph.addNewRelationship(person(graph, '1'), null));
+    expect(graph.childrenMustBeAdopted(rel)).toBe(true);
+    graph.addNewChild(rel, { gender: 'M', isAdopted: true }, 1);
+    expect(graph.hasToBeAdopted(childrenOf(graph, rel)[0])).toBe(true);
+  });
+
+  it('doesn\'t for a couple with no marks', () => {
+    const graph = graphFromPED('f 1 0 0 1 1');
+    const { rel } = newCouple(graph, graph.addNewRelationship(person(graph, '1'), null));
+    expect(graph.childrenMustBeAdopted(rel)).toBe(false);
   });
 });
