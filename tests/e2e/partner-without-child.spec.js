@@ -253,3 +253,86 @@ for (const format of ['GA4GH', 'PED', 'DADA2', 'internal']) {
     expect(await visibleForPlaceholders(page)).toBe(0);
   });
 }
+
+test('a child of a couple with an infertile partner is adopted', async ({ page }) => {
+  await open(page, 'local:pwc9?format=GA4GH', 'f 1 0 0 1 1');
+  await page.evaluate((src) => {
+    const id = eval(src)('1');
+    document.dispatchEvent(new window.CustomEvent('pedigree:node:setproperty', { detail: { nodeID: id, properties: { setChildlessStatus: 'infertile' } } }));
+    window.editor.getView().getNode(id).getGraphics().getHoverBox().handleAction('partnerR', false, null);
+  }, personByExt);
+  const rel = await page.evaluate(() => {
+    const g = window.editor.getGraph();
+    for (let v = 0; v <= g.getMaxNodeId(); v++) {
+      if (g.isRelationship(v)) {
+        return v;
+      }
+    }
+    return null;
+  });
+  await page.evaluate((rel) => document.dispatchEvent(new window.CustomEvent('pedigree:partnership:newchild', { detail: { partnershipID: rel, childParams: { gender: 'F', fName: 'Kid' } } })), rel);
+  const adopted = await page.evaluate(() => {
+    const g = window.editor.getGraph();
+    for (let v = 0; v <= g.getMaxNodeId(); v++) {
+      if (g.isPerson(v) && g.getProperties(v).fName === 'Kid') {
+        return g.getProperties(v).isAdopted === true;
+      }
+    }
+    return null;
+  });
+  expect(adopted).toBe(true);
+});
+
+test('dragging a person onto a couple with no children as their child centres on that person', async ({ page }) => {
+  // 3 gets a partner with no children (a placeholder); then 4 gets a partner, Q, made after that
+  // placeholder - so Q's ID shifts when the placeholder goes - and Q is made 3's couple's child
+  await open(page, 'local:pwc10?format=GA4GH', 'f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf 4 1 2 2 1');
+  await page.evaluate((src) => window.editor.getView().getNode(eval(src)('3')).getGraphics().getHoverBox().handleAction('partnerR', false, null), personByExt);
+  await page.evaluate((src) => window.editor.getView().getNode(eval(src)('4')).getGraphics().getHoverBox().handleAction('partnerR', false, null), personByExt);
+  const result = await page.evaluate((src) => {
+    const find = eval(src);
+    const g = window.editor.getGraph();
+    const coupleOf = (p) => g.DG.GG.getAllRelationships(p)[0];
+    const couple = coupleOf(find('3'));
+    const q = g.DG.GG.getParents(coupleOf(find('4'))).find((p) => p !== find('4'));
+    g.setProperties(q, { ...g.getProperties(q), fName: 'Q' });
+    const placeholder = g.getAllChildren(couple).find((c) => g.isPlaceholder(c));
+    const calls = [];
+    const workspace = window.editor.getWorkspace();
+    const original = workspace.centerAroundNode.bind(workspace);
+    workspace.centerAroundNode = (id, animate) => {
+      calls.push(id);
+      return original(id, animate);
+    };
+    document.dispatchEvent(new window.CustomEvent('pedigree:person:drag:newparent', { detail: { personID: q, parentID: couple } }));
+    let qNow = null;
+    for (let v = 0; v <= g.getMaxNodeId(); v++) {
+      if (g.isPerson(v) && g.getProperties(v).fName === 'Q') {
+        qNow = v;
+      }
+    }
+    return { calls, qBefore: q, qNow, placeholderBefore: placeholder };
+  }, personByExt);
+  // (Q's ID did shift)
+  expect(result.qBefore).toBeGreaterThan(result.placeholderBefore);
+  expect(result.qNow).toBe(result.qBefore - 1);
+  expect(result.calls).toEqual([result.qNow]);
+});
+
+test('a placeholder stays hidden when its properties are applied again', async ({ page }) => {
+  await open(page, 'local:pwc11?format=GA4GH', 'f 1 0 0 1 1');
+  await page.evaluate((src) => window.editor.getView().getNode(eval(src)('1')).getGraphics().getHoverBox().handleAction('partnerR', false, null), personByExt);
+  await page.evaluate(() => {
+    const g = window.editor.getGraph();
+    for (let v = 0; v <= g.getMaxNodeId(); v++) {
+      if (g.isPlaceholder(v)) {
+        const node = window.editor.getView().getNode(v);
+        node.assignProperties(g.getProperties(v));
+        node.setGender('M');
+        node.setLifeStatus('deceased');
+        node.getGraphics().drawLabels();
+      }
+    }
+  });
+  expect(await visibleForPlaceholders(page)).toBe(0);
+});

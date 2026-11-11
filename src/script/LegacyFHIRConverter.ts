@@ -1,4 +1,4 @@
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { addPlaceholderChild } from 'pedigree/model/baseGraph';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
@@ -336,9 +336,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           if (!relNode && nextPersonId !== partnerId) {
             // a couple with no shared child: their only child is a placeholder
             // (DynamicPositionedGraph.isPlaceholder)
-            const placeholderHub = relationshipTracker.createOrGetChildhub(nextPersonId, partnerId);
-            const placeholder = newG._addVertex(null, Graph.TYPE.PERSON, { 'gender': 'U', 'placeholder': true }, newG.defaultNonPersonNodeWidth);
-            newG.addEdge(placeholderHub, placeholder, defaultEdgeWeight);
+            addPlaceholderChild(newG, relationshipTracker.createOrGetChildhub(nextPersonId, partnerId), defaultEdgeWeight);
             relNode = newG.getRelationshipNode(nextPersonId, partnerId);
           }
           if (!partnerType.consangr && !partnerType.broken){

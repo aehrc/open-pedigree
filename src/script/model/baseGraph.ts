@@ -50,6 +50,21 @@ export function isPlaceholderProperties(type: any, properties: any): boolean {
  */
 export const PLACEHOLDER_ID_PREFIX = '_placeholder_';
 
+/** The properties of a new placeholder (see isPlaceholderProperties). */
+export function placeholderProperties(): any {
+  return { 'gender': 'U', 'placeholder': true };
+}
+
+/**
+ * Adds a placeholder as the only child of a couple's childhub, for an importer building a graph:
+ * a couple with no children (see isPlaceholderProperties). Returns its ID.
+ */
+export function addPlaceholderChild(graph: any, childhubId: any, edgeWeight: any): any {
+  const placeholder = graph._addVertex(null, (BaseGraph as any).TYPE.PERSON, placeholderProperties(), graph.defaultNonPersonNodeWidth);
+  graph.addEdge(childhubId, placeholder, edgeWeight);
+  return placeholder;
+}
+
 BaseGraph.prototype = {
 
   serialize: function(saveWidth) {

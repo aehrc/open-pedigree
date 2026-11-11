@@ -198,6 +198,14 @@ describe('a couple with no children in formats that record only parents', () => 
     expect(placeholderCount(read)).toBe(0);
   });
 
+  it('keeps the sex and ID a placeholder row gave when it is read as an ordinary person', () => {
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 2 1\nf _placeholder_1 0 0 1 2\nf 5 _placeholder_1 3 1 1', false, false, true);
+    const v = read.properties.findIndex((p) => p && p.externalID === '_placeholder_1');
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(read.properties[v].gender).toBe('M');
+    expect(read.properties[v].placeholder).toBeUndefined();
+  });
+
   it('leaves out a placeholder row whose couple has other children', () => {
     const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf _placeholder_1 1 2 0 -9', false, false, true);
     expect(placeholderCount(read)).toBe(0);

@@ -1,5 +1,5 @@
 import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
-import BaseGraph, { isPlaceholderProperties } from 'pedigree/model/baseGraph';
+import BaseGraph, { isPlaceholderProperties, placeholderProperties } from 'pedigree/model/baseGraph';
 import PositionedGraph from 'pedigree/model/positionedGraph';
 import PedigreeImport from 'pedigree/model/import';
 import Ordering from 'pedigree/model/ordering';
@@ -55,7 +55,7 @@ DynamicPositionedGraph.prototype = {
   // A new couple's child properties: null for a placeholder (see addNewRelationship).
   _childPropertiesOrPlaceholder: function( childProperties ) {
     if (childProperties === null) {
-      return { 'gender': 'U', 'placeholder': true };
+      return placeholderProperties();
     }
     return childProperties ? childProperties : {};
   },

@@ -1,5 +1,5 @@
 import { isInt } from 'pedigree/model/helpers';
-import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
+import BaseGraph, { PLACEHOLDER_ID_PREFIX, addPlaceholderChild, isPlaceholderProperties } from 'pedigree/model/baseGraph';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
@@ -254,11 +254,13 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     }
     var properties: any = {'gender': gender};
 
-    if (isPlaceholderPedID(pedID)) {
-      // a couple with no children, as the PED export writes it (see keepValidPlaceholders)
-      properties = {'gender': 'U', 'placeholder': true};
-    } else if (saveIDAsExternalID) {
+    if (saveIDAsExternalID) {
       properties['externalID'] = pedID;
+    }
+    if (isPlaceholderPedID(pedID)) {
+      // a couple with no children, as the PED export writes it (see keepValidPlaceholders, which
+      // makes it an ordinary person, as declared, if it isn't one)
+      properties['placeholder'] = true;
     }
 
     var useID = (postMakeped && parts[8] == 1) ? 0 : nextID++;
@@ -638,15 +640,18 @@ function keepValidPlaceholders(newG) {
     if (!isPlaceholderProperties(newG.type[v], newG.properties[v])) {
       continue;
     }
-    var onlyItsData = Object.keys(newG.properties[v]).every(function(key) {
-      return key === 'gender' || key === 'placeholder' || key === 'evaluated';
+    var onlyItsData = newG.properties[v].gender === 'U' && Object.keys(newG.properties[v]).every(function(key) {
+      return key === 'gender' || key === 'placeholder' || key === 'evaluated' || key === 'externalID';
     });
     var valid = v !== 0 && newG.inedges[v].length === 1 && newG.v[v].length === 0 && onlyItsData;
     if (!valid) {
+      // an ordinary person, with the sex and ID their row gave
       delete newG.properties[v].placeholder;
       newG.vWidth[v] = newG.defaultPersonNodeWidth;
       continue;
     }
+    // (a placeholder has no ID of its own: it's written with a new one)
+    delete newG.properties[v].externalID;
     var siblings = newG.v[newG.inedges[v][0]];
     if (siblings.length > 1) {
       newG.remove(v);
@@ -1014,9 +1019,8 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     if (children == null) {
       // a family with no children is a couple with no children: their only child is a placeholder
       // (DynamicPositionedGraph.isPlaceholder)
-      var childID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'U', 'placeholder': true}, newG.defaultNonPersonNodeWidth );
-      externalIDToID[childID] = childID;
-      children = [{'value': childID}];
+      addPlaceholderChild(newG, chhubID, defaultEdgeWeight);
+      children = [];
     }
 
     for (var j = 0; j < children.length; j++) {
@@ -1141,7 +1145,10 @@ PedigreeImport.initFromDADA2 = function(inputText) {
       gender = 'F';
     }
     // (a couple with no children, as the DADA2 export writes it: see keepValidPlaceholders)
-    const properties: any = isPlaceholderPedID(pedID) ? {'gender': 'U', 'placeholder': true} : {'gender': gender};
+    const properties: any = {'gender': gender};
+    if (isPlaceholderPedID(pedID)) {
+      properties['placeholder'] = true;
+    }
 
     var pedigreeID = newG._addVertex( nextID++, BaseGraph.TYPE.PERSON, properties, newG.defaultPersonNodeWidth );
 
