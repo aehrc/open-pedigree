@@ -60,10 +60,19 @@ test('the Numbers toggle shows and hides generation numbering', async ({ page })
   const columns = await page.evaluate(() => [...document.querySelectorAll('#canvas svg text')].filter((t) => /^[IVX]+$/.test(t.textContent)).map((t) => Math.round(t.getBBox().x + t.getBBox().width / 2)));
   expect(new Set(columns).size).toBe(1);
 
-  await page.click('#action-numbering');
+  // from the keyboard too
+  await page.focus('#action-numbering');
+  await page.keyboard.press('Enter');
   expect((await numbering(page)).numerals).toEqual([]);
   await expect(page.locator('#action-numbering')).not.toHaveClass(/active/);
   await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('the toggle shows numbering however it is switched on', async ({ page }) => {
+  await open(page, 'local:gn6?format=GA4GH', 'f 1 0 0 1 1');
+  await page.evaluate(() => window.editor.getView().setGenerationNumbering(true));
+  await expect(page.locator('#action-numbering')).toHaveClass(/active/);
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('numbers follow an edit', async ({ page }) => {
@@ -116,6 +125,10 @@ test('numbering is off when the editor opens, and isn\'t saved', async ({ page }
   for (const label of ['>I<', '>II<', '>I-1<', '>II-1<']) {
     expect(on.image, label).not.toContain(label);
   }
+  // and the labels are where they'd be without numbering (no gap left where a number was)
+  const labels = (image) => page.evaluate((svg) => [...new window.DOMParser().parseFromString(svg, 'image/svg+xml').getElementsByTagName('text')]
+    .map((t) => t.textContent + ' @' + t.getAttribute('x') + ',' + t.getAttribute('y')).sort(), image);
+  expect(await labels(on.image)).toEqual(await labels(off.image));
   // reopened, numbering is off
   await retireAutoCreatedEditor(page);
   await page.evaluate((u) => {

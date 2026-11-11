@@ -60,6 +60,9 @@
   background: #dde6f2;
   box-shadow: inset #8a9bb3 0 0 3px 0;
 }
+#editor-menu .menu-item.active:hover {
+  box-shadow: inset #8a9bb3 0 0 3px 0, #777 0 0 5px 0;
+}
 
 #editor-menu .title {
   float: left;

@@ -308,6 +308,12 @@ export default class View {
   setGenerationNumbering(on: boolean): void {
     this._generationNumbering = !!on;
     this.updateGenerationNumbering();
+    // (the toolbar's Numbers toggle shows the state, however it was set)
+    var button = document.getElementById('action-numbering');
+    if (button) {
+      button.classList.toggle('active', this._generationNumbering);
+      button.setAttribute('aria-pressed', String(this._generationNumbering));
+    }
   }
 
   // Whether the numbering is drawn now: when switched on, and always in a de-identified drawing.
@@ -320,24 +326,17 @@ export default class View {
    * numbering is view state, so what's saved never depends on it. Returns what `draw` returns.
    */
   withoutGenerationNumbering(draw: () => any): any {
-    if (!this.isGenerationNumberingShown()) {
+    if (!this._generationNumbering) {
       return draw();
     }
-    // hidden, not redrawn: cheap on every save, and nothing moves mid-animation
-    var graph = editor.getGraph();
-    var shown: any[] = [];
-    this._generationNumerals && shown.push(this._generationNumerals);
-    for (var nodeID in this._nodeMap) {
-      if (this._nodeMap.hasOwnProperty(nodeID) && graph.isPerson(nodeID)) {
-        var label = this._nodeMap[nodeID].getGraphics().getGenerationLabel();
-        label && shown.push(label);
-      }
-    }
-    shown.forEach((element) => element.hide());
+    // redrawn without it (not just hidden: the labels below the number would keep its gap)
+    this._generationNumbering = false;
     try {
+      this.updateGenerationNumbering();
       return draw();
     } finally {
-      shown.forEach((element) => element.show());
+      this._generationNumbering = true;
+      this.updateGenerationNumbering();
     }
   }
 

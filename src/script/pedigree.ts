@@ -231,11 +231,16 @@ export default class PedigreeEditor {
     });
     // generation numbering (II-3): view state only, so not an undo step and not saved
     var numberingButton = document.getElementById('action-numbering');
-    numberingButton && numberingButton.addEventListener('click', function(event: any) {
-      var view = editor.getView();
-      view.setGenerationNumbering(!view.isGenerationNumberingOn());
-      numberingButton.classList.toggle('active', view.isGenerationNumberingOn());
-      numberingButton.setAttribute('aria-pressed', String(view.isGenerationNumberingOn()));
+    var toggleNumbering = function() {
+      editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
+    };
+    numberingButton && numberingButton.addEventListener('click', toggleNumbering);
+    // (a toggle button: reachable with Tab, switched with Enter or Space)
+    numberingButton && numberingButton.addEventListener('keydown', function(event: any) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleNumbering();
+      }
     });
 
     var exportButton = document.getElementById('action-export');

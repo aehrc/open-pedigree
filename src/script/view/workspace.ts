@@ -231,6 +231,7 @@ export default class Workspace {
       mi.appendChild(document.createTextNode(data.label));
       if (data.toggle) {
         mi.setAttribute('role', 'button');
+        mi.setAttribute('tabindex', '0');
         mi.setAttribute('aria-pressed', 'false');
       }
       if (data.callback && typeof((this as any)[data.callback]) == 'function') {
