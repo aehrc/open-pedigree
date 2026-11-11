@@ -329,7 +329,8 @@ export default class View {
     if (!this._generationNumbering) {
       return draw();
     }
-    // redrawn without it (not just hidden: the labels below the number would keep its gap)
+    // redrawn without it (not just hidden: the labels below the number would keep its gap).
+    // Not for use inside withDeidentifiedRendering, which shows numbering regardless.
     this._generationNumbering = false;
     try {
       this.updateGenerationNumbering();

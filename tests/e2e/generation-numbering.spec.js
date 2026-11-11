@@ -66,6 +66,8 @@ test('the Numbers toggle shows and hides generation numbering', async ({ page })
   expect((await numbering(page)).numerals).toEqual([]);
   await expect(page.locator('#action-numbering')).not.toHaveClass(/active/);
   await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press(' ');
+  expect((await numbering(page)).numerals).toEqual(['I', 'II', 'III']);
 });
 
 test('the toggle shows numbering however it is switched on', async ({ page }) => {
