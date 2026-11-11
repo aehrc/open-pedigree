@@ -315,6 +315,24 @@ export default class View {
     return this._generationNumbering || !!this._deidentified;
   }
 
+  /**
+   * Runs `draw` with generation numbering hidden, for the diagram image saved with a pedigree:
+   * numbering is view state, so what's saved never depends on it. Returns what `draw` returns.
+   */
+  withoutGenerationNumbering(draw: () => any): any {
+    if (!this._generationNumbering) {
+      return draw();
+    }
+    this._generationNumbering = false;
+    try {
+      this.updateGenerationNumbering();
+      return draw();
+    } finally {
+      this._generationNumbering = true;
+      this.updateGenerationNumbering();
+    }
+  }
+
   /** The privacy level a de-identified drawing is for ('nopersonal' or 'minimal'), or null. */
   getDeidentified(): any {
     return this._deidentified;

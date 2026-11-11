@@ -3,6 +3,7 @@ import SVGtoPDF from 'svg-to-pdfkit';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
+import { generationNumbers } from 'pedigree/model/generationNumbers';
 
 var PedigreeExport = function () {
 };
@@ -531,6 +532,8 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
 
   var nextUnusedID = 1;
   var nextPlaceholder = 1;
+  // ('generation': each person's generation number, II-3, unique by construction)
+  var generations = (idGenerationPreference == 'generation') ? generationNumbers(pedigree) : null;
 
   for (var i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
     if (!pedigree.GG.isPerson(i)) {
@@ -551,7 +554,10 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
     }
 
     var id: any = nextUnusedID++;
-    if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
+    if (generations && generations[i]) {
+      nextUnusedID--;
+      id = generations[i].label;
+    } else if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
       nextUnusedID--;
       id = pedigree.GG.properties[i]['externalID'].replace(/\s/g, '_');
     } else if (idGenerationPreference == 'name' && pedigree.GG.properties[i].hasOwnProperty('fName')) {

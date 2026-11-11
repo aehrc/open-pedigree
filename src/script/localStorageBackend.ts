@@ -36,7 +36,8 @@ const LocalStorageBackend = {
                 try {
                     // the export version of the svg has been cleaned up to remove urls and extra content not shown
                     // in the image.
-                    svg = PedigreeExport.exportAsSVG(editor.getGraph().DG);
+                    // (the saved image never has generation numbering: it's view state)
+                    svg = editor.getView().withoutGenerationNumbering(() => PedigreeExport.exportAsSVG(editor.getGraph().DG));
                 } catch (err) {
                     console.log('Error creating svg');
                     console.log(err);

@@ -88,6 +88,7 @@ export default class ExportSelector {
     configListElementPED.appendChild(pedHeaderRow);
     configListElementPED.appendChild(_addConfigOption(true,  'ped-options', 'export-subconfig-label', 'External ID', 'external'));
     configListElementPED.appendChild(_addConfigOption(false, 'ped-options', 'export-subconfig-label', 'Name', 'name'));
+    configListElementPED.appendChild(_addConfigOption(false, 'ped-options', 'export-subconfig-label', 'Generation number (e.g. II-3)', 'generation'));
     configListElementPED.appendChild(_addConfigOption(false, 'ped-options', 'export-subconfig-label', 'None, generate new numeric ID for everyone', 'newid'));
 
     var configListElementPrivacy = document.createElement('table');

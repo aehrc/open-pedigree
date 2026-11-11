@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import DynamicPositionedGraph from 'pedigree/model/dynamicGraph';
+import PedigreeExport from 'pedigree/model/export';
 
 // Generation numbering (pedigree-editor-generation-numbering): generations I, II, III from the top,
 // people numbered from the left within each, e.g. II-3.
@@ -84,5 +85,27 @@ describe('getGenerationNumbers', () => {
       'f 6 0 0 1 1', 'f 7 6 5 1 1'].join('\n'));
     const generations = [...new Set(Object.values(graph.getGenerationNumbers()).map((n) => n.generation))].sort();
     expect(generations).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('PED export with generation numbers as IDs', () => {
+  const rows = (ped) => ped.trim().split('\n').map((line) => line.split(' '));
+
+  it('writes each person\'s generation number as their ID, and their parents\'', () => {
+    const graph = graphFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf 4 1 2 2 1');
+    const written = rows(PedigreeExport.exportAsPED(graph.DG, 'generation'));
+    expect(written.map((r) => r[1]).sort()).toEqual(['I-1', 'I-2', 'II-1', 'II-2']);
+    const parents = [...new Set(written.filter((r) => r[1].startsWith('II-')).map((r) => r[2] + ' ' + r[3]))];
+    expect(parents.length).toBe(1);
+    expect(parents[0].split(' ').sort()).toEqual(['I-1', 'I-2']);
+  });
+
+  it('keeps the reserved ID for the hidden child of a couple with no children', () => {
+    const graph = graphFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1');
+    const three = Object.keys(graph.getGenerationNumbers()).map(Number).find((v) => graph.getProperties(v).externalID === '3');
+    graph.addNewRelationship(three, null);
+    const ids = rows(PedigreeExport.exportAsPED(graph.DG, 'generation')).map((r) => r[1]);
+    expect(ids).toContain('_placeholder_1');
+    expect(ids.filter((id) => id !== '_placeholder_1').sort()).toEqual(['I-1', 'I-2', 'II-1', 'II-2']);
   });
 });
