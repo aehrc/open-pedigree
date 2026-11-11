@@ -290,9 +290,6 @@ export default class Controller {
             node.assignProperties(editor.getGraph().getProperties(nodeID));
           }
 
-          if (modificationType == 'makePlaceholder') {
-            // TODO
-          }
         }
       }
 
@@ -421,7 +418,8 @@ export default class Controller {
         childParams['numPersons'] = numPersons;
       }
 
-      var changeSet = editor.getGraph().addNewRelationship(personID, childParams, preferLeft, numTwins);
+      // (the partner handle asks for a partner only: the couple then has a placeholder child)
+      var changeSet = editor.getGraph().addNewRelationship(personID, event.detail.withoutChild ? null : childParams, preferLeft, numTwins);
       editor.getView().applyChanges(changeSet, true);
 
       if (!event.detail?.noUndoRedo) {
@@ -441,11 +439,6 @@ export default class Controller {
       return;
     }
 
-    var childProperties: any = {};
-    if (editor.getGraph().isChildless(personID) || editor.getGraph().isChildless(partnerID)) {
-      childProperties = { 'isAdopted': true };
-    }
-
     var node1 = editor.getView().getNode(personID);
     var node2 = editor.getView().getNode(partnerID);
 
@@ -459,7 +452,8 @@ export default class Controller {
       editor.getGraph().setProperties( partnerID, node2.getProperties() );
     }
 
-    var changeSet = editor.getGraph().assignPartner(personID, partnerID, childProperties);
+    // a couple with no children (a placeholder child): a child is added from the couple
+    var changeSet = editor.getGraph().assignPartner(personID, partnerID, null);
     editor.getView().applyChanges(changeSet, true);
 
     if (!event.detail?.noUndoRedo) {

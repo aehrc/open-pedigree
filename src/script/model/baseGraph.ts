@@ -34,6 +34,16 @@ BaseGraph.TYPE = {
   VIRTUALEDGE:  4    // for nodes not present in the original graph used as intermediate steps in multi-rank edges
 };
 
+/**
+ * Whether a vertex of this type and properties is a placeholder: the hidden only child of a couple
+ * with no children (pedigree-editor-partner-without-child). Every relationship has a childhub with
+ * at least one child (validate), so a couple with none keeps a placeholder, which is never drawn,
+ * saved to other formats or counted.
+ */
+BaseGraph.isPlaceholderProperties = function (type, properties) {
+  return type == BaseGraph.TYPE.PERSON && !!properties && properties.placeholder === true;
+};
+
 BaseGraph.prototype = {
 
   serialize: function(saveWidth) {
@@ -206,7 +216,8 @@ BaseGraph.prototype = {
 
     this.weights[nextId] = {};
 
-    this.vWidth[nextId] = width;
+    // a placeholder child takes as little room as layout allows (see isPlaceholder)
+    this.vWidth[nextId] = BaseGraph.isPlaceholderProperties(type, properties) ? this.defaultNonPersonNodeWidth : width;
 
     this.type[nextId] = type;
 
@@ -252,6 +263,9 @@ BaseGraph.prototype = {
 
   insertVertex: function(type, properties, edgeWeights, inedges, outedges, width) {
     var width = width ? width : ((type == BaseGraph.TYPE.PERSON) ? this.defaultPersonNodeWidth : this.defaultNonPersonNodeWidth);
+    if (BaseGraph.isPlaceholderProperties(type, properties)) {
+      width = this.defaultNonPersonNodeWidth;
+    }
 
     if (type == BaseGraph.TYPE.PERSON && !properties.hasOwnProperty('gender')) {
       properties['gender'] = 'U';

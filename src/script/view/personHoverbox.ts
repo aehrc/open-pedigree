@@ -238,7 +238,8 @@ export default class PersonHoverbox extends AbstractHoverbox {
       if(handleType == 'partnerR' || handleType == 'partnerL') {
         this.removeHandles();
         var preferLeft = (this.getNode().getGender() == 'F') || (handleType == 'partnerL');
-        var event: any = { 'personID': this.getNode().getID(), 'preferLeft': preferLeft };
+        // a partner only: a child is added from the couple, or with a partner from the child handle
+        var event: any = { 'personID': this.getNode().getID(), 'preferLeft': preferLeft, 'withoutChild': true };
         document.dispatchEvent(new CustomEvent('pedigree:person:newpartnerandchild', { detail: event }));
       } else if(handleType == 'child') {
         var position = editor.getWorkspace().canvasToDiv(this.getNodeX(), (this.getNodeY() + PedigreeEditorParameters.attributes.personHandleLength + 15));
