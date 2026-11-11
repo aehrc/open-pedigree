@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import PedigreeImport from 'pedigree/model/import';
+import PedigreeExport from 'pedigree/model/export';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
 
 // The GA4GH export's privacy options, as the export dialog's SVG/PDF ones: 'nopersonal' leaves out
@@ -48,10 +49,21 @@ describe('GA4GH export privacy: the QuestionnaireResponse', () => {
     vi.stubGlobal('editor', makeMockEditor(questionnaireConfig));
   });
 
-  it('keeps every answer with all data (and by default)', () => {
+  it('keeps every answer with all data, and is the strictest by default', () => {
     const all = ['first_name', 'last_name', 'external_id', 'date_of_birth', 'date_of_death', 'gestation_age', 'comments', 'carrier', 'notes', 'visit_date', 'visits'];
-    expect(linkIds(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', person))).toEqual(all);
     expect(linkIds(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', person, 'all'))).toEqual(all);
+    expect(linkIds(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', person))).toEqual(['carrier', 'visits']);
+  });
+
+  it('leaves out an answer of a type not known to be safe (a date-time, say) with either option', () => {
+    vi.stubGlobal('editor', makeMockEditor({
+      canonicalUrl: questionnaireConfig.canonicalUrl,
+      items: [{ linkId: 'seen_at', itemType: 'dateTime', fieldType: 'text', repeats: false, mapping: null }],
+    }));
+    const props = { questionnaireAnswers: { seen_at: '2019-05-06T10:00:00Z' } };
+    expect(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'all')).not.toBeNull();
+    expect(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'nopersonal')).toBeNull();
+    expect(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'minimal')).toBeNull();
   });
 
   it('leaves out names, the external ID, dates and gestational age without personal information', () => {
@@ -83,6 +95,23 @@ describe('GA4GH export privacy: the QuestionnaireResponse', () => {
     const props = { questionnaireAnswers: { ancestry: ['Ashkenazi', 'my gran said Cornish'] } };
     const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'minimal');
     expect(qr.item).toEqual([{ linkId: 'ancestry', answer: [{ valueString: 'Ashkenazi' }] }]);
+  });
+
+  it('leaves out a choice item\'s answer that isn\'t one of its options (e.g. imported text) with the stricter option, keeping a picked 0', () => {
+    vi.stubGlobal('editor', makeMockEditor({
+      canonicalUrl: questionnaireConfig.canonicalUrl,
+      items: [
+        { linkId: 'living', itemType: 'choice', fieldType: 'questionnaire-choice-picker', repeats: false, mapping: null,
+          answerOption: [{ value: 'alone', display: 'alone', answer: 'alone' }] },
+        { linkId: 'siblings', itemType: 'open-choice', fieldType: 'questionnaire-choice-picker', repeats: false, mapping: null,
+          answerOption: [{ value: 0, display: '0', answer: 0 }, { value: 1, display: '1', answer: 1 }] },
+      ],
+    }));
+    const props = { questionnaireAnswers: { living: 'lives with Ann at 3 Smith St', siblings: 0 } };
+    expect(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'minimal').item).toEqual([
+      { linkId: 'siblings', answer: [{ valueString: '0' }] },
+    ]);
+    expect(linkIds(GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'nopersonal'))).toEqual(['living', 'siblings']);
   });
 
   it('writes answers for a Questionnaire this editor doesn\'t know only with all data', () => {
@@ -118,7 +147,7 @@ describe('GA4GH export privacy: the person and their comments', () => {
       GA4GHFHIRConverter.addObservations(person, 'Patient/1', observations, privacy);
       return observations['Patient/1'].filter((o) => o.valueString === 'seen at clinic').length;
     };
-    expect(comments(undefined)).toBe(1);
+    expect(comments(undefined)).toBe(0);
     expect(comments('all')).toBe(1);
     expect(comments('nopersonal')).toBe(1);
     expect(comments('minimal')).toBe(0);
@@ -132,15 +161,31 @@ describe('GA4GH export privacy: no setting', () => {
 
   it('is the strictest, for the person and their answers alike', () => {
     const gg = JSON.parse(JSON.stringify(simpleGG));
-    gg[0].prop.questionnaireAnswers = { notes: 'lives with Ann' };
-    gg[0].prop.comments = 'seen at clinic';
+    Object.assign(gg[0].prop, {
+      questionnaireAnswers: { notes: 'lives with Ann' }, comments: 'seen at clinic', externalID: 'MRN998877',
+      dob: 'Sat Mar 04 1961', linkedPatientRef: 'Patient/4242',
+    });
     const exportWith = (setting) => GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(gg))) }, setting, null, null);
     for (const setting of [undefined, 'something else']) {
-      expect(exportWith(setting)).not.toMatch(/John|Jane|lives with Ann|seen at clinic/);
+      expect(exportWith(setting)).not.toMatch(/John|Jane|lives with Ann|seen at clinic|MRN998877|1961-03-04|Patient\/4242/);
     }
     const all = exportWith('all');
-    expect(all).toMatch(/John/);
-    expect(all).toMatch(/lives with Ann/);
-    expect(all).toMatch(/seen at clinic/);
+    for (const secret of ['John', 'lives with Ann', 'seen at clinic', 'MRN998877', '1961-03-04', 'Patient/4242']) {
+      expect(all).toContain(secret);
+    }
+  });
+
+  it('is the strictest through PedigreeExport.exportAsGA4GH too, and warns of a setting it doesn\'t know', () => {
+    const gg = JSON.parse(JSON.stringify(simpleGG));
+    const exportWith = (...args) => PedigreeExport.exportAsGA4GH({ GG: PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(gg))) }, ...args);
+    expect(exportWith()).not.toMatch(/John|Jane/);
+    expect(exportWith('all')).toMatch(/John/);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(exportWith('ALL')).not.toMatch(/John|Jane/);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"ALL"'));
+    warn.mockClear();
+    exportWith(undefined);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

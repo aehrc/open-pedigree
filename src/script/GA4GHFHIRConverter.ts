@@ -1119,6 +1119,9 @@ GA4GHFHIRConverter._collectTermCodings = function (pedigree) {
 GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhirPatienReference, pedigreeImage) {
   // (no setting, or one this export doesn't know: the strictest, so nothing personal goes out by mistake)
   if (['all', 'nopersonal', 'minimal'].indexOf(privacySetting) === -1) {
+    if (privacySetting !== undefined && privacySetting !== null) {
+      console.warn('GA4GH export: unknown privacy setting ' + JSON.stringify(privacySetting) + ', exporting as \'minimal\'');
+    }
     privacySetting = 'minimal';
   }
   // let exportObj = [];
@@ -1787,7 +1790,7 @@ GA4GHFHIRConverter.addConditions = function (nodeProperties, ref, condtions) {
   condtions[ref] = conditionsForRef;
 };
 
-GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations, privacySetting = 'all') {
+GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations, privacySetting = 'minimal') {
   let observationsForRef = [];
   const phenotypePrefix = 'phenotype: ';
   const genePrefix = 'gene: ';
@@ -2063,8 +2066,12 @@ GA4GHFHIRConverter._reservedLegendIdsToAnswers = function (linkId, nodePropertie
 // ID, dates and gestational age; with the stricter option, comments too.
 const PERSONAL_PROPERTY_KEYS = ['fName', 'lName', 'lNameAtB', 'externalID', 'dob', 'dod', 'gestationAge'];
 const FREE_TEXT_PROPERTY_KEYS = ['comments'];
-const DATE_ITEM_TYPES = ['date'];
+// Item types whose answers say nothing personal by themselves. With a privacy option, any other type
+// is left out (dates, and any type the parser comes to support), except free text, which only the
+// stricter option leaves out.
+const SAFE_ITEM_TYPES = ['boolean', 'integer', 'decimal', 'choice', 'open-choice'];
 const FREE_TEXT_ITEM_TYPES = ['string', 'text'];
+const CHOICE_ITEM_TYPES = ['choice', 'open-choice'];
 
 /** Whether a Questionnaire item's answer goes into a GA4GH export with this privacy setting. */
 GA4GHFHIRConverter.isAnswerExported = function (item, privacySetting) {
@@ -2080,16 +2087,16 @@ GA4GHFHIRConverter.isAnswerExported = function (item, privacySetting) {
       return privacySetting !== 'minimal';
     }
   }
-  if (DATE_ITEM_TYPES.indexOf(item.itemType) !== -1) {
-    return false;
+  if (SAFE_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+    return true;
   }
-  if (privacySetting === 'minimal' && FREE_TEXT_ITEM_TYPES.indexOf(item.itemType) !== -1) {
-    return false;
+  if (FREE_TEXT_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+    return privacySetting !== 'minimal';
   }
-  return true;
+  return false;
 };
 
-GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, privacySetting = 'all') {
+GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, privacySetting = 'minimal') {
   var questionnaireConfig = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
   if (!questionnaireConfig) {
     return null;
@@ -2112,10 +2119,10 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, p
       continue;
     }
     let values = Array.isArray(value) ? value : [value];
-    if (privacySetting === 'minimal' && item.itemType === 'open-choice') {
-      // (an answer typed in, not picked from the item's options, is free text)
+    if (privacySetting === 'minimal' && CHOICE_ITEM_TYPES.indexOf(item.itemType) !== -1) {
+      // (an answer typed in, or imported, rather than picked from the item's options, is free text)
       const picked = (item.answerOption || []).map((o: any) => o.answer);
-      values = values.filter((v) => v && (v.code || picked.indexOf(v) !== -1));
+      values = values.filter((v) => v !== null && v !== undefined && ((typeof v === 'object' && v.code) || picked.indexOf(v) !== -1));
       if (values.length === 0) {
         continue;
       }
@@ -2138,7 +2145,7 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, p
   };
 };
 
-GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses, privacySetting = 'all') {
+GA4GHFHIRConverter.addQuestionnaireResponse = function (nodeProperties, ref, questionnaireResponses, privacySetting = 'minimal') {
   const qr = this.buildQuestionnaireResponse(ref, nodeProperties, privacySetting);
   questionnaireResponses[ref] = qr ? [qr] : [];
   // A QuestionnaireResponse loaded for a Questionnaire this editor never had goes back out as it

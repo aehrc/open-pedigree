@@ -44,13 +44,13 @@ describe('GA4GHFHIRConverter.buildQuestionnaireResponse', () => {
   });
 
   it('returns null when the node has no answers', () => {
-    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', {});
+    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', {}, 'all');
     expect(result).toBeNull();
   });
 
   it('produces a QuestionnaireResponse with subject, questionnaire, and item[] for answered fields', () => {
     const nodeProperties = { questionnaireAnswers: { notes: 'hello' } };
-    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', nodeProperties);
+    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', nodeProperties, 'all');
     expect(result.resourceType).toBe('QuestionnaireResponse');
     expect(result.subject).toEqual({ reference: 'Patient/123' });
     expect(result.questionnaire).toBe(questionnaireConfig.canonicalUrl);
@@ -59,14 +59,14 @@ describe('GA4GHFHIRConverter.buildQuestionnaireResponse', () => {
 
   it('sources a mapsToField item from the property bag key, not the answers map', () => {
     const nodeProperties = { carrierStatus: 'carrier', questionnaireAnswers: {} };
-    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', nodeProperties);
+    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', nodeProperties, 'all');
     const carrierItem = result.item.find(i => i.linkId === 'carrier');
     expect(carrierItem.answer).toEqual([{ valueBoolean: true }]);
   });
 
   it('returns null when questionnaireConfig is not set on the editor', () => {
     vi.stubGlobal('editor', makeMockEditor(null));
-    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', { questionnaireAnswers: { notes: 'x' } });
+    const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', { questionnaireAnswers: { notes: 'x' } }, 'all');
     expect(result).toBeNull();
   });
 });
@@ -147,7 +147,7 @@ describe('field mapping: mapsToCondition / mapsToObservation export', () => {
     const nodeProperties = { questionnaireAnswers: { diabetes: true } };
     const conditions = { 'Patient/123': [] };
     const observations = { 'Patient/123': [] };
-    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {});
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {}, 'all');
     GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/123', conditions, observations);
     const diabetesCondition = conditions['Patient/123'].find(c => c.code === DIABETES_CODE);
     expect(diabetesCondition).toBeDefined();
@@ -158,7 +158,7 @@ describe('field mapping: mapsToCondition / mapsToObservation export', () => {
     const nodeProperties = { questionnaireAnswers: { diabetes: false } };
     const conditions = { 'Patient/123': [] };
     const observations = { 'Patient/123': [] };
-    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {});
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {}, 'all');
     GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/123', conditions, observations);
     expect(conditions['Patient/123'].length).toBe(0);
   });
@@ -167,7 +167,7 @@ describe('field mapping: mapsToCondition / mapsToObservation export', () => {
     const nodeProperties = { questionnaireAnswers: { smoking: { system: 'http://example.org', code: 'never', display: 'Never smoked' } } };
     const conditions = { 'Patient/123': [] };
     const observations = { 'Patient/123': [] };
-    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {});
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/123', {}, 'all');
     GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/123', conditions, observations);
     const smokingObs = observations['Patient/123'].find(o => o.code === SMOKING_CODE);
     expect(smokingObs).toBeDefined();
@@ -273,7 +273,7 @@ describe('mapsToLegendCondition / mapsToLegendObservation - reserved linkIds (di
 
   it('buildQuestionnaireResponse sources disorders/genes/hpo answers from the nodeProperties bag, not questionnaireAnswers', () => {
     const nodeProperties = { disorders: ['73211009'], candidateGenes: ['BRCA1'], hpoTerms: ['HP:0001'] };
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties);
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties, 'all');
     const byLinkId = Object.fromEntries(qr.item.map(i => [i.linkId, i]));
     expect(byLinkId.disorders.answer).toEqual([{ valueCoding: { system: 'http://snomed.info/sct', code: '73211009', display: 'Disorder-73211009' } }]);
     expect(byLinkId.candidate_genes.answer).toEqual([{ valueCoding: { system: 'http://www.genenames.org', code: 'BRCA1', display: 'Gene-BRCA1' } }]);
@@ -281,7 +281,7 @@ describe('mapsToLegendCondition / mapsToLegendObservation - reserved linkIds (di
   });
 
   it('buildQuestionnaireResponse omits disorders/genes/hpo entries when the node has none', () => {
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', {});
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', {}, 'all');
     expect(qr).toBeNull();
   });
 
@@ -289,7 +289,7 @@ describe('mapsToLegendCondition / mapsToLegendObservation - reserved linkIds (di
     const nodeProperties = { disorders: ['73211009'], candidateGenes: ['BRCA1'] };
     const conditions = { 'Patient/1': [] };
     const observations = { 'Patient/1': [] };
-    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {});
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {}, 'all');
     GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/1', conditions, observations);
     expect(conditions['Patient/1'].length).toBe(0);
     expect(observations['Patient/1'].length).toBe(0);
@@ -341,7 +341,7 @@ describe('mapsToLegendCondition / mapsToLegendObservation - a genuinely new cust
 
   it('buildQuestionnaireResponse reads the answer directly from questionnaireAnswers (already {system,code,display}-shaped)', () => {
     const nodeProperties = { questionnaireAnswers: { comorbidities: [{ system: 'http://example.org', code: 'X1', display: 'Condition X1' }] } };
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties);
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', nodeProperties, 'all');
     expect(qr.item[0].answer).toEqual([{ valueCoding: { system: 'http://example.org', code: 'X1', display: 'Condition X1' } }]);
   });
 
@@ -352,7 +352,7 @@ describe('mapsToLegendCondition / mapsToLegendObservation - a genuinely new cust
     ] } };
     const conditions = { 'Patient/1': [] };
     const observations = { 'Patient/1': [] };
-    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {});
+    const qr = GA4GHFHIRConverter.addQuestionnaireResponse(nodeProperties, 'Patient/1', {}, 'all');
     GA4GHFHIRConverter.deriveResourcesFromQuestionnaireResponse(qr, 'Patient/1', conditions, observations);
     expect(conditions['Patient/1'].length).toBe(2);
     expect(conditions['Patient/1'][0].code).toEqual({ coding: [{ system: 'http://example.org', code: 'X1', display: 'Condition X1' }] });
@@ -371,7 +371,7 @@ describe('invokesAction items never produce a QuestionnaireResponse item entry',
         ],
       }),
     });
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { questionnaireAnswers: { notes: 'hello' } });
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { questionnaireAnswers: { notes: 'hello' } }, 'all');
     expect(qr.item.map(i => i.linkId)).toEqual(['notes']);
   });
 });
@@ -965,7 +965,7 @@ describe('changing the terminology between saves (terminology-change-keeps-codes
 
   it('the pedigree\'s codings are used only while it\'s exported', () => {
     openAndSave(savedUnderSnomed(), HPO_OMIM);
-    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { disorders: ['Hypertrophic cardiomyopathy'] });
+    const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', { disorders: ['Hypertrophic cardiomyopathy'] }, 'all');
     expect(qr.item.find((i) => i.linkId === 'disorders').answer)
       .toEqual([{ valueCoding: { code: 'Hypertrophic cardiomyopathy', display: 'Hypertrophic cardiomyopathy' } }]);
   });
