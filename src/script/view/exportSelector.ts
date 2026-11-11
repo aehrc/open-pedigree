@@ -103,7 +103,7 @@ export default class ExportSelector {
     privHeaderRow.appendChild(privHeaderTd);
     configListElementPrivacy.appendChild(privHeaderRow);
     configListElementPrivacy.appendChild(_addConfigOption(true,  'privacy-options', 'export-subconfig-label', 'All data', 'all'));
-    configListElementPrivacy.appendChild(_addConfigOption(false, 'privacy-options', 'export-subconfig-label', 'Remove personal information (name and age)', 'nopersonal'));
+    configListElementPrivacy.appendChild(_addConfigOption(false, 'privacy-options', 'export-subconfig-label', 'Remove personal information (names, IDs and dates; ages as bands)', 'nopersonal'));
     configListElementPrivacy.appendChild(_addConfigOption(false, 'privacy-options', 'export-subconfig-label', 'Remove personal information and free-form comments', 'minimal'));
 
     var _addSelectOption = function (name: any, cssClass: any, labelText: any, options: any) {

@@ -397,16 +397,23 @@ export default class View {
       var number = numbers[nodeID];
       node.getGraphics().setGenerationLabel(number ? number.label : null);
       if (number) {
-        var row = rows[number.generation] = rows[number.generation] || { x: Infinity, y: node.getGraphics().getY() };
-        row.x = Math.min(row.x, node.getGraphics().getX());
+        // (the left edge of the person: their symbol, or a wider label under it, such as a long name)
+        var graphics = node.getGraphics();
+        var left = graphics.getX() - (PedigreeEditorParameters as any).attributes.radius;
+        var labels = graphics.getLabels();
+        if (labels.length) {
+          left = Math.min(left, labels.getBBox().x);
+        }
+        var row = rows[number.generation] = rows[number.generation] || { x: Infinity, y: graphics.getY() };
+        row.x = Math.min(row.x, left);
       }
     }
     if (!shown || Object.keys(rows).length == 0) {
       return;
     }
-    // (one column, at the left of the whole pedigree, as on paper)
+    // (one column, at the left of the whole pedigree and clear of every label, as on paper)
     var attributes = (PedigreeEditorParameters as any).attributes;
-    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - attributes.radius * 2.5;
+    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - attributes.radius * 1.5;
     var paper = editor.getPaper();
     paper.setStart();
     for (var generation in rows) {

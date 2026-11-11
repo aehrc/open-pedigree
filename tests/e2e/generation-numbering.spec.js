@@ -95,6 +95,37 @@ test('holding Enter on the Numbers toggle switches it once', async ({ page }) =>
   await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
 });
 
+// The numerals clear every person's labels, however wide (a long name on the leftmost person).
+const numeralsClearLabels = (page) => page.evaluate(() => {
+  const view = window.editor.getView();
+  const graph = window.editor.getGraph();
+  let labelsLeft = Infinity;
+  for (let v = 0; v <= graph.getMaxNodeId(); v++) {
+    if (graph.isPerson(v) && !graph.isPlaceholder(v)) {
+      const labels = view.getNode(v).getGraphics().getLabels();
+      if (labels.length) {
+        labelsLeft = Math.min(labelsLeft, labels.getBBox().x);
+      }
+    }
+  }
+  const numerals = [...document.querySelectorAll('#canvas svg text')].filter((t) => /^[IVX]+$/.test(t.textContent));
+  const numeralsRight = Math.max(...numerals.map((t) => t.getBBox().x + t.getBBox().width));
+  return { count: numerals.length, clear: numeralsRight < labelsLeft };
+});
+
+test('the numerals clear a long name, set before or after numbering is switched on', async ({ page }) => {
+  await open(page, 'local:gn8?format=GA4GH', 'f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1');
+  const setName = (name) => page.evaluate(([src, name]) => {
+    const find = eval(src); const left = [find('1'), find('2')].sort((a, b) => window.editor.getView().getNode(a).getGraphics().getX() - window.editor.getView().getNode(b).getGraphics().getX())[0];
+    document.dispatchEvent(new window.CustomEvent('pedigree:node:setproperty', { detail: { nodeID: left, properties: { setFirstName: name } } }));
+  }, [byExt, name]);
+  await setName('Alexandra Montgomery-Smith');
+  await page.click('#action-numbering');
+  expect(await numeralsClearLabels(page)).toEqual({ count: 2, clear: true });
+  await setName('Bartholomew Featherstonehaugh-Worthington');
+  expect(await numeralsClearLabels(page)).toEqual({ count: 2, clear: true });
+});
+
 test('numbers follow an edit', async ({ page }) => {
   await open(page, 'local:gn2?format=GA4GH', 'f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1');
   await page.click('#action-numbering');
