@@ -1,3 +1,4 @@
+/* global Buffer */
 import { test, expect } from '@playwright/test';
 import { retireAutoCreatedEditor } from './helpers/singleEditor';
 
@@ -40,7 +41,7 @@ const numbering = (page) => page.evaluate(() => {
   return { people, numerals };
 });
 
-const byExt = `(ext) => { const g = window.editor.getGraph(); for (let v = 0; v <= g.getMaxNodeId(); v++) if (g.isPerson(v) && g.getProperties(v).externalID === ext) return v; return null; }`;
+const byExt = '(ext) => { const g = window.editor.getGraph(); for (let v = 0; v <= g.getMaxNodeId(); v++) if (g.isPerson(v) && g.getProperties(v).externalID === ext) return v; return null; }';
 
 test('the Numbers toggle shows and hides generation numbering', async ({ page }) => {
   await open(page, 'local:gn1?format=GA4GH', FAMILY);
@@ -66,7 +67,9 @@ test('numbers follow an edit', async ({ page }) => {
   await open(page, 'local:gn2?format=GA4GH', 'f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1');
   await page.click('#action-numbering');
   expect((await numbering(page)).people[3]).toBe('II-1');
-  const rel = await page.evaluate((src) => { const find = eval(src); return window.editor.getGraph().DG.GG.getRelationshipNode(find('1'), find('2')); }, byExt);
+  const rel = await page.evaluate((src) => {
+    const find = eval(src); return window.editor.getGraph().DG.GG.getRelationshipNode(find('1'), find('2')); 
+  }, byExt);
   await page.evaluate((rel) => document.dispatchEvent(new window.CustomEvent('pedigree:partnership:newchild', { detail: { partnershipID: rel, childParams: { gender: 'F' } } })), rel);
   const after = await numbering(page);
   expect(Object.values(after.people).filter((l) => l && l.startsWith('II-')).sort()).toEqual(['II-1', 'II-2']);

@@ -213,8 +213,9 @@ export default class PersonVisuals extends AbstractPersonVisuals {
       return;
     }
     this._generationLabel && this._generationLabel.remove();
+    var attributes = (PedigreeEditorParameters as any).attributes;
     this._generationLabel = text
-      ? editor.getPaper().text(this.getX(), this.getY() + PedigreeEditorParameters.attributes.radius, text).attr(PedigreeEditorParameters.attributes.pedNumberLabel)
+      ? editor.getPaper().text(this.getX(), this.getY() + attributes.radius, text).attr(attributes.pedNumberLabel)
       : null;
     this.drawLabels();
   }

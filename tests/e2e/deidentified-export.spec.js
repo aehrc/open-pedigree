@@ -1,3 +1,4 @@
+/* global Buffer */
 import { test, expect } from '@playwright/test';
 
 // The de-identified export (pedigree-editor-generation-numbering): with either "Remove personal
@@ -43,12 +44,20 @@ async function openFamily(page) {
       change(n);
       graph.setProperties(n.getID(), n.getProperties());
     };
-    set('GD1', (n) => { n.setFirstName('Grandad'); n.setLifeStatus('deceased'); n.setBirthDate(new Date(dates.grandadBorn)); n.setDeathDate(new Date(dates.grandadDied)); });
+    set('GD1', (n) => {
+      n.setFirstName('Grandad'); n.setLifeStatus('deceased'); n.setBirthDate(new Date(dates.grandadBorn)); n.setDeathDate(new Date(dates.grandadDied)); 
+    });
     set('GM2', (n) => n.setFirstName('Grandma'));
-    set('AR3', (n) => { n.setFirstName('Arthur'); n.setLastName('Ashworth'); n.setBirthDate(new Date(dates.arthur)); n.setComments('Lives in Leeds'); });
+    set('AR3', (n) => {
+      n.setFirstName('Arthur'); n.setLastName('Ashworth'); n.setBirthDate(new Date(dates.arthur)); n.setComments('Lives in Leeds'); 
+    });
     set('BE4', (n) => n.setFirstName('Beryl'));
-    set('CY5', (n) => { n.setFirstName('Cyril'); n.setBirthDate(new Date(dates.cyril)); });
-    set('DO6', (n) => { n.setFirstName('Dot'); n.setBirthDate(new Date(dates.dot)); });
+    set('CY5', (n) => {
+      n.setFirstName('Cyril'); n.setBirthDate(new Date(dates.cyril)); 
+    });
+    set('DO6', (n) => {
+      n.setFirstName('Dot'); n.setBirthDate(new Date(dates.dot)); 
+    });
   }, dates);
   // (the template choosers the page shows for an empty pedigree - the startup one and the editor's -
   // whose modal covers the toolbar; the export dialog has a container of its own)
@@ -84,7 +93,7 @@ async function exportSVG(page, privacy) {
   const svg = Buffer.concat(chunks).toString('utf8');
   await page.evaluate(() => window.editor.getExportSelector().hide());
   return page.evaluate((svg) => {
-    const dom = new DOMParser().parseFromString(svg, 'image/svg+xml');
+    const dom = new window.DOMParser().parseFromString(svg, 'image/svg+xml');
     return [...dom.getElementsByTagName('text')].map((t) => t.textContent);
   }, svg);
 }

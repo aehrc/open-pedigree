@@ -397,13 +397,14 @@ export default class View {
       return;
     }
     // (one column, at the left of the whole pedigree, as on paper)
-    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - PedigreeEditorParameters.attributes.radius * 2.5;
+    var attributes = (PedigreeEditorParameters as any).attributes;
+    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - attributes.radius * 2.5;
     var paper = editor.getPaper();
     paper.setStart();
     for (var generation in rows) {
       if (rows.hasOwnProperty(generation)) {
         paper.text(leftX, rows[generation].y, romanize(Number(generation)))
-          .attr(PedigreeEditorParameters.attributes.pedNumberLabel).attr({ 'font-weight': 'bold' });
+          .attr(attributes.pedNumberLabel).attr({ 'font-weight': 'bold' });
       }
     }
     this._generationNumerals = paper.setFinish();
