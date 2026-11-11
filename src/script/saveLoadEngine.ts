@@ -259,7 +259,8 @@ export default class SaveLoadEngine {
       patientDataUrl: patientDataUrl,
       jsonData: jsonData,
       setSaveInProgress: this.setSaveInProgress.bind(this),
-      svgData: canvasToSvg(image)
+      // (the saved image never has generation numbering: it's view state)
+      svgData: editor.getView().withoutGenerationNumbering(() => canvasToSvg(image))
     });
     backgroundParent.insertBefore(background, backgroundPosition);
   }

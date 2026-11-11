@@ -207,6 +207,11 @@ export default class Workspace {
           { key : 'clear',  label : 'Clear all', icon : 'times-circle'}
         ]
       }, {
+        name : 'view',
+        items: [
+          { key : 'numbering', label : 'Numbers', icon : 'list-ol', toggle : true}
+        ]
+      }, {
         name : 'output',
         items: [
           { key : 'export',    label : 'Export', icon : 'file-export'},
@@ -224,6 +229,11 @@ export default class Workspace {
       mi.appendChild(icon);
       mi.appendChild(document.createTextNode(' '));
       mi.appendChild(document.createTextNode(data.label));
+      if (data.toggle) {
+        mi.setAttribute('role', 'button');
+        mi.setAttribute('tabindex', '0');
+        mi.setAttribute('aria-pressed', 'false');
+      }
       if (data.callback && typeof((this as any)[data.callback]) == 'function') {
         mi.addEventListener('click', function() {
           (this as any)[data.callback]();

@@ -1,4 +1,5 @@
 import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
+import { generationNumbers } from 'pedigree/model/generationNumbers';
 import BaseGraph, { isPlaceholderProperties, placeholderProperties } from 'pedigree/model/baseGraph';
 import PositionedGraph from 'pedigree/model/positionedGraph';
 import PedigreeImport from 'pedigree/model/import';
@@ -77,6 +78,15 @@ DynamicPositionedGraph.prototype = {
   getGeneration: function( id ) {
     var minRank = Math.min.apply(null, this.DG.ranks);
     return (this.DG.ranks[id] - minRank)/2 + 1;
+  },
+
+  /**
+   * Generation numbers (II-3) for this pedigree as it's drawn: see generationNumbers.
+   *
+   * @return {Object} person ID => {generation, number, label}
+   */
+  getGenerationNumbers: function() {
+    return generationNumbers(this.DG);
   },
 
   getOrderWithinGeneration: function( id ) {

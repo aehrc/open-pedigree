@@ -229,6 +229,23 @@ export default class PedigreeEditor {
     importButton && importButton.addEventListener('click', function(event: any) {
       editor.getImportSelector().show();
     });
+    // generation numbering (II-3): view state only, so not an undo step and not saved
+    var numberingButton = document.getElementById('action-numbering');
+    var toggleNumbering = function() {
+      editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
+    };
+    numberingButton && numberingButton.addEventListener('click', toggleNumbering);
+    // (a toggle button: reachable with Tab, switched with Enter or Space; once per press, not per key repeat)
+    numberingButton && numberingButton.addEventListener('keydown', function(event: any) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (event.repeat) {
+          return;
+        }
+        toggleNumbering();
+      }
+    });
+
     var exportButton = document.getElementById('action-export');
     exportButton && exportButton.addEventListener('click', function(event: any) {
       editor.getExportSelector().show();

@@ -269,6 +269,9 @@ export default class Controller {
       editor.getView().applyChanges(changeSet, true);
     }
 
+    // (a longer name or comment can push the generation numerals further left)
+    editor.getView().updateGenerationNumbering();
+
     editor.getNodeMenu().update();
 
     if (!event.detail?.noUndoRedo && changedValue) {

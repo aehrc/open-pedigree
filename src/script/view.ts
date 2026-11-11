@@ -1,5 +1,5 @@
 import Raphael from 'pedigree/raphael';
-import { arrayContains, Timer } from 'pedigree/model/helpers';
+import { arrayContains, romanize, Timer } from 'pedigree/model/helpers';
 import Partnership from 'pedigree/view/partnership';
 import Person from 'pedigree/view/person';
 import PersonGroup from 'pedigree/view/personGroup';
@@ -9,6 +9,11 @@ import { drawCornerCurve, drawLevelChangeCurve } from 'pedigree/view/graphicHelp
 
 export default class View {
   _nodeMap: any;
+  // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
+  _generationNumbering: boolean;
+  _generationNumerals: any;
+  // while a de-identified export is drawn: 'nopersonal' or 'minimal' (see withDeidentifiedRendering)
+  _deidentified: any;
   hoverModeZones: any;
   _currentMarkedNew: any[];
   _currentGrownNodes: any[];
@@ -26,6 +31,9 @@ export default class View {
     this.preGenerateGraphics();
 
     this._nodeMap = {};
+    this._generationNumbering = false;
+    this._generationNumerals = null;
+    this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
 
@@ -289,6 +297,135 @@ export default class View {
     return node;
   }
 
+  /**
+   * Whether generation numbering (II-3) is switched on: view state only, off when the editor
+   * opens, never saved or undone.
+   */
+  isGenerationNumberingOn(): boolean {
+    return this._generationNumbering;
+  }
+
+  setGenerationNumbering(on: boolean): void {
+    this._generationNumbering = !!on;
+    this.updateGenerationNumbering();
+    // (the toolbar's Numbers toggle shows the state, however it was set)
+    var button = document.getElementById('action-numbering');
+    if (button) {
+      button.classList.toggle('active', this._generationNumbering);
+      button.setAttribute('aria-pressed', String(this._generationNumbering));
+    }
+  }
+
+  // Whether the numbering is drawn now: when switched on, and always in a de-identified drawing.
+  isGenerationNumberingShown(): boolean {
+    return this._generationNumbering || !!this._deidentified;
+  }
+
+  /**
+   * Runs `draw` with generation numbering hidden, for the diagram image saved with a pedigree:
+   * numbering is view state, so what's saved never depends on it. Returns what `draw` returns.
+   */
+  withoutGenerationNumbering(draw: () => any): any {
+    if (!this._generationNumbering) {
+      return draw();
+    }
+    // redrawn without it (not just hidden: the labels below the number would keep its gap).
+    // Not for use inside withDeidentifiedRendering, which shows numbering regardless.
+    this._generationNumbering = false;
+    try {
+      this.updateGenerationNumbering();
+      return draw();
+    } finally {
+      this._generationNumbering = true;
+      this.updateGenerationNumbering();
+    }
+  }
+
+  /** The privacy level a de-identified drawing is for ('nopersonal' or 'minimal'), or null. */
+  getDeidentified(): any {
+    return this._deidentified;
+  }
+
+  /**
+   * Runs `draw` with the pedigree drawn de-identified, for an export: no names, external IDs or
+   * dates, ages as bands, people labelled by generation number, and (for 'minimal') no comments.
+   * Everything is redrawn as it was afterwards, before the screen can show the de-identified one
+   * (this is all one synchronous call). Returns what `draw` returns.
+   */
+  withDeidentifiedRendering(level: string, draw: () => any): any {
+    this._deidentified = level;
+    try {
+      this._redrawPersonLabels();
+      return draw();
+    } finally {
+      this._deidentified = null;
+      this._redrawPersonLabels();
+    }
+  }
+
+  // Redraws the labels that a de-identified drawing changes, for every person, and the numbering.
+  _redrawPersonLabels(): void {
+    var graph = editor.getGraph();
+    for (var nodeID in this._nodeMap) {
+      if (this._nodeMap.hasOwnProperty(nodeID) && graph.isPerson(nodeID) && !graph.isPlaceholder(nodeID)) {
+        var visuals = this._nodeMap[nodeID].getGraphics();
+        visuals.updateNameLabel();
+        visuals.updateExternalIDLabel();
+        visuals.updateAgeLabel();
+        visuals.updateCommentsLabel();
+      }
+    }
+    this.updateGenerationNumbering();
+  }
+
+  /**
+   * Draws generation numbering as it now stands, or clears it: each person's label (II-3) and
+   * each generation's Roman numeral at the left of its row. Redrawn whole, after every change.
+   */
+  updateGenerationNumbering(): void {
+    this._generationNumerals && this._generationNumerals.remove();
+    this._generationNumerals = null;
+    var graph = editor.getGraph();
+    var shown = this.isGenerationNumberingShown();
+    var numbers = shown ? graph.getGenerationNumbers() : {};
+    var rows: any = {};
+    for (var nodeID in this._nodeMap) {
+      if (!this._nodeMap.hasOwnProperty(nodeID) || !graph.isPerson(nodeID)) {
+        continue;
+      }
+      var node = this._nodeMap[nodeID];
+      var number = numbers[nodeID];
+      node.getGraphics().setGenerationLabel(number ? number.label : null);
+      if (number) {
+        // (the left edge of the person: their symbol, or a wider label under it, such as a long name)
+        var graphics = node.getGraphics();
+        var left = graphics.getX() - (PedigreeEditorParameters as any).attributes.radius;
+        var labels = graphics.getLabels();
+        if (labels.length) {
+          left = Math.min(left, labels.getBBox().x);
+        }
+        var row = rows[number.generation] = rows[number.generation] || { x: Infinity, y: graphics.getY() };
+        row.x = Math.min(row.x, left);
+      }
+    }
+    if (!shown || Object.keys(rows).length == 0) {
+      return;
+    }
+    // (one column, at the left of the whole pedigree and clear of every label, as on paper)
+    var attributes = (PedigreeEditorParameters as any).attributes;
+    var leftX = Math.min.apply(null, Object.keys(rows).map((g) => rows[g].x)) - attributes.radius * 1.5;
+    var paper = editor.getPaper();
+    paper.setStart();
+    for (var generation in rows) {
+      if (rows.hasOwnProperty(generation)) {
+        paper.text(leftX, rows[generation].y, romanize(Number(generation)))
+          .attr(attributes.pedNumberLabel).attr({ 'font-weight': 'bold' });
+      }
+    }
+    this._generationNumerals = paper.setFinish();
+    this._generationNumerals.toBack();
+  }
+
   moveNode(id: any, animate?: any): void {
     var positionedGraph = editor.getGraph();
     var graphPos = positionedGraph.getPosition(id);
@@ -539,6 +676,9 @@ export default class View {
           }
         }
       }
+
+      // (an edit can renumber everyone)
+      this.updateGenerationNumbering();
 
       timer.printSinceLast('=== highlight & update handles runtime: ');
       timer2.printSinceLast('=== Total apply changes runtime: ');

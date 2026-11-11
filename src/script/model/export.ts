@@ -3,6 +3,7 @@ import SVGtoPDF from 'svg-to-pdfkit';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
+import { generationNumbers } from 'pedigree/model/generationNumbers';
 
 var PedigreeExport = function () {
 };
@@ -235,7 +236,21 @@ PedigreeExport.exportAsGA4GH = function(pedigree, privacySetting = "all", fhirPa
 
 // ===============================================================================================
 
+/**
+ * The pedigree as SVG, as the canvas draws it. With a privacy setting other than 'all' ('nopersonal'
+ * or 'minimal') it's drawn de-identified first (no names, external IDs or dates; ages as bands;
+ * people labelled by generation number; and for 'minimal' no comments - see
+ * View.withDeidentifiedRendering), and the canvas is drawn as it was again afterwards.
+ */
 PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
+  if (privacySetting === 'all') {
+    return canvasAsSVG();
+  }
+  return editor.getView().withDeidentifiedRendering(privacySetting, canvasAsSVG);
+};
+
+// The canvas, serialised as SVG.
+function canvasAsSVG() {
   // Plain DOM calls: this was written against Prototype.js ($('canvas'), .down()), which is gone,
   // so every call threw - no SVG export, and no image embedded in a saved pedigree.
   var image = document.getElementById('canvas');
@@ -291,25 +306,7 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
       domNode.removeChild(childNode);
     }
   }
-  function removeText(dom, fontSize) {
-    let toRemove = [];
-    for (let textNode of dom.getElementsByTagName('text')){
-      if (textNode.style.fontSize === fontSize){
-        toRemove.push(textNode);
-      }
-    }
-    for (let childNode of toRemove){
-      childNode.parentNode.removeChild(childNode);
-    }
-  }
-
   removeHiddenNodes(dom.getRootNode());
-  if (privacySetting !== 'all' ){
-    removeText(dom, '20px');
-  }
-  if (privacySetting === 'minimal'){
-    removeText(dom, '19px');
-  }
 
   const serializer = new XMLSerializer();
   return serializer.serializeToString(dom);
@@ -535,6 +532,8 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
 
   var nextUnusedID = 1;
   var nextPlaceholder = 1;
+  // ('generation': each person's generation number, II-3, unique by construction)
+  var generations = (idGenerationPreference == 'generation') ? generationNumbers(pedigree) : null;
 
   for (var i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
     if (!pedigree.GG.isPerson(i)) {
@@ -555,7 +554,10 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
     }
 
     var id: any = nextUnusedID++;
-    if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
+    if (generations && generations[i]) {
+      nextUnusedID--;
+      id = generations[i].label;
+    } else if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
       nextUnusedID--;
       id = pedigree.GG.properties[i]['externalID'].replace(/\s/g, '_');
     } else if (idGenerationPreference == 'name' && pedigree.GG.properties[i].hasOwnProperty('fName')) {
