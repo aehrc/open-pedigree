@@ -1,4 +1,4 @@
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { isPlaceholderProperties } from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
@@ -337,7 +337,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
           // a couple with no shared child: their only child is a placeholder
           // (DynamicPositionedGraph.isPlaceholder)
           const placeholderHub = relationshipTracker.createOrGetChildhub(nextPersonId, partnerId);
-          const placeholder = newG._addVertex(null, BaseGraph.TYPE.PERSON, { 'gender': 'U', 'placeholder': true }, newG.defaultNonPersonNodeWidth);
+          const placeholder = newG._addVertex(null, (BaseGraph as any).TYPE.PERSON, { 'gender': 'U', 'placeholder': true }, newG.defaultNonPersonNodeWidth);
           newG.addEdge(placeholderHub, placeholder, defaultEdgeWeight);
           relNode = newG.getRelationshipNode(nextPersonId, partnerId);
         }
@@ -1104,7 +1104,7 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
 
 // The hidden only child of a couple with no children (DynamicPositionedGraph.isPlaceholder): never exported.
 function isPlaceholderNode(pedigree, v) {
-  return BaseGraph.isPlaceholderProperties(pedigree.GG.type[v], pedigree.GG.properties[v]);
+  return isPlaceholderProperties(pedigree.GG.type[v], pedigree.GG.properties[v]);
 }
 
 GA4GHFHIRConverter._collectTermCodings = function (pedigree) {

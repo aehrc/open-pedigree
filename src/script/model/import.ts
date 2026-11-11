@@ -1,5 +1,5 @@
 import { isInt } from 'pedigree/model/helpers';
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
@@ -375,7 +375,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
-  PedigreeImport.keepValidPlaceholders(newG);
+  keepValidPlaceholders(newG);
   PedigreeImport.validateBaseGraph(newG);
 
   return newG;
@@ -620,12 +620,12 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
  */
 /*
  * A row written for a placeholder - the hidden only child of a couple with no children - in a
- * format that records only parents (PED, DADA2): its individual ID is BaseGraph.PLACEHOLDER_ID_PREFIX
+ * format that records only parents (PED, DADA2): its individual ID is PLACEHOLDER_ID_PREFIX
  * and a number (see PedigreeExport.createNewIDs).
  */
 function isPlaceholderPedID(pedID) {
-  return typeof pedID === 'string' && pedID.startsWith(BaseGraph.PLACEHOLDER_ID_PREFIX)
-    && /^[0-9]+$/.test(pedID.substring(BaseGraph.PLACEHOLDER_ID_PREFIX.length));
+  return typeof pedID === 'string' && pedID.startsWith(PLACEHOLDER_ID_PREFIX)
+    && /^[0-9]+$/.test(pedID.substring(PLACEHOLDER_ID_PREFIX.length));
 }
 
 /*
@@ -633,9 +633,9 @@ function isPlaceholderPedID(pedID) {
  * partners or children, no data but its sex, and not the proband. Any other is an ordinary person
  * of unknown sex; and a placeholder whose couple has other children isn't needed, so goes.
  */
-PedigreeImport.keepValidPlaceholders = function(newG) {
+function keepValidPlaceholders(newG) {
   for (var v = newG.getMaxRealVertexId(); v >= 0; v--) {
-    if (!BaseGraph.isPlaceholderProperties(newG.type[v], newG.properties[v])) {
+    if (!isPlaceholderProperties(newG.type[v], newG.properties[v])) {
       continue;
     }
     var onlyItsData = Object.keys(newG.properties[v]).every(function(key) {
@@ -652,7 +652,7 @@ PedigreeImport.keepValidPlaceholders = function(newG) {
       newG.remove(v);
     }
   }
-};
+}
 
 PedigreeImport.validateBaseGraph = function(newG) {
   validateImportedGraph(newG);
@@ -1242,7 +1242,7 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
-  PedigreeImport.keepValidPlaceholders(newG);
+  keepValidPlaceholders(newG);
   PedigreeImport.validateBaseGraph(newG);
 
   return newG;

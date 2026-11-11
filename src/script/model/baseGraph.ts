@@ -40,15 +40,15 @@ BaseGraph.TYPE = {
  * at least one child (validate), so a couple with none keeps a placeholder, which is never drawn,
  * saved to other formats or counted.
  */
-BaseGraph.isPlaceholderProperties = function (type, properties) {
-  return type == BaseGraph.TYPE.PERSON && !!properties && properties.placeholder === true;
-};
+export function isPlaceholderProperties(type: any, properties: any): boolean {
+  return type == (BaseGraph as any).TYPE.PERSON && !!properties && properties.placeholder === true;
+}
 
 /**
  * The individual ID a placeholder is written with in formats that record only each person's
  * parents (PED, PEDX, DADA2, DADA2X), followed by a number: `_placeholder_1`.
  */
-BaseGraph.PLACEHOLDER_ID_PREFIX = '_placeholder_';
+export const PLACEHOLDER_ID_PREFIX = '_placeholder_';
 
 BaseGraph.prototype = {
 
@@ -223,7 +223,7 @@ BaseGraph.prototype = {
     this.weights[nextId] = {};
 
     // a placeholder child takes as little room as layout allows (see isPlaceholder)
-    this.vWidth[nextId] = BaseGraph.isPlaceholderProperties(type, properties) ? this.defaultNonPersonNodeWidth : width;
+    this.vWidth[nextId] = isPlaceholderProperties(type, properties) ? this.defaultNonPersonNodeWidth : width;
 
     this.type[nextId] = type;
 
@@ -269,7 +269,7 @@ BaseGraph.prototype = {
 
   insertVertex: function(type, properties, edgeWeights, inedges, outedges, width) {
     var width = width ? width : ((type == BaseGraph.TYPE.PERSON) ? this.defaultPersonNodeWidth : this.defaultNonPersonNodeWidth);
-    if (BaseGraph.isPlaceholderProperties(type, properties)) {
+    if (isPlaceholderProperties(type, properties)) {
       width = this.defaultNonPersonNodeWidth;
     }
 

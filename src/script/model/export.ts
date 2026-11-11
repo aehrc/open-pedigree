@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit/js/pdfkit.standalone';
 import SVGtoPDF from 'svg-to-pdfkit';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
 
 var PedigreeExport = function () {
 };
@@ -544,10 +544,10 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
     // The hidden only child of a couple with no children (DynamicPositionedGraph.isPlaceholder):
     // formats that record only parents (PED, DADA2) can't hold such a couple, so it's written as a
     // row with a reserved ID, which PedigreeImport reads back as a placeholder.
-    if (BaseGraph.isPlaceholderProperties(pedigree.GG.type[i], pedigree.GG.properties[i])) {
-      var placeholderID = BaseGraph.PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
+    if (isPlaceholderProperties(pedigree.GG.type[i], pedigree.GG.properties[i])) {
+      var placeholderID = PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
       while (usedIDs.hasOwnProperty(placeholderID)) {
-        placeholderID = BaseGraph.PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
+        placeholderID = PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
       }
       idToNewId[i] = placeholderID;
       usedIDs[placeholderID] = true;

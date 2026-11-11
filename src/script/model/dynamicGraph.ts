@@ -1,5 +1,5 @@
 import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { isPlaceholderProperties } from 'pedigree/model/baseGraph';
 import PositionedGraph from 'pedigree/model/positionedGraph';
 import PedigreeImport from 'pedigree/model/import';
 import Ordering from 'pedigree/model/ordering';
@@ -64,7 +64,7 @@ DynamicPositionedGraph.prototype = {
     if (!this.isPerson(id)) {
       return false;
     }
-    return BaseGraph.isPlaceholderProperties(BaseGraph.TYPE.PERSON, this.DG.GG.properties[id]);
+    return isPlaceholderProperties((BaseGraph as any).TYPE.PERSON, this.DG.GG.properties[id]);
   },
 
   isAdopted: function( id ) {
@@ -710,7 +710,7 @@ DynamicPositionedGraph.prototype = {
 
   /**
    * Adds a new partner for a person, and the couple's child: with childProperties null, a
-   * placeholder (a couple with no children - see BaseGraph.isPlaceholderProperties).
+   * placeholder (a couple with no children - see isPlaceholderProperties in baseGraph).
    */
   addNewRelationship: function( personId, childProperties, preferLeft, numTwins ) {
     this._debugPrintAll('before');
@@ -1068,7 +1068,7 @@ DynamicPositionedGraph.prototype = {
       if (allChildrenGo) {
         hubsGivenPlaceholder[hub] = true;
         var rank = this.DG.ranks[hub] + 1;
-        placeholdersAdded.push(this._insertVertex(BaseGraph.TYPE.PERSON, this._childPropertiesOrPlaceholder(null), 1.0, hub, null,
+        placeholdersAdded.push(this._insertVertex((BaseGraph as any).TYPE.PERSON, this._childPropertiesOrPlaceholder(null), 1.0, hub, null,
           rank, this._findBestInsertPosition(rank, hub)));
       }
     }
