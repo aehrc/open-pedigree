@@ -393,6 +393,10 @@ export default class PedigreeEditor {
     if (!config || !node || !node.getType || node.getType() !== 'Person') {
       return;
     }
+    // (a placeholder - the hidden child of a couple with no children - has no answers)
+    if (this.getGraph() && this.getGraph().isPlaceholder(node.getID())) {
+      return;
+    }
     var tried = false;
     var summary: any = null;
     // Passes until nothing more applies: a default can show an item (enableWhen) earlier in the list.

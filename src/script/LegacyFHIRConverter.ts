@@ -332,12 +332,20 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           // (Both partners usually carry the extension; setting the same flags twice is harmless.)
           const partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');
           const partnerType = nextPerson.partners[i].type;
+          let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+          if (!relNode && nextPersonId !== partnerId) {
+            // a couple with no shared child: their only child is a placeholder
+            // (DynamicPositionedGraph.isPlaceholder)
+            const placeholderHub = relationshipTracker.createOrGetChildhub(nextPersonId, partnerId);
+            const placeholder = newG._addVertex(null, Graph.TYPE.PERSON, { 'gender': 'U', 'placeholder': true }, newG.defaultNonPersonNodeWidth);
+            newG.addEdge(placeholderHub, placeholder, defaultEdgeWeight);
+            relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+          }
           if (!partnerType.consangr && !partnerType.broken){
             // nothing to set
             continue;
           }
 
-          let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
           if (relNode){
             let relProperties = newG.properties[relNode];
             if (partnerType.consangr){

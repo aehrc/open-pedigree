@@ -1,6 +1,7 @@
 import { ChildlessBehavior } from 'pedigree/view/abstractNode';
 import AbstractPerson from 'pedigree/view/abstractPerson';
 import PersonVisuals from 'pedigree/view/personVisuals';
+import PlaceholderVisuals from 'pedigree/view/placeholderVisuals';
 import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
@@ -205,6 +206,10 @@ export default class Person extends AbstractPerson {
     this._gender = this.parseGender(AbstractPerson._pendingGender);
     this._type = 'Person';
     this._setDefault();
+    // a couple with no children has a hidden placeholder child (see DynamicPositionedGraph.isPlaceholder)
+    if (editor.getGraph() && editor.getGraph().isPlaceholder(this.getID())) {
+      return new PlaceholderVisuals(this, x, y);
+    }
     return new PersonVisuals(this, x, y);
   }
 

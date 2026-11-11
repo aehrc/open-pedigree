@@ -316,8 +316,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     newG.addEdge(chhubID, personID, defaultEdgeWeight);
   }
 
-  validateImportedGraph(newG);
-
   // set any partner relationships
   for (const nextPerson of nodeData){
     if (nextPerson.partners){
@@ -329,16 +327,24 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         }
 
         const partnerType = nextPerson.partnerType[i];
-        if (!partnerType.consangr && !partnerType.broken){
-          // nothing to set
-          continue;
-        }
 
         if (nextPersonId === undefined){
           nextPersonId = findReferencedPerson(nextPerson.properties.id, 'partner');
         }
         const partnerId = findReferencedPerson(nodeData[partner].properties.id, 'partner');
         let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+        if (!relNode && nextPersonId !== partnerId) {
+          // a couple with no shared child: their only child is a placeholder
+          // (DynamicPositionedGraph.isPlaceholder)
+          const placeholderHub = relationshipTracker.createOrGetChildhub(nextPersonId, partnerId);
+          const placeholder = newG._addVertex(null, BaseGraph.TYPE.PERSON, { 'gender': 'U', 'placeholder': true }, newG.defaultNonPersonNodeWidth);
+          newG.addEdge(placeholderHub, placeholder, defaultEdgeWeight);
+          relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+        }
+        if (!partnerType.consangr && !partnerType.broken){
+          // nothing to set
+          continue;
+        }
         if (relNode){
           let relProperties = newG.properties[relNode];
           if (partnerType.consangr){
@@ -363,7 +369,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }
     }
   }
-  // PedigreeImport.validateBaseGraph(newG);
+  // (after the partners: a couple with no shared child only connects once given its placeholder)
+  validateImportedGraph(newG);
   return newG;
 
 };
@@ -1095,6 +1102,11 @@ GA4GHFHIRConverter.exportAsFHIR = function (pedigree, privacySetting, knownFhirP
   }
 };
 
+// The hidden only child of a couple with no children (DynamicPositionedGraph.isPlaceholder): never exported.
+function isPlaceholderNode(pedigree, v) {
+  return BaseGraph.isPlaceholderProperties(pedigree.GG.type[v], pedigree.GG.properties[v]);
+}
+
 GA4GHFHIRConverter._collectTermCodings = function (pedigree) {
   const collected = {};
   for (let i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
@@ -1129,7 +1141,8 @@ GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhir
 
   // add any missing nodes, the recursion only goes up the tree
   for (let i = (pedigree.GG.isPerson(0) ? 1 : 0); i <= pedigree.GG.getMaxRealVertexId(); i++) {
-    if (!pedigree.GG.isPerson(i)) {
+    // (not a placeholder: a couple with no children is written as their partner relationship only)
+    if (!pedigree.GG.isPerson(i) || isPlaceholderNode(pedigree, i)) {
       continue;
     }
     this.processTreeNode(i, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
@@ -1443,6 +1456,10 @@ GA4GHFHIRConverter.relationshipMap = {
 
 GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, knownFhirPatienReference,
   pedigreeIndividuals, pedigreeRelationship, condtions, observations, nodeIndexToRef, questionnaireResponses) {
+
+  if (isPlaceholderNode(pedigree, index)) {
+    throw 'Assertion failed: exporting a placeholder (the hidden child of a couple with no children)';
+  }
 
   if (pedigreeIndividuals[index]) {
     // already processed

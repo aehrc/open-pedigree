@@ -624,13 +624,13 @@ DynamicPositionedGraph.prototype = {
       throw 'Assertion failed: dropping a placeholder after a change that removed nodes';
     }
     var removal = this.removeNodes([placeholder]);
+    // the child was placed beside the placeholder: tidy the layout again now it's gone (e.g. the
+    // couple right above an only child). IDs have changed, so moved nodes can't be worked out:
+    // everything is redrawn where it now is.
+    this._heuristics.improvePositioning();
     var renumber = (list) => (list || []).filter((v) => v !== placeholder).map((v) => (v > placeholder ? v - 1 : v));
-    var moved = renumber(changeSet.moved);
-    for (var i = 0; i < removal.moved.length; i++) {
-      if (!arrayContains(moved, removal.moved[i])) {
-        moved.push(removal.moved[i]);
-      }
-    }
+    var newNodes = renumber(changeSet['new']);
+    var moved = this._getAllNodes().filter((v) => !arrayContains(newNodes, v));
     var result: any = {'removed': removal.removed, 'removedInternally': removal.removedInternally, 'moved': moved};
     for (const key of ['new', 'animate', 'highlight']) {
       if (changeSet.hasOwnProperty(key)) {

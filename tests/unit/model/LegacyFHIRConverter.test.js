@@ -80,6 +80,25 @@ describe('LegacyFHIRConverter', () => {
     vi.stubGlobal('editor', { getFhirTerminologyHelper: () => terminologyHelper });
   });
 
+  // pedigree-editor-partner-without-child: another producer's couple with no shared child
+  it('reads a couple with no shared child as a couple with a placeholder child', () => {
+    const pedigree = JSON.parse(legacyText);
+    // Arthur (FMH_1) gets a second partner, Beryl, with no children
+    pedigree.contained.push({ resourceType: 'FamilyMemberHistory', id: 'FMH_NEW', status: 'completed',
+      patient: { type: 'Patient', reference: '#pat' }, name: 'Beryl Example',
+      sex: { coding: [{ system: 'http://hl7.org/fhir/administrative-gender', code: 'female', display: 'Female' }] },
+      relationship: { coding: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode', code: 'EXT', display: 'extended family member' }] },
+      extension: [{ url: 'http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-partner', extension: [
+        { url: 'type', valueCodeableConcept: { coding: [{ system: 'http://purl.org/ga4gh/kin.fhir', code: 'KIN:026', display: 'isPartner' }] } },
+        { url: 'reference', valueReference: { reference: '#FMH_1' } }] }] });
+    const graph = LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree));
+    const byName = (first) => Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.properties[v].fName === first);
+    const rel = graph.getRelationshipNode(byName('Arthur'), byName('Beryl'));
+    expect(rel).not.toBeNull();
+    const children = graph.getOutEdges(graph.getRelationshipChildhub(rel));
+    expect(children.map((v) => graph.properties[v].placeholder)).toEqual([true]);
+  });
+
   it('reads a pedigree saved in the legacy format exactly as v0.3.2 did', () => {
     expect(asVertices(LegacyFHIRConverter.initFromFHIR(legacyText))).toEqual(V032_READS);
   });

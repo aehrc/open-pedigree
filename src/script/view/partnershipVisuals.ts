@@ -342,8 +342,8 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
     var childlinePos = positionedGraph.getRelationshipChildhubPosition(id);
     var childlineY   = editor.convertGraphCoordToCanvasCoord( childlinePos.x, childlinePos.y ).y;
 
-    // draw child edges from childhub
-    var children = positionedGraph.getRelationshipChildrenSortedByOrder(id);
+    // draw child edges from childhub (not to a placeholder: a couple with no children has none)
+    var children = positionedGraph.getRelationshipChildrenSortedByOrder(id).filter((child: any) => !positionedGraph.isPlaceholder(child));
 
     var leftmostX  = this.getX();
     var rightmostX = this.getX();
@@ -420,8 +420,11 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
       }
     }
 
-    editor.getView().drawLineWithCrossings( id, leftmostX, childlineY, rightmostX, childlineY, PedigreeEditorParameters.attributes.partnershipLines);
-    editor.getView().drawLineWithCrossings( id, this.getX(), this.getY(), this.getX(), childlineY, PedigreeEditorParameters.attributes.partnershipLines);
+    // a couple with no children (only a placeholder) has no drop line
+    if (children.length > 0) {
+      editor.getView().drawLineWithCrossings( id, leftmostX, childlineY, rightmostX, childlineY, PedigreeEditorParameters.attributes.partnershipLines);
+      editor.getView().drawLineWithCrossings( id, this.getX(), this.getY(), this.getX(), childlineY, PedigreeEditorParameters.attributes.partnershipLines);
+    }
 
     //draw small non-functional childhub junction orb
     if (numPregnancies > 1) {
