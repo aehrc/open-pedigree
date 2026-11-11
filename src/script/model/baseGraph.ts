@@ -44,6 +44,12 @@ BaseGraph.isPlaceholderProperties = function (type, properties) {
   return type == BaseGraph.TYPE.PERSON && !!properties && properties.placeholder === true;
 };
 
+/**
+ * The individual ID a placeholder is written with in formats that record only each person's
+ * parents (PED, PEDX, DADA2, DADA2X), followed by a number: `_placeholder_1`.
+ */
+BaseGraph.PLACEHOLDER_ID_PREFIX = '_placeholder_';
+
 BaseGraph.prototype = {
 
   serialize: function(saveWidth) {

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import DynamicPositionedGraph from 'pedigree/model/dynamicGraph';
+import PedigreeExport from 'pedigree/model/export';
+import PedigreeImport from 'pedigree/model/import';
 
 // A couple with no children (pedigree-editor-partner-without-child): the couple's only child is a
 // hidden placeholder, so every graph rule (BaseGraph.validate) still holds.
@@ -165,5 +167,61 @@ describe('a couple with no children', () => {
     expect(graph.getPossibleChildrenOf(other)).not.toContain(placeholder);
     expect(graph.getPossibleSiblingsOf(other)).not.toContain(placeholder);
     expect(graph.getPossiblePartnersOf(other)).not.toContain(placeholder);
+  });
+});
+
+describe('a couple with no children in formats that record only parents', () => {
+  function couple() {
+    const graph = graphFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1');
+    graph.addNewRelationship(person(graph, '3'), null);
+    return graph;
+  }
+  const placeholderCount = (g) => g.properties.filter((p, v) => g.isPerson(v) && p && p.placeholder === true).length;
+
+  it.each(['PED', 'DADA2'])('round-trips through %s, with the placeholder as a reserved row', (format) => {
+    const text = format === 'PED' ? PedigreeExport.exportAsPED(couple().DG, 'newid') : PedigreeExport.exportAsDADA2(couple().DG);
+    expect(text).toMatch(/ _placeholder_1 /);
+    const read = format === 'PED' ? PedigreeImport.initFromPED(text, false, false, true) : PedigreeImport.initFromDADA2(text);
+    expect(placeholderCount(read)).toBe(1);
+    const ph = read.properties.findIndex((p) => p && p.placeholder === true);
+    expect(read.properties[ph].externalID).toBeUndefined();
+    expect(read.vWidth[ph]).toBe(read.defaultNonPersonNodeWidth);
+  });
+
+  it('reads a placeholder row with children of its own as an ordinary person', () => {
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf _placeholder_1 1 2 0 -9\nf 4 0 0 1 1\nf 5 4 _placeholder_1 1 1', false, false, true);
+    expect(placeholderCount(read)).toBe(0);
+  });
+
+  it('reads a placeholder row without parents as an ordinary person', () => {
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf _placeholder_1 0 0 0 -9\nf 5 3 _placeholder_1 1 1', false, false, true);
+    expect(placeholderCount(read)).toBe(0);
+  });
+
+  it('leaves out a placeholder row whose couple has other children', () => {
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 1 1\nf _placeholder_1 1 2 0 -9', false, false, true);
+    expect(placeholderCount(read)).toBe(0);
+    expect(read.properties.filter((p, v) => read.isPerson(v)).length).toBe(3);
+  });
+
+  it('only takes the reserved ID followed by a number', () => {
+    const read = PedigreeImport.initFromPED('f 1 0 0 1 1\nf 2 0 0 2 1\nf _placeholder_x 1 2 0 -9', false, false, true);
+    expect(placeholderCount(read)).toBe(0);
+  });
+});
+
+describe('a couple with no children from GEDCOM', () => {
+  it('reads a family with a husband and a wife and no children as a couple with a placeholder', () => {
+    const gedcom = ['0 HEAD', '1 CHAR UTF-8',
+      '0 @I1@ INDI', '1 NAME John /Smith/', '1 SEX M',
+      '0 @I2@ INDI', '1 NAME Jane /Smith/', '1 SEX F',
+      '0 @F1@ FAM', '1 HUSB @I1@', '1 WIFE @I2@',
+      '0 TRLR'].join('\n');
+    const read = PedigreeImport.initFromGEDCOM(gedcom, false, true);
+    const persons = read.properties.map((p, v) => v).filter((v) => read.isPerson(v));
+    expect(persons.length).toBe(3);
+    const placeholders = persons.filter((v) => read.properties[v].placeholder === true);
+    expect(placeholders.length).toBe(1);
+    expect(read.properties[placeholders[0]].comments).toBeUndefined();
   });
 });

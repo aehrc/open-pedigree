@@ -394,7 +394,8 @@ export default class PedigreeEditor {
       return;
     }
     // (a placeholder - the hidden child of a couple with no children - has no answers)
-    if (this.getGraph() && this.getGraph().isPlaceholder(node.getID())) {
+    var graph = this.getGraph();
+    if (graph && typeof graph.isPlaceholder === 'function' && graph.isPlaceholder(node.getID())) {
       return;
     }
     var tried = false;

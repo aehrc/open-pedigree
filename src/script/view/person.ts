@@ -207,7 +207,8 @@ export default class Person extends AbstractPerson {
     this._type = 'Person';
     this._setDefault();
     // a couple with no children has a hidden placeholder child (see DynamicPositionedGraph.isPlaceholder)
-    if (editor.getGraph() && editor.getGraph().isPlaceholder(this.getID())) {
+    var graph = editor.getGraph && editor.getGraph();
+    if (graph && typeof graph.isPlaceholder === 'function' && graph.isPlaceholder(this.getID())) {
       return new PlaceholderVisuals(this, x, y);
     }
     return new PersonVisuals(this, x, y);

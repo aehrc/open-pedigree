@@ -252,9 +252,12 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     } else if (genderValue == 2) {
       gender = 'F';
     }
-    var properties = {'gender': gender};
+    var properties: any = {'gender': gender};
 
-    if (saveIDAsExternalID) {
+    if (isPlaceholderPedID(pedID)) {
+      // a couple with no children, as the PED export writes it (see keepValidPlaceholders)
+      properties = {'gender': 'U', 'placeholder': true};
+    } else if (saveIDAsExternalID) {
       properties['externalID'] = pedID;
     }
 
@@ -372,6 +375,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
+  PedigreeImport.keepValidPlaceholders(newG);
   PedigreeImport.validateBaseGraph(newG);
 
   return newG;
@@ -614,6 +618,42 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
  *
  * ===============================================================================================
  */
+/*
+ * A row written for a placeholder - the hidden only child of a couple with no children - in a
+ * format that records only parents (PED, DADA2): its individual ID is BaseGraph.PLACEHOLDER_ID_PREFIX
+ * and a number (see PedigreeExport.createNewIDs).
+ */
+function isPlaceholderPedID(pedID) {
+  return typeof pedID === 'string' && pedID.startsWith(BaseGraph.PLACEHOLDER_ID_PREFIX)
+    && /^[0-9]+$/.test(pedID.substring(BaseGraph.PLACEHOLDER_ID_PREFIX.length));
+}
+
+/*
+ * A row read as a placeholder stays one only as the export writes it: someone's child, with no
+ * partners or children, no data but its sex, and not the proband. Any other is an ordinary person
+ * of unknown sex; and a placeholder whose couple has other children isn't needed, so goes.
+ */
+PedigreeImport.keepValidPlaceholders = function(newG) {
+  for (var v = newG.getMaxRealVertexId(); v >= 0; v--) {
+    if (!BaseGraph.isPlaceholderProperties(newG.type[v], newG.properties[v])) {
+      continue;
+    }
+    var onlyItsData = Object.keys(newG.properties[v]).every(function(key) {
+      return key === 'gender' || key === 'placeholder' || key === 'evaluated';
+    });
+    var valid = v !== 0 && newG.inedges[v].length === 1 && newG.v[v].length === 0 && onlyItsData;
+    if (!valid) {
+      delete newG.properties[v].placeholder;
+      newG.vWidth[v] = newG.defaultPersonNodeWidth;
+      continue;
+    }
+    var siblings = newG.v[newG.inedges[v][0]];
+    if (siblings.length > 1) {
+      newG.remove(v);
+    }
+  }
+};
+
 PedigreeImport.validateBaseGraph = function(newG) {
   validateImportedGraph(newG);
 };
@@ -937,7 +977,6 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
 
   var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
 
-  var noChildFamilies = [];
 
   // second pass (once all vertex IDs are known): process families & add edges
   for (var i = 0; i < gedcom.families.length; i++) {
@@ -973,9 +1012,9 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     var children = nextFamily.hasOwnProperty('CHIL') ? nextFamily['CHIL'] : null;
 
     if (children == null) {
-      // create a virtual child
-      var childID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'U', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-      noChildFamilies.push(nextFamily.id);
+      // a family with no children is a couple with no children: their only child is a placeholder
+      // (DynamicPositionedGraph.isPlaceholder)
+      var childID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'U', 'placeholder': true}, newG.defaultNonPersonNodeWidth );
       externalIDToID[childID] = childID;
       children = [{'value': childID}];
     }
@@ -991,11 +1030,6 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
 
       newG.addEdge( chhubID, childID, defaultEdgeWeight );
     }
-  }
-
-  if (noChildFamilies.length > 0) {
-    // JSON.stringify(noChildFamilies)
-    alert('Some families with no children were found in the imported pedigree: this is not supported at the moment, so a child was added to each childless family');
   }
 
   PedigreeImport.validateBaseGraph(newG);
@@ -1106,7 +1140,8 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     } else if (genderValue == 2) {
       gender = 'F';
     }
-    const properties = {'gender': gender};
+    // (a couple with no children, as the DADA2 export writes it: see keepValidPlaceholders)
+    const properties: any = isPlaceholderPedID(pedID) ? {'gender': 'U', 'placeholder': true} : {'gender': gender};
 
     var pedigreeID = newG._addVertex( nextID++, BaseGraph.TYPE.PERSON, properties, newG.defaultPersonNodeWidth );
 
@@ -1207,6 +1242,7 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
+  PedigreeImport.keepValidPlaceholders(newG);
   PedigreeImport.validateBaseGraph(newG);
 
   return newG;
