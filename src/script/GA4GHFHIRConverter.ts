@@ -1,10 +1,10 @@
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { addPlaceholderChild, isPlaceholderProperties } from 'pedigree/model/baseGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { MAPS_TO_FIELD_TARGETS, RESERVED_LEGEND_TARGETS } from 'pedigree/questionnaire/questionnaireParser';
 import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/localDate';
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
-import validateImportedGraph from 'pedigree/model/validateImportedGraph';
+import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 // A node's link to an external record (record-link-provider), on its Patient resource.
@@ -316,54 +316,64 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     newG.addEdge(chhubID, personID, defaultEdgeWeight);
   }
 
-  validateImportedGraph(newG);
+  // set any partner relationships (before validation: a couple with no shared child only connects
+  // once given its placeholder; anything this trips over is reported as validation would)
+  try {
+    for (const nextPerson of nodeData){
+      if (nextPerson.partners){
+        let nextPersonId = undefined;
+        for (let i=0; i < nextPerson.partners.length; i++){
+          const partner = nextPerson.partners[i];
+          if (partner < nextPerson.nodeId){
+            continue; // should have already been processed.
+          }
 
-  // set any partner relationships
-  for (const nextPerson of nodeData){
-    if (nextPerson.partners){
-      let nextPersonId = undefined;
-      for (let i=0; i < nextPerson.partners.length; i++){
-        const partner = nextPerson.partners[i];
-        if (partner < nextPerson.nodeId){
-          continue; // should have already been processed.
-        }
+          const partnerType = nextPerson.partnerType[i];
 
-        const partnerType = nextPerson.partnerType[i];
-        if (!partnerType.consangr && !partnerType.broken){
-          // nothing to set
-          continue;
-        }
-
-        if (nextPersonId === undefined){
-          nextPersonId = findReferencedPerson(nextPerson.properties.id, 'partner');
-        }
-        const partnerId = findReferencedPerson(nodeData[partner].properties.id, 'partner');
-        let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
-        if (relNode){
-          let relProperties = newG.properties[relNode];
-          if (partnerType.consangr){
-            if (relProperties['consangr'] !== 'Y'){
-              relProperties['consangr'] = 'Y';
-              // check if we can make it 'A'
-              let nextGreatGrandParents = newG.getParentGenerations(nextPersonId, 3);
-              let partnerGreatGrandParents = newG.getParentGenerations(partnerId, 3);
-              for (let elem of nextGreatGrandParents) {
-                if (partnerGreatGrandParents.has(elem)) {
-                  // found common
-                  relProperties['consangr'] = 'A';
-                  break;
+          if (nextPersonId === undefined){
+            nextPersonId = findReferencedPerson(nextPerson.properties.id, 'partner');
+          }
+          const partnerId = findReferencedPerson(nodeData[partner].properties.id, 'partner');
+          let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+          if (!relNode && nextPersonId !== partnerId) {
+            // a couple with no shared child: their only child is a placeholder
+            // (DynamicPositionedGraph.isPlaceholder)
+            addPlaceholderChild(newG, relationshipTracker.createOrGetChildhub(nextPersonId, partnerId), defaultEdgeWeight);
+            relNode = newG.getRelationshipNode(nextPersonId, partnerId);
+          }
+          if (!partnerType.consangr && !partnerType.broken){
+            // nothing to set
+            continue;
+          }
+          if (relNode){
+            let relProperties = newG.properties[relNode];
+            if (partnerType.consangr){
+              if (relProperties['consangr'] !== 'Y'){
+                relProperties['consangr'] = 'Y';
+                // check if we can make it 'A'
+                let nextGreatGrandParents = newG.getParentGenerations(nextPersonId, 3);
+                let partnerGreatGrandParents = newG.getParentGenerations(partnerId, 3);
+                for (let elem of nextGreatGrandParents) {
+                  if (partnerGreatGrandParents.has(elem)) {
+                    // found common
+                    relProperties['consangr'] = 'A';
+                    break;
+                  }
                 }
               }
             }
-          }
-          if (partnerType.broken){
-            relProperties['broken'] = true;
+            if (partnerType.broken){
+              relProperties['broken'] = true;
+            }
           }
         }
       }
     }
+  } catch (err) {
+    throw importError(err);
   }
-  // PedigreeImport.validateBaseGraph(newG);
+  // (after the partners: a couple with no shared child only connects once given its placeholder)
+  validateImportedGraph(newG);
   return newG;
 
 };
@@ -1129,7 +1139,8 @@ GA4GHFHIRConverter._exportAsFHIR = function (pedigree, privacySetting, knownFhir
 
   // add any missing nodes, the recursion only goes up the tree
   for (let i = (pedigree.GG.isPerson(0) ? 1 : 0); i <= pedigree.GG.getMaxRealVertexId(); i++) {
-    if (!pedigree.GG.isPerson(i)) {
+    // (not a placeholder: a couple with no children is written as their partner relationship only)
+    if (!pedigree.GG.isPerson(i) || isPlaceholderProperties(pedigree.GG.type[i], pedigree.GG.properties[i])) {
       continue;
     }
     this.processTreeNode(i, pedigree, privacySetting, knownFhirPatienReference, pedigreeIndividuals,
@@ -1443,6 +1454,10 @@ GA4GHFHIRConverter.relationshipMap = {
 
 GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, knownFhirPatienReference,
   pedigreeIndividuals, pedigreeRelationship, condtions, observations, nodeIndexToRef, questionnaireResponses) {
+
+  if (isPlaceholderProperties(pedigree.GG.type[index], pedigree.GG.properties[index])) {
+    throw 'Assertion failed: exporting a placeholder (the hidden child of a couple with no children)';
+  }
 
   if (pedigreeIndividuals[index]) {
     // already processed

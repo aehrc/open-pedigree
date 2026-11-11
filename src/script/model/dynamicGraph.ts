@@ -1,5 +1,5 @@
 import { arrayContains, arrayIndexOf, clone2DArray, removeFirstOccurrenceByValue, toObjectWithTrue, Timer } from 'pedigree/model/helpers';
-import BaseGraph from 'pedigree/model/baseGraph';
+import BaseGraph, { isPlaceholderProperties, placeholderProperties } from 'pedigree/model/baseGraph';
 import PositionedGraph from 'pedigree/model/positionedGraph';
 import PedigreeImport from 'pedigree/model/import';
 import Ordering from 'pedigree/model/ordering';
@@ -52,12 +52,19 @@ DynamicPositionedGraph.prototype = {
     return this.DG.GG.isRelationship(id);
   },
 
+  // A new couple's child properties: null for a placeholder (see addNewRelationship).
+  _childPropertiesOrPlaceholder: function( childProperties ) {
+    if (childProperties === null) {
+      return placeholderProperties();
+    }
+    return childProperties ? childProperties : {};
+  },
+
   isPlaceholder: function( id ) {
     if (!this.isPerson(id)) {
       return false;
     }
-    // TODO
-    return false;
+    return isPlaceholderProperties((BaseGraph as any).TYPE.PERSON, this.DG.GG.properties[id]);
   },
 
   isAdopted: function( id ) {
@@ -335,10 +342,19 @@ DynamicPositionedGraph.prototype = {
     }
 
     var parentRel = this.getParentRelationship(v);
-    if (parentRel !== null && this.isChildless(parentRel)) {
+    return parentRel !== null && this.childrenMustBeAdopted(parentRel);
+  },
+
+  /**
+   * Whether a child of this couple (or person) is adopted: the couple, or either partner, is marked
+   * childless or infertile. (A partner's mark used to reach the child made with them; now a partner
+   * is added without a child, it reaches the couple's children.)
+   */
+  childrenMustBeAdopted: function( parentId ) {
+    if (this.isChildless(parentId)) {
       return true;
     }
-    return false;
+    return this.isRelationship(parentId) && this.DG.GG.getParents(parentId).some((p) => this.isChildless(p));
   },
 
   hasRelationships: function( v ) {
@@ -370,7 +386,7 @@ DynamicPositionedGraph.prototype = {
     // all person nodes which are not ancestors of v and which do not already have parents
     var result = [];
     for (var i = 0; i <= this.DG.GG.getMaxRealVertexId(); i++) {
-      if (!this.isPerson(i)) {
+      if (!this.isPerson(i) || this.isPlaceholder(i)) {
         continue;
       }
       if (this.DG.GG.inedges[i].length != 0) {
@@ -390,7 +406,7 @@ DynamicPositionedGraph.prototype = {
     var hasParents = (this.getParentRelationship(v) !== null);
     var result = [];
     for (var i = 0; i <= this.DG.GG.getMaxRealVertexId(); i++) {
-      if (!this.isPerson(i)) {
+      if (!this.isPerson(i) || this.isPlaceholder(i)) {
         continue;
       }
       if (this.DG.ancestors[v].hasOwnProperty(i)) {
@@ -414,7 +430,7 @@ DynamicPositionedGraph.prototype = {
       if (!this.isRelationship(i) && !this.isPerson(i)) {
         continue;
       }
-      if (this.isPersonGroup(i)) {
+      if (this.isPersonGroup(i) || this.isPlaceholder(i)) {
         continue;
       }
       if (this.DG.ancestors[i].hasOwnProperty(v)) {
@@ -462,13 +478,7 @@ DynamicPositionedGraph.prototype = {
     removedList[v] = true;
 
     if (this.isPerson(v)) {
-      // special case: removing the only child also removes the relationship
-      if (this.DG.GG.getInEdges(v).length != 0) {
-        var chhub = this.DG.GG.getInEdges(v)[0];
-        if (this.DG.GG.getOutEdges(chhub).length == 1) {
-          removedList[ this.DG.GG.getInEdges(chhub)[0] ] = true;
-        }
-      }
+      // (removing a couple's only child keeps the couple, with a placeholder child: see removeNodes)
 
       // also remove all relationships by this person
       var allRels = this.DG.GG.getAllRelationships(v);
@@ -604,7 +614,39 @@ DynamicPositionedGraph.prototype = {
       movedNodes.push(relationshipId);
     }
     var animateNodes = this.DG.GG.getInEdges(relationshipId);  // animate parents if they move. if not, nothing will be done with them
-    return {'new': newNodes, 'moved': movedNodes, 'animate': animateNodes};
+    // a couple's first child takes the place of their placeholder
+    return this._dropPlaceholderOf(childhubId, {'new': newNodes, 'moved': movedNodes, 'animate': animateNodes});
+  },
+
+  /**
+   * Once a couple has a real child, removes their placeholder (see isPlaceholder), and returns the
+   * change set made so far with the placeholder's removal added: the view removes it first, by its
+   * current ID, so every other ID in the change set is given as it is after the removal.
+   */
+  _dropPlaceholderOf: function( childhubId, changeSet ) {
+    var children = this.DG.GG.getOutEdges(childhubId);
+    var placeholder = children.find((v) => this.isPlaceholder(v));
+    if (placeholder === undefined || children.length < 2) {
+      return changeSet;
+    }
+    if (changeSet.removed && changeSet.removed.length > 0) {
+      throw 'Assertion failed: dropping a placeholder after a change that removed nodes';
+    }
+    var removal = this.removeNodes([placeholder]);
+    // the child was placed beside the placeholder: tidy the layout again now it's gone (e.g. the
+    // couple right above an only child). IDs have changed, so moved nodes can't be worked out:
+    // everything is redrawn where it now is.
+    this._heuristics.improvePositioning();
+    var renumber = (list) => (list || []).filter((v) => v !== placeholder).map((v) => (v > placeholder ? v - 1 : v));
+    var newNodes = renumber(changeSet['new']);
+    var moved = this._getAllNodes().filter((v) => !arrayContains(newNodes, v));
+    var result: any = {'removed': removal.removed, 'removedInternally': removal.removedInternally, 'moved': moved};
+    for (const key of ['new', 'animate', 'highlight']) {
+      if (changeSet.hasOwnProperty(key)) {
+        result[key] = renumber(changeSet[key]);
+      }
+    }
+    return result;
   },
 
   addNewParents: function( personId ) {
@@ -675,6 +717,10 @@ DynamicPositionedGraph.prototype = {
     return {'new': newNodes, 'moved': movedNodes, 'highlight': [personId], 'animate': animateNodes};
   },
 
+  /**
+   * Adds a new partner for a person, and the couple's child: with childProperties null, a
+   * placeholder (a couple with no children - see isPlaceholderProperties in baseGraph).
+   */
   addNewRelationship: function( personId, childProperties, preferLeft, numTwins ) {
     this._debugPrintAll('before');
     var timer = new Timer();
@@ -682,6 +728,9 @@ DynamicPositionedGraph.prototype = {
     if (!this.DG.GG.isPerson(personId)) {
       throw 'Assertion failed: adding relationship to a non-person node';
     }
+
+    var withoutChild = (childProperties === null);
+    childProperties = this._childPropertiesOrPlaceholder(childProperties);
 
     var positionsBefore  = this.DG.positions.slice(0);
     var ranksBefore      = this.DG.ranks.slice(0);
@@ -727,7 +776,7 @@ DynamicPositionedGraph.prototype = {
     var newChildId       = this._insertVertex(BaseGraph.TYPE.PERSON, childProperties, 1.0, newChildhubId, null, insertChildRank, insertChildOrder);
 
     var newNodes = [newRelationshipId, newPersonId, newChildId];
-    for (var i = 0; i < numTwins - 1; i++ ) {
+    for (var i = 0; !withoutChild && i < numTwins - 1; i++ ) {
       var changeSet = this.addTwin( newChildId, childProperties );
       newNodes.push(changeSet['new'][0]);
     }
@@ -763,8 +812,9 @@ DynamicPositionedGraph.prototype = {
 
       var animateList = [childId];
 
+      // (a couple's first child takes the place of their placeholder)
       if (rankChildHub != rankChild - 1) {
-        return this.redrawAll(animateList);
+        return this._dropPlaceholderOf(childHubId, this.redrawAll(animateList));
       }
 
       var positionsBefore  = this.DG.positions.slice(0);
@@ -784,7 +834,7 @@ DynamicPositionedGraph.prototype = {
 
       positionsBefore[parentId] = Infinity; // so that it is added to the list of moved nodes
       var movedNodes = this._findMovedNodes( numNodesBefore, positionsBefore, ranksBefore, vertLevelsBefore, rankYBefore, consangrBefore );
-      return {'moved': movedNodes, 'animate': [childId]};
+      return this._dropPlaceholderOf(childHubId, {'moved': movedNodes, 'animate': [childId]});
     } else {
       var rankParent = this.DG.ranks[parentId];
       var rankChild  = this.DG.ranks[childId];
@@ -889,7 +939,12 @@ DynamicPositionedGraph.prototype = {
 
   },
 
+  /**
+   * Makes two people a couple, with a child: with childProperties null, a placeholder (a couple with
+   * no children).
+   */
   assignPartner: function( person1, person2, childProperties ) {
+    childProperties = this._childPropertiesOrPlaceholder(childProperties);
     var positionsBefore  = this.DG.positions.slice(0);
     var ranksBefore      = this.DG.ranks.slice(0);
     var vertLevelsBefore = this.DG.vertLevel.copy();
@@ -1003,6 +1058,30 @@ DynamicPositionedGraph.prototype = {
     //var consangrBefore   = this.DG.consangr;
     //var numNodesBefore   = this.DG.GG.getMaxRealVertexId();
 
+    // A couple whose last children are removed stays, with a placeholder child (see isPlaceholder).
+    // Placeholders are inserted first, while nodeList holds real IDs only (inserting a person only
+    // shifts the IDs of virtual nodes).
+    var placeholdersAdded = [];
+    var hubsGivenPlaceholder = {};
+    for (var i = 0; i < nodeList.length; i++) {
+      var v = nodeList[i];
+      if (!this.isPerson(v) || this.DG.GG.getInEdges(v).length == 0) {
+        continue;
+      }
+      var hub = this.DG.GG.getInEdges(v)[0];
+      var rel = this.DG.GG.getInEdges(hub)[0];
+      if (hubsGivenPlaceholder[hub] || arrayContains(nodeList, rel)) {
+        continue;
+      }
+      var allChildrenGo = this.DG.GG.getOutEdges(hub).every((child) => arrayContains(nodeList, child));
+      if (allChildrenGo) {
+        hubsGivenPlaceholder[hub] = true;
+        var rank = this.DG.ranks[hub] + 1;
+        placeholdersAdded.push(this._insertVertex((BaseGraph as any).TYPE.PERSON, this._childPropertiesOrPlaceholder(null), 1.0, hub, null,
+          rank, this._findBestInsertPosition(rank, hub)));
+      }
+    }
+
     var removed = nodeList.slice(0);
     removed.sort();
     var moved = [];
@@ -1075,7 +1154,12 @@ DynamicPositionedGraph.prototype = {
     //        movedNodes.push(moved[i]);
 
     // note: moved now has the correct IDs valid in the graph with all affected nodes removed
-    return {'removed': removed, 'removedInternally': nodeList, 'moved': moved };
+    var result: any = {'removed': removed, 'removedInternally': nodeList, 'moved': moved };
+    if (placeholdersAdded.length > 0) {
+      // (their IDs once the removed nodes are gone)
+      result['new'] = placeholdersAdded.map((p) => p - nodeList.filter((r) => r < p).length);
+    }
+    return result;
   },
 
   improvePosition: function () {
@@ -1983,7 +2067,7 @@ DynamicPositionedGraph.prototype = {
       if (!this.isPerson(i)) {
         continue;
       }
-      if (this.isPersonGroup(i)) {
+      if (this.isPersonGroup(i) || this.isPlaceholder(i)) {
         continue;
       }
       var gender = this.getProperties(i)['gender'].toLowerCase();

@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit/js/pdfkit.standalone';
 import SVGtoPDF from 'svg-to-pdfkit';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
 
 var PedigreeExport = function () {
 };
@@ -533,13 +534,27 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
   var usedIDs   = {};
 
   var nextUnusedID = 1;
+  var nextPlaceholder = 1;
 
   for (var i = 0; i <= pedigree.GG.getMaxRealVertexId(); i++) {
     if (!pedigree.GG.isPerson(i)) {
       continue;
     }
 
-    var id = nextUnusedID++;
+    // The hidden only child of a couple with no children (DynamicPositionedGraph.isPlaceholder):
+    // formats that record only parents (PED, DADA2) can't hold such a couple, so it's written as a
+    // row with a reserved ID, which PedigreeImport reads back as a placeholder.
+    if (isPlaceholderProperties(pedigree.GG.type[i], pedigree.GG.properties[i])) {
+      var placeholderID = PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
+      while (usedIDs.hasOwnProperty(placeholderID)) {
+        placeholderID = PLACEHOLDER_ID_PREFIX + nextPlaceholder++;
+      }
+      idToNewId[i] = placeholderID;
+      usedIDs[placeholderID] = true;
+      continue;
+    }
+
+    var id: any = nextUnusedID++;
     if (idGenerationPreference == 'external' && pedigree.GG.properties[i].hasOwnProperty('externalID')) {
       nextUnusedID--;
       id = pedigree.GG.properties[i]['externalID'].replace(/\s/g, '_');
@@ -549,6 +564,10 @@ PedigreeExport.createNewIDs = function(pedigree, idGenerationPreference, maxLeng
     }
     if (maxLength && id.length > maxLength) {
       id = id.substring(0, maxLength);
+    }
+    // (an ordinary person never gets a placeholder's reserved ID, which reads back as a placeholder)
+    if (typeof id === 'string' && id.startsWith(PLACEHOLDER_ID_PREFIX)) {
+      id = '_' + id;
     }
     while ( usedIDs.hasOwnProperty(id) ) {
       if (!maxLength || id.length < maxLength) {

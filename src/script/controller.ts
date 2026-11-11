@@ -2,6 +2,13 @@ import { cloneObject, isBlankValue, Timer } from 'pedigree/model/helpers';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { parseLocalIsoDate } from 'pedigree/model/localDate';
 
+// A node's ID once a change set's removals are applied (its removedInternally IDs, as the view
+// renumbers them).
+function idAfterRemovals(id: any, changeSet: any): any {
+  var removed = (changeSet && changeSet.removedInternally) || [];
+  return id - removed.filter((r: any) => r < id).length;
+}
+
 export default class Controller {
   constructor() {
     document.addEventListener('pedigree:graph:clear',               (e) => this.handleClearGraph(e));
@@ -290,9 +297,6 @@ export default class Controller {
             node.assignProperties(editor.getGraph().getProperties(nodeID));
           }
 
-          if (modificationType == 'makePlaceholder') {
-            // TODO
-          }
         }
       }
 
@@ -311,7 +315,7 @@ export default class Controller {
       return;
     }
 
-    if (editor.getGraph().isChildless(parentID)) {
+    if (editor.getGraph().childrenMustBeAdopted(parentID)) {
       editor.getController().handleSetProperty( { 'detail': { 'nodeID': personID, 'properties': { 'setAdopted': true }, 'noUndoRedo': true } } );
     }
 
@@ -319,8 +323,10 @@ export default class Controller {
       var changeSet = editor.getGraph().assignParent(parentID, personID);
       editor.getView().applyChanges(changeSet, true);
 
-      if (changeSet.moved.indexOf(personID) != -1) {
-        editor.getWorkspace().centerAroundNode(personID, true);
+      // (a couple's first child takes their placeholder's place, which shifts the IDs above it)
+      var movedPersonID = idAfterRemovals(personID, changeSet);
+      if (changeSet.moved.indexOf(movedPersonID) != -1) {
+        editor.getWorkspace().centerAroundNode(movedPersonID, true);
       }
 
       if (!event.detail?.noUndoRedo) {
@@ -421,7 +427,8 @@ export default class Controller {
         childParams['numPersons'] = numPersons;
       }
 
-      var changeSet = editor.getGraph().addNewRelationship(personID, childParams, preferLeft, numTwins);
+      // (the partner handle asks for a partner only: the couple then has a placeholder child)
+      var changeSet = editor.getGraph().addNewRelationship(personID, event.detail.withoutChild ? null : childParams, preferLeft, numTwins);
       editor.getView().applyChanges(changeSet, true);
 
       if (!event.detail?.noUndoRedo) {
@@ -441,11 +448,6 @@ export default class Controller {
       return;
     }
 
-    var childProperties: any = {};
-    if (editor.getGraph().isChildless(personID) || editor.getGraph().isChildless(partnerID)) {
-      childProperties = { 'isAdopted': true };
-    }
-
     var node1 = editor.getView().getNode(personID);
     var node2 = editor.getView().getNode(partnerID);
 
@@ -459,7 +461,8 @@ export default class Controller {
       editor.getGraph().setProperties( partnerID, node2.getProperties() );
     }
 
-    var changeSet = editor.getGraph().assignPartner(personID, partnerID, childProperties);
+    // a couple with no children (a placeholder child): a child is added from the couple
+    var changeSet = editor.getGraph().assignPartner(personID, partnerID, null);
     editor.getView().applyChanges(changeSet, true);
 
     if (!event.detail?.noUndoRedo) {
@@ -476,7 +479,7 @@ export default class Controller {
     var numTwins = event.detail.twins ? event.detail.twins : 1;
 
     var childParams = cloneObject(event.detail.childParams);
-    if (editor.getGraph().isChildless(partnershipID)) {
+    if (editor.getGraph().childrenMustBeAdopted(partnershipID)) {
       childParams['isAdopted'] = true;
     }
 

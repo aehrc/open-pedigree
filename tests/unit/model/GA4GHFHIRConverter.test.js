@@ -3,6 +3,7 @@ import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import { placeParents, chooseParentClaims } from 'pedigree/model/parentClaims';
 import PedigreeImport from 'pedigree/model/import';
 import simpleGG from '../fixtures/simple-pedigree-gg.json';
+import DynamicPositionedGraph from 'pedigree/model/dynamicGraph';
 
 const mockTerminologyHelper = {
   getCodeableConceptFromDisorder: vi.fn(() => ({})),
@@ -581,5 +582,71 @@ describe('GA4GHFHIRConverter import errors', () => {
     exported.entry = exported.entry.filter((e) => e.resource.resourceType !== 'FamilyMemberHistory');
     expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)))
       .toThrow(/^Unsupported pedigree: some components of the imported pedigree are disconnected from each other \(disconnected component detected/);
+  });
+});
+
+// pedigree-editor-partner-without-child: a couple with no children has a placeholder child
+describe('GA4GHFHIRConverter and a couple with no children', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  // John and Jane, with no children: John (vertex 0) given a partner without a child
+  function childlessCouple(partnerProperties) {
+    const graph = DynamicPositionedGraph.makeEmpty(10, 2);
+    graph.fromImport('f 1 0 0 1 1', 'ped', {});
+    graph.setProperties(0, { gender: 'M', fName: 'John' });
+    const changeSet = graph.addNewRelationship(0, null);
+    const partner = changeSet.new.find((v) => graph.isPerson(v) && !graph.isPlaceholder(v));
+    graph.setProperties(partner, { gender: 'F', fName: 'Jane', ...partnerProperties });
+    return graph;
+  }
+  const resources = (exported) => JSON.parse(exported).entry.map((e) => e.resource);
+  const kinCodes = (exported) => resources(exported).filter((r) => r.resourceType === 'FamilyMemberHistory').map((r) => r.relationship.coding[0].code);
+  const placeholders = (graph) => Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v) && graph.properties[v].placeholder === true);
+
+  it('writes the couple as their partner relationship only', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR(childlessCouple().DG, 'all', null, null);
+    const patients = resources(exported).filter((r) => r.resourceType === 'Patient');
+    expect(patients.map((p) => p.name[0].given[0]).sort()).toEqual(['Jane', 'John']);
+    expect(kinCodes(exported).sort()).toEqual(['KIN:026']);
+    expect(resources(exported).filter((r) => r.resourceType === 'QuestionnaireResponse').length).toBeLessThanOrEqual(2);
+  });
+
+  it('reads a couple with no shared child back as a couple with a placeholder', () => {
+    const graph = GA4GHFHIRConverter.initFromFHIR(GA4GHFHIRConverter.exportAsFHIR(childlessCouple().DG, 'all', null, null));
+    const john = Object.keys(graph.properties).map(Number).find((v) => graph.properties[v].fName === 'John');
+    const jane = Object.keys(graph.properties).map(Number).find((v) => graph.properties[v].fName === 'Jane');
+    const rel = graph.getRelationshipNode(john, jane);
+    expect(rel).not.toBeNull();
+    expect(placeholders(graph)).toEqual(graph.getOutEdges(graph.getRelationshipChildhub(rel)));
+    expect(placeholders(graph).length).toBe(1);
+  });
+
+  it('keeps a separated couple separated', () => {
+    const graph = childlessCouple();
+    const rel = graph.DG.GG.getRelationshipNode(0, graph.DG.GG.getAllPartners(0)[0]);
+    graph.setProperties(rel, { broken: true });
+    const exported = GA4GHFHIRConverter.exportAsFHIR(graph.DG, 'all', null, null);
+    expect(kinCodes(exported)).toEqual(['KIN:048']);
+    const again = GA4GHFHIRConverter.initFromFHIR(exported);
+    const relAgain = Object.keys(again.properties).map(Number).find((v) => again.isRelationship(v));
+    expect(again.properties[relAgain].broken).toBe(true);
+  });
+
+  it('opens a bundle from elsewhere whose partners share no child, instead of failing as disconnected', () => {
+    // John and Jane with a child, Jane's second partner Bob with none
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
+    const jane = exported.entry.find((e) => e.resource.resourceType === 'Patient' && e.resource.name && e.resource.name[0].given[0] === 'Jane');
+    const bobRef = 'urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e';
+    exported.entry.push({ fullUrl: bobRef, resource: { resourceType: 'Patient', id: bobRef, gender: 'male', name: [{ given: ['Bob'] }] } });
+    exported.entry.push({ fullUrl: 'urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7', resource: { resourceType: 'FamilyMemberHistory', id: 'urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7', status: 'completed', patient: { reference: jane.resource.id },
+      extension: [{ url: 'http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record', valueReference: { reference: bobRef } }],
+      relationship: { coding: [{ system: 'http://purl.org/ga4gh/kin.fhir', code: 'KIN:026', display: 'isPartner' }] } } });
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const bob = Object.keys(graph.properties).map(Number).find((v) => graph.properties[v].fName === 'Bob');
+    const janeId = Object.keys(graph.properties).map(Number).find((v) => graph.properties[v].fName === 'Jane');
+    expect(graph.getRelationshipNode(bob, janeId)).not.toBeNull();
+    expect(placeholders(graph).length).toBe(1);
   });
 });

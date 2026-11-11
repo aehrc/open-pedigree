@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import PedigreeImport from 'pedigree/model/import';
+import { importError } from 'pedigree/model/validateImportedGraph';
 
 const DISCONNECTED = 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other';
 
@@ -42,5 +43,18 @@ describe('PedigreeImport.validateBaseGraph', () => {
       .toThrow(DISCONNECTED);
     expect(() => PedigreeImport.validateBaseGraph(failingWith(new TypeError('x is undefined'))))
       .toThrow('Unable to import pedigree (x is undefined)');
+  });
+});
+
+describe('importError', () => {
+  it('words an importer\'s own failure as a validation failure', () => {
+    expect(importError('Assertion failed: adding relationship to a non-person node')).toBe('Unable to import pedigree (adding relationship to a non-person node)');
+    expect(importError(new TypeError('x is undefined'))).toBe('Unable to import pedigree (x is undefined)');
+  });
+
+  it('leaves a message that is already worded for the user', () => {
+    expect(importError('Unable to import pedigree: ambiguous reference to [a]')).toBe('Unable to import pedigree: ambiguous reference to [a]');
+    expect(importError('Unsupported pedigree: some components of the imported pedigree are disconnected from each other (x)'))
+      .toBe('Unsupported pedigree: some components of the imported pedigree are disconnected from each other (x)');
   });
 });
