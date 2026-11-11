@@ -12,6 +12,8 @@ export default class View {
   // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
   _generationNumbering: boolean;
   _generationNumerals: any;
+  // while a de-identified export is drawn: 'nopersonal' or 'minimal' (see withDeidentifiedRendering)
+  _deidentified: any;
   hoverModeZones: any;
   _currentMarkedNew: any[];
   _currentGrownNodes: any[];
@@ -31,6 +33,7 @@ export default class View {
     this._nodeMap = {};
     this._generationNumbering = false;
     this._generationNumerals = null;
+    this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
 
@@ -307,9 +310,46 @@ export default class View {
     this.updateGenerationNumbering();
   }
 
-  // Whether the numbering is drawn now.
+  // Whether the numbering is drawn now: when switched on, and always in a de-identified drawing.
   isGenerationNumberingShown(): boolean {
-    return this._generationNumbering;
+    return this._generationNumbering || !!this._deidentified;
+  }
+
+  /** The privacy level a de-identified drawing is for ('nopersonal' or 'minimal'), or null. */
+  getDeidentified(): any {
+    return this._deidentified;
+  }
+
+  /**
+   * Runs `draw` with the pedigree drawn de-identified, for an export: no names, external IDs or
+   * dates, ages as bands, people labelled by generation number, and (for 'minimal') no comments.
+   * Everything is redrawn as it was afterwards, before the screen can show the de-identified one
+   * (this is all one synchronous call). Returns what `draw` returns.
+   */
+  withDeidentifiedRendering(level: string, draw: () => any): any {
+    this._deidentified = level;
+    try {
+      this._redrawPersonLabels();
+      return draw();
+    } finally {
+      this._deidentified = null;
+      this._redrawPersonLabels();
+    }
+  }
+
+  // Redraws the labels that a de-identified drawing changes, for every person, and the numbering.
+  _redrawPersonLabels(): void {
+    var graph = editor.getGraph();
+    for (var nodeID in this._nodeMap) {
+      if (this._nodeMap.hasOwnProperty(nodeID) && graph.isPerson(nodeID) && !graph.isPlaceholder(nodeID)) {
+        var visuals = this._nodeMap[nodeID].getGraphics();
+        visuals.updateNameLabel();
+        visuals.updateExternalIDLabel();
+        visuals.updateAgeLabel();
+        visuals.updateCommentsLabel();
+      }
+    }
+    this.updateGenerationNumbering();
   }
 
   /**

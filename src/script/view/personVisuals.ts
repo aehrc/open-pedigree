@@ -6,6 +6,7 @@ import ReadOnlyHoverbox from 'pedigree/view/readonlyHoverbox';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { getElementHalfHeight, sector } from 'pedigree/view/graphicHelpers';
 import getAge from 'pedigree/view/ageCalc';
+import { deidentifiedAgeLabel } from 'pedigree/model/ageBand';
 
 /**
  * Class for organizing graphics for Person nodes.
@@ -19,6 +20,13 @@ import getAge from 'pedigree/view/ageCalc';
  */
 
 const LINKED_RECORD_CHANGED_TOOLTIP = 'This person\'s linked record has changed since this pedigree was saved';
+
+// The privacy level of the de-identified drawing being made for an export, or null (see
+// View.withDeidentifiedRendering).
+function isDeidentified(): any {
+  var view = editor.getView && editor.getView();
+  return view && typeof view.getDeidentified === 'function' ? view.getDeidentified() : null;
+}
 
 export default class PersonVisuals extends AbstractPersonVisuals {
   _nameLabel: any;
@@ -169,7 +177,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   updateExternalIDLabel(): any {
     this._externalIDLabel && this._externalIDLabel.remove();
 
-    if (this.getNode().getExternalID()) {
+    if (this.getNode().getExternalID() && !isDeidentified()) {
       var text = '[' + this.getNode().getExternalID() + ']';
       this._externalIDLabel = editor.getPaper().text(this.getX(), this.getY() + PedigreeEditorParameters.attributes.radius, text).attr(PedigreeEditorParameters.attributes.externalIDLabels);
     } else {
@@ -218,9 +226,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   updateNameLabel(): any {
     this._nameLabel && this._nameLabel.remove();
     var text =  '';
-    this.getNode().getFirstName() && (text = this.getNode().getFirstName());
+    // (not in a de-identified drawing: see View.withDeidentifiedRendering)
+    !isDeidentified() && this.getNode().getFirstName() && (text = this.getNode().getFirstName());
 
-    if (this.getNode().getLastName()) {
+    if (!isDeidentified() && this.getNode().getLastName()) {
       text += ' ' + this.getNode().getLastName();
     }
 
@@ -398,6 +407,9 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     if (person.isFetus()) {
       var date = person.getGestationAge();
       text = (date) ? date + ' weeks' : null;
+    } else if (isDeidentified()) {
+      // an age band, no dates (see View.withDeidentifiedRendering)
+      text = deidentifiedAgeLabel(person.getBirthDate() || null, person.getDeathDate() || null, person.getLifeStatus() != 'alive');
     } else if(person.getLifeStatus() == 'alive') {
       if (person.getBirthDate()) {
         var age = getAge(person.getBirthDate(), null);
@@ -672,7 +684,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   updateCommentsLabel(): any {
     this.getCommentsLabel() && this.getCommentsLabel().remove();
-    if (this.getNode().getComments() != '') {
+    if (this.getNode().getComments() != '' && isDeidentified() !== 'minimal') {
       var text = this.getNode().getComments(); //.replace(/\n/g, '<br />');
       this._commentsLabel = editor.getPaper().text(this.getX(), this.getY(), text).attr(PedigreeEditorParameters.attributes.commentLabel);
       this._commentsLabel.alignTop = true;
