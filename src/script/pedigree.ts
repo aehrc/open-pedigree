@@ -235,10 +235,13 @@ export default class PedigreeEditor {
       editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
     };
     numberingButton && numberingButton.addEventListener('click', toggleNumbering);
-    // (a toggle button: reachable with Tab, switched with Enter or Space)
+    // (a toggle button: reachable with Tab, switched with Enter or Space; once per press, not per key repeat)
     numberingButton && numberingButton.addEventListener('keydown', function(event: any) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        if (event.repeat) {
+          return;
+        }
         toggleNumbering();
       }
     });

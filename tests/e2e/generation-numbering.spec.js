@@ -75,6 +75,24 @@ test('the toggle shows numbering however it is switched on', async ({ page }) =>
   await page.evaluate(() => window.editor.getView().setGenerationNumbering(true));
   await expect(page.locator('#action-numbering')).toHaveClass(/active/);
   await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
+  // the saved image's drawing without numbering leaves the toggle as it was
+  await page.evaluate(() => window.editor.getView().withoutGenerationNumbering(() => null));
+  await expect(page.locator('#action-numbering')).toHaveClass(/active/);
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() => window.editor.getView().setGenerationNumbering(false));
+  await expect(page.locator('#action-numbering')).not.toHaveClass(/active/);
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('holding Enter on the Numbers toggle switches it once', async ({ page }) => {
+  await open(page, 'local:gn7?format=GA4GH', 'f 1 0 0 1 1');
+  await page.focus('#action-numbering');
+  await page.keyboard.down('Enter');
+  for (let i = 0; i < 3; i++) {
+    await page.dispatchEvent('#action-numbering', 'keydown', { key: 'Enter', repeat: true });
+  }
+  await page.keyboard.up('Enter');
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('numbers follow an edit', async ({ page }) => {
