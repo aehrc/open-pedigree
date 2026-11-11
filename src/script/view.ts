@@ -320,16 +320,24 @@ export default class View {
    * numbering is view state, so what's saved never depends on it. Returns what `draw` returns.
    */
   withoutGenerationNumbering(draw: () => any): any {
-    if (!this._generationNumbering) {
+    if (!this.isGenerationNumberingShown()) {
       return draw();
     }
-    this._generationNumbering = false;
+    // hidden, not redrawn: cheap on every save, and nothing moves mid-animation
+    var graph = editor.getGraph();
+    var shown: any[] = [];
+    this._generationNumerals && shown.push(this._generationNumerals);
+    for (var nodeID in this._nodeMap) {
+      if (this._nodeMap.hasOwnProperty(nodeID) && graph.isPerson(nodeID)) {
+        var label = this._nodeMap[nodeID].getGraphics().getGenerationLabel();
+        label && shown.push(label);
+      }
+    }
+    shown.forEach((element) => element.hide());
     try {
-      this.updateGenerationNumbering();
       return draw();
     } finally {
-      this._generationNumbering = true;
-      this.updateGenerationNumbering();
+      shown.forEach((element) => element.show());
     }
   }
 
@@ -393,7 +401,7 @@ export default class View {
         row.x = Math.min(row.x, node.getGraphics().getX());
       }
     }
-    if (!shown) {
+    if (!shown || Object.keys(rows).length == 0) {
       return;
     }
     // (one column, at the left of the whole pedigree, as on paper)

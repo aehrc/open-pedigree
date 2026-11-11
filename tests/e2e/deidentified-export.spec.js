@@ -119,6 +119,13 @@ for (const privacy of ['nopersonal', 'minimal']) {
       expect(texts, label).toContain(label);
     }
     expect(all.includes('Lives in Leeds')).toBe(privacy === 'nopersonal');
+    // and nothing else: any text the de-identified drawing doesn't vet (e.g. a label added later)
+    // fails here
+    const allowed = [/^$/, /^[IVXLC]+$/, /^[IVXLC]+-\d+$/, /^(d\. )?(infant|child|teen|\d+0s)$/, /^d\.$/, /^\d+ weeks$/, /^SB$/];
+    for (const text of texts) {
+      const ok = allowed.some((pattern) => pattern.test(text.trim())) || (privacy === 'nopersonal' && text === 'Lives in Leeds');
+      expect(ok, 'unexpected text in a de-identified export: ' + JSON.stringify(text)).toBe(true);
+    }
   });
 }
 

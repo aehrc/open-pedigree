@@ -209,7 +209,7 @@ export default class Workspace {
       }, {
         name : 'view',
         items: [
-          { key : 'numbering', label : 'Numbers', icon : 'list-ol'}
+          { key : 'numbering', label : 'Numbers', icon : 'list-ol', toggle : true}
         ]
       }, {
         name : 'output',
@@ -229,6 +229,10 @@ export default class Workspace {
       mi.appendChild(icon);
       mi.appendChild(document.createTextNode(' '));
       mi.appendChild(document.createTextNode(data.label));
+      if (data.toggle) {
+        mi.setAttribute('role', 'button');
+        mi.setAttribute('aria-pressed', 'false');
+      }
       if (data.callback && typeof((this as any)[data.callback]) == 'function') {
         mi.addEventListener('click', function() {
           (this as any)[data.callback]();

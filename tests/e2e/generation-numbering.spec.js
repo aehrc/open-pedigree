@@ -47,7 +47,9 @@ test('the Numbers toggle shows and hides generation numbering', async ({ page })
   await open(page, 'local:gn1?format=GA4GH', FAMILY);
   expect(await numbering(page)).toEqual({ people: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null }, numerals: [] });
 
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'false');
   await page.click('#action-numbering');
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'true');
   const on = await numbering(page);
   expect(on.numerals).toEqual(['I', 'II', 'III']);
   expect([on.people[1], on.people[2]].sort()).toEqual(['I-1', 'I-2']);
@@ -61,6 +63,7 @@ test('the Numbers toggle shows and hides generation numbering', async ({ page })
   await page.click('#action-numbering');
   expect((await numbering(page)).numerals).toEqual([]);
   await expect(page.locator('#action-numbering')).not.toHaveClass(/active/);
+  await expect(page.locator('#action-numbering')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('numbers follow an edit', async ({ page }) => {

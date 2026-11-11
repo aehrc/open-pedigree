@@ -197,11 +197,6 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   }
 
   /**
-   * Updates the name label for this Person
-   *
-   * @method updateNameLabel
-   */
-  /**
    * Shows this Person's generation number (II-3) under their name, or none (see
    * View.updateGenerationNumbering).
    *
@@ -224,6 +219,11 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     return this._generationLabel;
   }
 
+  /**
+   * Updates the name label for this Person
+   *
+   * @method updateNameLabel
+   */
   updateNameLabel(): any {
     this._nameLabel && this._nameLabel.remove();
     var text =  '';
