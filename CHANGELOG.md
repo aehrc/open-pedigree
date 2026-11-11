@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.6.0...open-pedigree-v1.7.0) (2026-11-11)
+
+
+### Features
+
+* generation numbering, and a de-identified export with age bands ([#94](https://github.com/aehrc/open-pedigree/issues/94)) ([866cc02](https://github.com/aehrc/open-pedigree/commit/866cc02ad020fad27bfd81d9b3f0eabd13bcb8e6))
+
 ## [1.6.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.5...open-pedigree-v1.6.0) (2026-11-11)
 
 
