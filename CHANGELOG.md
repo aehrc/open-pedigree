@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.5...open-pedigree-v1.6.0) (2026-11-11)
+
+
+### Features
+
+* a partner can be added without a child ([#93](https://github.com/aehrc/open-pedigree/issues/93)) ([d49a07a](https://github.com/aehrc/open-pedigree/commit/d49a07a9c929e645ef40b16872bcd19d071d414f))
+
+
+### Bug Fixes
+
+* keep a person adopted when their parents aren't in the pedigree ([#90](https://github.com/aehrc/open-pedigree/issues/90)) ([50f81f7](https://github.com/aehrc/open-pedigree/commit/50f81f7bce365c9a3dcccfd64d0aa71039e126af))
+* read a gene saved without QuestionnaireResponses as a gene, not a phenotype ([#91](https://github.com/aehrc/open-pedigree/issues/91)) ([d1a63fa](https://github.com/aehrc/open-pedigree/commit/d1a63fac4708961ce5ad3f3abaf43371ac04da8a))
+* report import validation failures correctly, and keep an unborn carrier's mark clear of the "P" ([#89](https://github.com/aehrc/open-pedigree/issues/89)) ([0929e18](https://github.com/aehrc/open-pedigree/commit/0929e18c12d1210dc860c30c0bfafc0be82bcf35))
+
 ## [1.5.5](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.5.4...open-pedigree-v1.5.5) (2026-11-05)
 
 
