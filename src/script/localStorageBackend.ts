@@ -11,7 +11,13 @@ const LocalStorageBackend = createTransportBackend({
         return JSON.parse(localStorage.getItem(key));
     },
     send: function (key, data) {
-        localStorage.setItem(key, JSON.stringify(data, null, 2));
+        try {
+            localStorage.setItem(key, JSON.stringify(data, null, 2));
+        } catch (err) {
+            // (e.g. the pedigree doesn't fit in the browser's storage): say so, not "not sent back"
+            err.pedigreeMessage = 'Error saving pedigree: ' + err;
+            throw err;
+        }
     }
 });
 

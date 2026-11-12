@@ -26,15 +26,19 @@ const PedigreeExport: any = PedigreeExportModule;
  * A save while this backend's load is still waiting for `receive` isn't sent (it would send the
  * canvas from before the pedigree arrived): it is skipped, as the editor skips saves while it
  * waits for its first load. A load gives up on a `receive` that hasn't settled after
- * RECEIVE_TIMEOUT_MS, and an answer after that is ignored.
+ * RECEIVE_TIMEOUT_MS, and an answer after that is ignored; a save treats a `send` that hasn't
+ * settled after SEND_TIMEOUT_MS as not delivered. A pedigree that arrives once the canvas already
+ * has one (e.g. the user started drawing) isn't drawn over it.
  */
 export interface PedigreeTransport {
   receive(key: string): any;
   send(key: string, data: { value: any; svg: any; context?: any }): any;
 }
 
-// How long a load waits for `receive` before giving up (the template chooser).
+// How long a load waits for `receive` before giving up (the template chooser), and a save for
+// `send` before treating it as not delivered.
 export const RECEIVE_TIMEOUT_MS = 30000;
+export const SEND_TIMEOUT_MS = 30000;
 
 export const NOT_SENT_MESSAGE = 'The pedigree could not be sent back (the page that opened this editor '
   + 'may have been closed or reloaded). Your changes are still here: keep this window open and try '
@@ -152,7 +156,17 @@ export function createTransportBackend(transport: PedigreeTransport): any {
         alert('Error exporting pedigree: ' + err);
         return;
       }
-      settle(() => transport.send(options.key, data), () => {
+      // Settles once: the transport's answer, or the timeout.
+      let answered = false;
+      const once = (fn: (arg: any) => void) => (arg: any) => {
+        if (!answered) {
+          answered = true;
+          clearTimeout(sendTimer);
+          fn(arg);
+        }
+      };
+      let sendTimer: any = null;
+      const delivered = once(() => {
         console.log('[SAVE] sent : ' + options.key + ' as ' + options.format);
         args.setSaveInProgress(false);
         if (options.closeOnSave) {
@@ -164,12 +178,17 @@ export function createTransportBackend(transport: PedigreeTransport): any {
             editor.flagClosing(false);
           }
         }
-      }, (err) => {
+      });
+      const notDelivered = once((err: any) => {
         console.warn('[SAVE] not delivered: ' + options.key, err);
         args.setSaveInProgress(false);
         const hostMessage = err && typeof err.pedigreeMessage === 'string' ? err.pedigreeMessage.trim() : '';
         alert(hostMessage || NOT_SENT_MESSAGE);
       });
+      settle(() => transport.send(options.key, data), delivered, notDelivered);
+      if (!answered) {
+        sendTimer = setTimeout(() => notDelivered(new Error('send did not settle')), SEND_TIMEOUT_MS);
+      }
     },
 
     load: function (args: any) {
@@ -199,6 +218,12 @@ export function createTransportBackend(transport: PedigreeTransport): any {
         new TemplateSelector(true);
       });
       settle(() => transport.receive(options.key), (data) => settled(() => {
+        const graph = (window as any).editor && (window as any).editor.getGraph();
+        if (graph && graph.getMaxNodeId() >= 0) {
+          // (as the editor's own deferred first load does: never replace a pedigree already there)
+          console.warn('[LOAD] Not drawn: the canvas already has a pedigree');
+          return;
+        }
         backend._context = data && data.context ? data.context : undefined;
         backend._display(engine, data, options.format);
       }), nothing);

@@ -73,7 +73,7 @@ docker run -p 9000:9000 -d open-pedigree
   - `transport.receive(key)` returns the stored `{ value, context }`, or `null` when nothing is stored. `context` is the host's own, and it is passed back with each save.
   - `transport.send(key, { value, svg, context })` delivers a save.
 
-  Either can return a value or a Promise. If `send` rejects, the save wasn't delivered: the window stays open, the user is told (with the error's `pedigreeMessage` if it has one, e.g. the host's reason for refusing it), and they can save again or export a copy. If `receive` rejects, nothing is loaded. While `receive` hasn't settled, a save is skipped (as the editor skips saves while waiting for its first load); after 30 seconds the load gives up and shows the template chooser.
+  Either can return a value or a Promise. If `send` rejects, the save wasn't delivered: the window stays open, the user is told (with the error's `pedigreeMessage` if it has one, e.g. the host's reason for refusing it), and they can save again or export a copy. If `receive` rejects, nothing is loaded. While `receive` hasn't settled, a save is skipped (as the editor skips saves while waiting for its first load); after 30 seconds the load gives up and shows the template chooser, and a pedigree that arrives once the canvas has one isn't drawn over it. A `send` that hasn't settled after 30 seconds counts as not delivered.
 
 ## Questionnaire-driven custom fields
 

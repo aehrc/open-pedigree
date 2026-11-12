@@ -13,7 +13,7 @@ vi.mock('pedigree/model/export', () => ({
 vi.mock('pedigree/view/templateSelector', () => ({ default: vi.fn() }));
 
 import TemplateSelector from 'pedigree/view/templateSelector';
-import { createTransportBackend, NOT_SENT_MESSAGE, RECEIVE_TIMEOUT_MS } from 'pedigree/transportBackend';
+import { createTransportBackend, NOT_SENT_MESSAGE, RECEIVE_TIMEOUT_MS, SEND_TIMEOUT_MS } from 'pedigree/transportBackend';
 
 const URL_CLOSING = 'local:pedigreeData?format=GA4GH&closeOnSave=true';
 
@@ -28,13 +28,14 @@ function deferredTransport() {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('createTransportBackend', () => {
-    let close, alertSpy, engine;
+    let close, alertSpy, engine, maxNodeId;
 
     beforeEach(() => {
         TemplateSelector.mockClear();
+        maxNodeId = -1; // (an empty canvas)
         globalThis.editor = {
             getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
-            getGraph: () => ({ DG: {} }),
+            getGraph: () => ({ DG: {}, getMaxNodeId: () => maxNodeId }),
             getVersionUpdater: () => ({ updateToCurrentVersion: (d) => d }),
             flagClosing: vi.fn(),
         };
@@ -275,5 +276,35 @@ describe('createTransportBackend', () => {
         backend.load.call(engine, { patientDataUrl: 'https://example.org/pedigree' });
         expect(t.receive).not.toHaveBeenCalled();
         expect(TemplateSelector).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not draw a late pedigree over one already on the canvas', async () => {
+        const t = deferredTransport();
+        createTransportBackend(t).load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        maxNodeId = 2; // (the user started drawing)
+        t.received[0].resolve({ value: 'STORED' });
+        await flush();
+        expect(engine.createGraphFromSerializedData).not.toHaveBeenCalled();
+    });
+
+    it('treats a send that never settles as not delivered', async () => {
+        vi.useFakeTimers();
+        try {
+            const t = deferredTransport();
+            const args = saveArgs();
+            createTransportBackend(t).save(args);
+            vi.advanceTimersByTime(SEND_TIMEOUT_MS - 1);
+            expect(alertSpy).not.toHaveBeenCalled();
+            vi.advanceTimersByTime(1);
+            expect(alertSpy).toHaveBeenCalledWith(NOT_SENT_MESSAGE);
+            expect(args.setSaveInProgress).toHaveBeenLastCalledWith(false);
+
+            // (a late answer changes nothing: the window stays open)
+            t.sent[0].resolve();
+            await vi.runAllTimersAsync();
+            expect(close).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
