@@ -3,12 +3,6 @@ import TemplateSelector from "./view/templateSelector";
 import PedigreeExport from "./model/export";
 
 
-// A query-string parameter's value: null when absent, '' when present without a value
-// (e.g. "?closeOnSave").
-function getParameterByName(search, name) {
-    return new URLSearchParams(search).get(name);
-}
-
 const LocalStorageBackend = {
 
     _context: undefined,
@@ -21,9 +15,10 @@ const LocalStorageBackend = {
             if (uri.protocol() === 'local') {
                 const localStorageKey = uri.path();
                 uri.normalizeQuery();
-                const options = uri.search();
-                const format = getParameterByName(options, 'format') || 'internal';
-                const closeOnSave = getParameterByName(options, 'closeOnSave');
+                // null when absent, '' when present without a value (e.g. "?closeOnSave")
+                const options = new URLSearchParams(uri.search());
+                const format = options.get('format') || 'internal';
+                const closeOnSave = options.get('closeOnSave');
 
                 let svg = null;
                 try {
@@ -85,8 +80,7 @@ const LocalStorageBackend = {
             if (uri.protocol() === 'local') {
                 const localStorageKey = uri.path();
                 uri.normalizeQuery();
-                const options = uri.search();
-                const format = getParameterByName(options, 'format') || 'internal';
+                const format = new URLSearchParams(uri.search()).get('format') || 'internal';
 
                 console.log('initiating load process from local storage : ' + localStorageKey + ' as ' + format);
 

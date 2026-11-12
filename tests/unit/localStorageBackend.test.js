@@ -69,3 +69,34 @@ describe('LocalStorageBackend.save options', () => {
         expect(close).not.toHaveBeenCalled();
     });
 });
+
+// load() reads `format` from the same query string to pick the importer.
+describe('LocalStorageBackend.load format', () => {
+    let engine;
+
+    beforeEach(() => {
+        localStorage.clear();
+        engine = {
+            createGraphFromImportData: vi.fn().mockReturnValue(true),
+            createGraphFromSerializedData: vi.fn(),
+        };
+        globalThis.editor = { getVersionUpdater: () => ({ updateToCurrentVersion: (d) => d }) };
+        localStorage.setItem('pedigreeData', JSON.stringify({ value: 'STORED', context: { field: 'f' } }));
+    });
+
+    afterEach(() => {
+        delete globalThis.editor;
+    });
+
+    it('imports in the format the URL names', () => {
+        LocalStorageBackend.load.call(engine, { patientDataUrl: 'local:pedigreeData?format=PED&closeOnSave=true' });
+        expect(engine.createGraphFromImportData).toHaveBeenCalledWith('STORED', 'PED', {}, false, true);
+        expect(engine.createGraphFromSerializedData).not.toHaveBeenCalled();
+    });
+
+    it('reads the internal format when there is none', () => {
+        LocalStorageBackend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        expect(engine.createGraphFromSerializedData).toHaveBeenCalledWith('STORED');
+        expect(engine.createGraphFromImportData).not.toHaveBeenCalled();
+    });
+});
