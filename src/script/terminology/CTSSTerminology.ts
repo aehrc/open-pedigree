@@ -18,7 +18,7 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
       '?q=' +
       encodeURI(this._valueColumn) +
       '%3A' +
-      encodeURI(this.desanitizeID(id).replace(/\\/g, '\\\\').replace(/:/g, '\\:'))
+      encodeURI(this.desanitizeID(id).replace(':', '\\:'))
     );
   }
 

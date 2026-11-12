@@ -76,6 +76,7 @@ describe('LocalStorageBackend.load format', () => {
 
     beforeEach(() => {
         localStorage.clear();
+        LocalStorageBackend._context = undefined;
         engine = {
             createGraphFromImportData: vi.fn().mockReturnValue(true),
             createGraphFromSerializedData: vi.fn(),
@@ -86,12 +87,14 @@ describe('LocalStorageBackend.load format', () => {
 
     afterEach(() => {
         delete globalThis.editor;
+        LocalStorageBackend._context = undefined;
     });
 
-    it('imports in the format the URL names', () => {
+    it('imports in the format the URL names, keeping the stored context for the save', () => {
         LocalStorageBackend.load.call(engine, { patientDataUrl: 'local:pedigreeData?format=PED&closeOnSave=true' });
         expect(engine.createGraphFromImportData).toHaveBeenCalledWith('STORED', 'PED', {}, false, true);
         expect(engine.createGraphFromSerializedData).not.toHaveBeenCalled();
+        expect(LocalStorageBackend._context).toEqual({ field: 'f' });
     });
 
     it('reads the internal format when there is none', () => {

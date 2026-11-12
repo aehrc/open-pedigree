@@ -4,15 +4,15 @@
 TBD - created by archiving change remove-prototype. Update Purpose after archive.
 ## Requirements
 ### Requirement: Service URLs are configurable via initialiseEditor options
-The pedigree editor SHALL accept `omimServiceUrl` and `hpoServiceUrl` as optional properties in the options object passed to `OpenPedigree.initialiseEditor()`. When provided, these URLs SHALL be used directly by `Disorder` and `HPOTerm` instead of constructing them via `XWiki.Document`. When not provided, the editor SHALL fall back to a sensible default (empty string or a configurable constant), logging a warning if the OMIM/HPO terminology is used without a URL.
+The pedigree editor SHALL accept `omimServiceUrl` and `hpoServiceUrl` as optional properties in the options object passed to `OpenPedigree.initialiseEditor()`. When provided, these URLs SHALL be the base URLs of the default disorder and phenotype terminologies (`CTSSTerminology`, used when no `disorderOptions`/`phenotypeOptions` are given) instead of being constructed via `XWiki.Document`. When not provided, the editor SHALL fall back to a sensible default (empty string or a configurable constant), logging a warning if the OMIM/HPO terminology is used without a URL.
 
 #### Scenario: Custom service URL used for disorder lookup
 - **WHEN** `initialiseEditor({ omimServiceUrl: 'https://example.com/omim' })` is called
-- **THEN** `Disorder` uses `'https://example.com/omim'` as its base URL for AJAX lookups
+- **THEN** the default disorder terminology uses `'https://example.com/omim'` as its base URL for AJAX lookups
 
 #### Scenario: Custom service URL used for HPO lookup
 - **WHEN** `initialiseEditor({ hpoServiceUrl: 'https://example.com/hpo' })` is called
-- **THEN** `HPOTerm` uses `'https://example.com/hpo'` as its base URL for AJAX lookups
+- **THEN** the default phenotype terminology uses `'https://example.com/hpo'` as its base URL for AJAX lookups
 
 #### Scenario: No remaining XWiki.Document reference in source
 - **WHEN** `grep -rn "XWiki\.Document\|XWiki\.currentWiki" src/script/` is run
