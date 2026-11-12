@@ -13,7 +13,7 @@ vi.mock('pedigree/model/export', () => ({
 vi.mock('pedigree/view/templateSelector', () => ({ default: vi.fn() }));
 
 import TemplateSelector from 'pedigree/view/templateSelector';
-import { createTransportBackend, NOT_SENT_MESSAGE } from 'pedigree/transportBackend';
+import { createTransportBackend, NOT_SENT_MESSAGE, STILL_LOADING_MESSAGE } from 'pedigree/transportBackend';
 
 const URL_CLOSING = 'local:pedigreeData?format=GA4GH&closeOnSave=true';
 
@@ -120,19 +120,62 @@ describe('createTransportBackend', () => {
         expect(t.sent[0].data.value).toBe('DADA2-DATA');
     });
 
-    it('holds a save until its load has settled', async () => {
+    it('does not send a save made while its load is waiting, and saves normally once loaded', async () => {
         const t = deferredTransport();
         const backend = createTransportBackend(t);
-        backend.load.call(engine, { patientDataUrl: URL_CLOSING });
-        backend.save(saveArgs());
+        backend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        const early = saveArgs('local:pedigreeData');
+        backend.save(early);
         await flush();
         expect(t.send).not.toHaveBeenCalled();
+        expect(early.setSaveInProgress).not.toHaveBeenCalledWith(true);
+        expect(alertSpy).toHaveBeenCalledWith(STILL_LOADING_MESSAGE);
 
         t.received[0].resolve({ value: 'STORED', context: { field: 'f' } });
         await flush();
-        expect(engine.createGraphFromImportData).toHaveBeenCalled();
+        expect(engine.createGraphFromSerializedData).toHaveBeenCalledWith('STORED');
+        // (the early save is never sent later, with the canvas from before the load)
+        expect(t.send).not.toHaveBeenCalled();
+
+        backend.save(saveArgs('local:pedigreeData'));
         expect(t.sent).toHaveLength(1);
         expect(t.sent[0].data.context).toEqual({ field: 'f' });
+    });
+
+    it("shows the host's own message when it refuses a save", async () => {
+        const t = deferredTransport();
+        const backend = createTransportBackend(t);
+        const args = saveArgs();
+        backend.save(args);
+        t.sent[0].reject(Object.assign(new Error('refused'), { pedigreeMessage: 'Too large for the form.' }));
+        await flush();
+        expect(alertSpy).toHaveBeenCalledWith('Too large for the form.');
+        expect(close).not.toHaveBeenCalled();
+        expect(args.setSaveInProgress).toHaveBeenLastCalledWith(false);
+    });
+
+    it("forgets the last load's context when a later load gets nothing", async () => {
+        const t = deferredTransport();
+        const backend = createTransportBackend(t);
+        backend.load.call(engine, { patientDataUrl: URL_CLOSING });
+        t.received[0].resolve({ value: 'STORED', context: { field: 'x' } });
+        await flush();
+        backend.load.call(engine, { patientDataUrl: URL_CLOSING });
+        t.received[1].resolve(null);
+        await flush();
+        backend.save(saveArgs());
+        expect(t.sent[0].data.context).toBeUndefined();
+    });
+
+    it('a failure after delivery is logged, not reported as not delivered', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        globalThis.editor.flagClosing = () => { throw new Error('boom'); };
+        const backend = createTransportBackend({ receive: () => null, send: () => Promise.resolve() });
+        backend.save(saveArgs());
+        await flush();
+        expect(alertSpy).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockRestore();
     });
 
     it('shows the template chooser when nothing is received', async () => {
