@@ -7,6 +7,7 @@ import 'flatpickr/dist/flatpickr.min.css';
 import '@selectize/selectize/dist/css/selectize.default.css';
 import '@selectize/selectize';
 import LocalStorageBackend from "./script/localStorageBackend";
+import { createTransportBackend } from './script/transportBackend';
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
 import { DEFAULT_QUESTIONNAIRE } from './script/questionnaire/defaultQuestionnaire';
 
@@ -18,6 +19,8 @@ OpenPedigree.initialiseEditor = function(options){
 };
 
 OpenPedigree.localStorageBackend = LocalStorageBackend;
+// A backend over a host-supplied transport (see src/script/transportBackend.ts).
+OpenPedigree.createTransportBackend = createTransportBackend;
 OpenPedigree.FHIRPatientProvider = FHIRPatientProvider;
 OpenPedigree.defaultQuestionnaire = DEFAULT_QUESTIONNAIRE;
 

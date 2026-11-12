@@ -156,7 +156,7 @@ test('numbering is off when the editor opens, and isn\'t saved', async ({ page }
   await page.click('#action-numbering');
   await page.evaluate((u) => window.editor.getSaveLoadEngine().save(u), url);
   const withNumbering = await page.evaluate(() => JSON.parse(window.localStorage.getItem('gn4')).value);
-  // the same pedigree (apart from when it was saved and the diagram image, which a toolbar click's
+  // the same pedigree (apart from when it was saved - its dates and the bundle's timestamp - and the diagram image, which a toolbar click's
   // hover can touch), and no numbering in its image
   const parts = (saved) => {
     const bundle = JSON.parse(saved);
@@ -167,7 +167,7 @@ test('numbering is off when the editor opens, and isn\'t saved', async ({ page }
         delete entry.resource.content.attachment.data;
       }
     }
-    const rest = JSON.stringify(bundle).replace(/"date":"[^"]*"/g, '').replace(/urn:uuid:[0-9a-f-]+/g, 'urn:uuid');
+    const rest = JSON.stringify(bundle).replace(/"(date|timestamp)":"[^"]*"/g, '').replace(/urn:uuid:[0-9a-f-]+/g, 'urn:uuid');
     return { rest, image };
   };
   const off = parts(withoutNumbering);

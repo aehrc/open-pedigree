@@ -64,6 +64,17 @@ docker build . -t open-pedigree
 docker run -p 9000:9000 -d open-pedigree
 ```
 
+## Saving and loading: backends and transports
+
+`initialiseEditor`'s `backend` option (`{ save, load }`) decides where the pedigree is read from and saved to. With `patientDataUrl: 'local:<key>?format=<f>&closeOnSave=true'`, two ready-made backends handle the formats (`format`: `fhir`/`GA4GH`, `PED`, `PEDX`, `DADA2`, `DADA2X`, or the internal JSON when absent), close the window after a save (`closeOnSave`), and show the template chooser when there's nothing to load:
+
+- `OpenPedigree.localStorageBackend` reads and writes `localStorage[<key>]`. It's meant for standalone pages: anything in `localStorage` can be read by every page on the origin and stays after the window closes.
+- `OpenPedigree.createTransportBackend(transport)` does the same over a transport the host supplies, e.g. `postMessage` to the window that opened the editor:
+  - `transport.receive(key)` returns the stored `{ value, context }`, or `null` when nothing is stored. `context` is the host's own, and it is passed back with each save.
+  - `transport.send(key, { value, svg, context })` delivers a save.
+
+  Either can return a value or a Promise. If `send` rejects, the save wasn't delivered: the window stays open, the user is told, and they can save again or export a copy. If `receive` rejects, nothing is loaded. A save waits until the backend's own load has finished.
+
 ## Questionnaire-driven custom fields
 
 Implementers can add extra per-person fields to the node editor's "Custom" tab by pointing the editor at a FHIR `Questionnaire`, instead of forking the editor to add hardcoded fields:

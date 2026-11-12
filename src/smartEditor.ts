@@ -3,6 +3,7 @@ import PedigreeEditor from './script/pedigree';
 import SmartFhirBackend from './script/SmartFhirBackend';
 import SmartPatientProvider from './script/patientProvider/SmartPatientProvider';
 import LocalStorageBackend from './script/localStorageBackend';
+import { createTransportBackend } from './script/transportBackend';
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
 import { DEFAULT_QUESTIONNAIRE } from './script/questionnaire/defaultQuestionnaire';
 
@@ -20,6 +21,8 @@ OpenPedigree.initialiseEditor = function(options: any) {
 };
 
 OpenPedigree.localStorageBackend = LocalStorageBackend;
+// A backend over a host-supplied transport (see src/script/transportBackend.ts).
+OpenPedigree.createTransportBackend = createTransportBackend;
 OpenPedigree.FHIRPatientProvider = FHIRPatientProvider;
 OpenPedigree.SmartFhirBackend = SmartFhirBackend;
 OpenPedigree.SmartPatientProvider = SmartPatientProvider;
