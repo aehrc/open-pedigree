@@ -44,6 +44,13 @@ import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 // setTimeout takes at most 2^31-1 ms; a longer delay fires at once.
 const QUESTIONNAIRE_WAIT_MS = 10000;
 const MAX_TIMEOUT_MS = 2147483647;
+// The longest the editor waits, under its loading cover, for a backend's load that said (by
+// returning a Promise) it would finish later.
+const BACKEND_LOAD_WAIT_MS = 35000;
+
+function isThenable(value: any): boolean {
+  return Boolean(value) && typeof value.then === 'function';
+}
 
 // Person setter -> getter for the questionnaire targets (names don't always mirror, e.g.
 // setHPO/getPhenotypes), used to read a node's current value during a linked-record refresh.
@@ -191,7 +198,13 @@ export default class PedigreeEditor {
     // (applyPendingQuestionnaireResponses) can't bring back resource-mapped answers.
     var loadAfterQuestionnaire = Boolean(options.questionnaireUrl && !options.questionnaireLocal);
     if (!loadAfterQuestionnaire) {
-      this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+      var pendingLoad = this._saveLoadEngine.load(patientDataUrl, this._saveLoadEngine);
+      if (isThenable(pendingLoad)) {
+        // An asynchronous backend's pedigree is still on its way: keep the user out (and saves
+        // held) until it has arrived, as for the deferred load below.
+        this._firstLoadPending = true;
+        this._untilBackendLoaded(pendingLoad, this._showLoadingCover());
+      }
     }
     this._closing = false;
 
@@ -326,25 +339,50 @@ export default class PedigreeEditor {
     });
     var run = function() {
       clearTimeout(timer);
+      var pendingLoad: any = null;
       try {
         if (!_this._graphIsEmpty() || (window as any).editor !== _this) {
           return;
         }
-        _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
+        pendingLoad = _this._saveLoadEngine.load(patientDataUrl, _this._saveLoadEngine);
       } catch (err) {
         console.error('Loading the stored pedigree failed', err);
         if (_this._graphIsEmpty()) {
           new TemplateSelector(true);
         }
       } finally {
-        // Held only this far: an asynchronous backend is still fetching now, as it always was
-        // after the constructor, and a backend that never answers mustn't hold saving forever.
-        _this._firstLoadPending = false;
-        cover.remove();
+        if (isThenable(pendingLoad)) {
+          // The backend said it finishes later: hold until then (capped).
+          _this._untilBackendLoaded(pendingLoad, cover);
+        } else {
+          // Held only this far otherwise: a backend that doesn't say when it's done (e.g. the
+          // default fetch backend) is still fetching now, as it always was after the
+          // constructor, and must not hold saving forever.
+          _this._firstLoadPending = false;
+          cover.remove();
+        }
       }
     };
     // _questionnaireSettled doesn't reject; if it ever did, the load still runs.
     Promise.race([this._questionnaireSettled, cap]).then(run, run);
+  }
+
+  /**
+   * Keeps the loading cover up, and saving held (isAwaitingFirstLoad), until a backend's load
+   * Promise settles, or BACKEND_LOAD_WAIT_MS has passed.
+   */
+  _untilBackendLoaded(pendingLoad: any, cover: { remove: () => void }): void {
+    var _this = this;
+    var timer: any;
+    var cap = new Promise<void>(function(resolve) {
+      timer = setTimeout(resolve, BACKEND_LOAD_WAIT_MS);
+    });
+    var release = function() {
+      clearTimeout(timer);
+      _this._firstLoadPending = false;
+      cover.remove();
+    };
+    Promise.race([Promise.resolve(pendingLoad), cap]).then(release, release);
   }
 
   /**

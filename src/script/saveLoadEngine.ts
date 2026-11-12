@@ -271,10 +271,15 @@ export default class SaveLoadEngine {
     );
   }
 
-  load(patientDataUrl: any): void {
+  /**
+   * Returns what the backend's load returns: a Promise when the backend loads asynchronously and
+   * says when it's done (e.g. createTransportBackend), which the editor waits for before letting
+   * the user in.
+   */
+  load(patientDataUrl: any): any {
     console.log('initiating load process');
     if (patientDataUrl || this._customBackend) {
-      this._loadFunction({
+      return this._loadFunction({
         patientDataUrl: patientDataUrl,
         onSuccess: this._displayData.bind(this),
         onFailure: () => { new TemplateSelector(true); }

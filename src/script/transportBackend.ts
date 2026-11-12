@@ -15,8 +15,9 @@ const PedigreeExport: any = PedigreeExportModule;
  * - `closeOnSave` (`true`, or present without a value) closes the window once a save is delivered.
  *
  * The transport:
- * - `receive(key)` gives the stored `{value, context}` for the key, or null for nothing stored. The
- *   `context` is the host's own and goes back with each save.
+ * - `receive(key)` gives the stored `{value, context}` for the key, or null for nothing stored.
+ *   `value` is the stored text (JSON as a string, or PED text), as `send` gives it. The `context`
+ *   is the host's own and goes back with each save.
  * - `send(key, {value, svg, context})` delivers a save.
  * Either may return its result directly or as a Promise. A rejected or throwing `receive` loads
  * nothing (the template chooser); a rejected or throwing `send` means the save wasn't delivered:
@@ -26,7 +27,8 @@ const PedigreeExport: any = PedigreeExportModule;
  * A save while this backend's load is still waiting for `receive` isn't sent (it would send the
  * canvas from before the pedigree arrived): it is skipped, as the editor skips saves while it
  * waits for its first load. A load gives up on a `receive` that hasn't settled after
- * RECEIVE_TIMEOUT_MS, and an answer after that is ignored; a save treats a `send` that hasn't
+ * RECEIVE_TIMEOUT_MS, and an answer after that is ignored. An asynchronous load returns a Promise
+ * that settles when it's done, so the editor keeps its loading cover up until then. A save treats a `send` that hasn't
  * settled after SEND_TIMEOUT_MS as not delivered. A pedigree that arrives once the canvas already
  * has one (e.g. the user started drawing) isn't drawn over it.
  */
@@ -45,6 +47,19 @@ export const NOT_SENT_MESSAGE = 'The pedigree could not be sent back (the page t
   + 'Save again, or use Export to keep a copy.';
 
 const IMPORT_FORMATS = ['fhir', 'fhir_v1', 'GA4GH', 'PED', 'PEDX', 'DADA2', 'DADA2X'];
+
+// Whether the editor's canvas has no pedigree yet (its own rule, when it has one).
+function canvasIsEmpty(): boolean {
+  const editor = (window as any).editor;
+  if (!editor) {
+    return true;
+  }
+  if (typeof editor._graphIsEmpty === 'function') {
+    return editor._graphIsEmpty();
+  }
+  const graph = editor.getGraph && editor.getGraph();
+  return !graph || graph.getMaxNodeId() < 0;
+}
 
 // Runs `then` on a value, or once a Promise of it resolves; `fail` on a throw or rejection. A plain
 // value is handled straight away, so a synchronous transport behaves synchronously. An error in
@@ -204,6 +219,8 @@ export function createTransportBackend(transport: PedigreeTransport): any {
       backend._context = undefined;
       loading = true;
       let timer: any = null;
+      let done: () => void = () => {};
+      const finished = new Promise<void>((resolve) => { done = resolve; });
       // Runs once, for the current load only.
       const settled = (fn: () => void) => {
         if (thisLoad !== currentLoad || !loading) {
@@ -211,25 +228,33 @@ export function createTransportBackend(transport: PedigreeTransport): any {
         }
         clearTimeout(timer);
         loading = false;
-        fn();
+        try {
+          fn();
+        } finally {
+          done();
+        }
       };
       const nothing = (err: any) => settled(() => {
         console.warn('[LOAD] nothing received: ' + options.key, err);
-        new TemplateSelector(true);
+        if (canvasIsEmpty()) {
+          new TemplateSelector(true);
+        }
       });
       settle(() => transport.receive(options.key), (data) => settled(() => {
-        const graph = (window as any).editor && (window as any).editor.getGraph();
-        if (graph && graph.getMaxNodeId() >= 0) {
+        backend._context = data && data.context ? data.context : undefined;
+        if (!canvasIsEmpty()) {
           // (as the editor's own deferred first load does: never replace a pedigree already there)
           console.warn('[LOAD] Not drawn: the canvas already has a pedigree');
           return;
         }
-        backend._context = data && data.context ? data.context : undefined;
         backend._display(engine, data, options.format);
       }), nothing);
       if (loading && thisLoad === currentLoad) {
         timer = setTimeout(() => nothing(new Error('receive did not settle')), RECEIVE_TIMEOUT_MS);
+        // (the editor waits for this, under its loading cover)
+        return finished;
       }
+      return undefined;
     },
 
     _display: function (engine: any, data: any, format: string) {

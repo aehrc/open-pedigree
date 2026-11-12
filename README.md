@@ -70,10 +70,10 @@ docker run -p 9000:9000 -d open-pedigree
 
 - `OpenPedigree.localStorageBackend` reads and writes `localStorage[<key>]`. It's meant for standalone pages: anything in `localStorage` can be read by every page on the origin and stays after the window closes.
 - `OpenPedigree.createTransportBackend(transport)` does the same over a transport the host supplies, e.g. `postMessage` to the window that opened the editor:
-  - `transport.receive(key)` returns the stored `{ value, context }`, or `null` when nothing is stored. `context` is the host's own, and it is passed back with each save.
+  - `transport.receive(key)` returns the stored `{ value, context }`, or `null` when nothing is stored. `value` is the stored text (JSON as a string, or PED text), as `send` gives it. `context` is the host's own, and it is passed back with each save.
   - `transport.send(key, { value, svg, context })` delivers a save.
 
-  Either can return a value or a Promise. If `send` rejects, the save wasn't delivered: the window stays open, the user is told (with the error's `pedigreeMessage` if it has one, e.g. the host's reason for refusing it), and they can save again or export a copy. If `receive` rejects, nothing is loaded. While `receive` hasn't settled, a save is skipped (as the editor skips saves while waiting for its first load); after 30 seconds the load gives up and shows the template chooser, and a pedigree that arrives once the canvas has one isn't drawn over it. A `send` that hasn't settled after 30 seconds counts as not delivered.
+  Either can return a value or a Promise. If `send` rejects, the save wasn't delivered: the window stays open, the user is told (with the error's `pedigreeMessage` if it has one, e.g. the host's reason for refusing it), and they can save again or export a copy. If `receive` rejects, nothing is loaded. While `receive` hasn't settled, the editor keeps its "Loading the pedigree..." cover up and a save is skipped (as the editor skips saves while waiting for its first load); after 30 seconds the load gives up and shows the template chooser, and a pedigree that arrives once the canvas has one isn't drawn over it. A `send` that hasn't settled after 30 seconds counts as not delivered.
 
 ## Questionnaire-driven custom fields
 

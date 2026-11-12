@@ -307,4 +307,41 @@ describe('createTransportBackend', () => {
             vi.useRealTimers();
         }
     });
+
+    it('an asynchronous load returns a Promise that settles once the pedigree is in; a synchronous one returns nothing', async () => {
+        const t = deferredTransport();
+        const pending = createTransportBackend(t).load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        expect(typeof pending.then).toBe('function');
+        let settled = false;
+        pending.then(() => { settled = true; });
+        await flush();
+        expect(settled).toBe(false);
+        t.received[0].resolve({ value: 'STORED' });
+        await flush();
+        expect(settled).toBe(true);
+        expect(engine.createGraphFromSerializedData).toHaveBeenCalledWith('STORED');
+
+        const sync = createTransportBackend({ receive: () => null, send: () => {} }).load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        expect(sync).toBeUndefined();
+    });
+
+    it('does not put the template chooser over a pedigree already on the canvas when nothing arrives', async () => {
+        const t = deferredTransport();
+        createTransportBackend(t).load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        maxNodeId = 2;
+        t.received[0].reject(new Error('no answer'));
+        await flush();
+        expect(TemplateSelector).not.toHaveBeenCalled();
+    });
+
+    it("keeps the host's context when a late pedigree isn't drawn", async () => {
+        const t = deferredTransport();
+        const backend = createTransportBackend(t);
+        backend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        maxNodeId = 2;
+        t.received[0].resolve({ value: 'STORED', context: { field: 'f' } });
+        await flush();
+        backend.save(saveArgs('local:pedigreeData'));
+        expect(t.sent[0].data.context).toEqual({ field: 'f' });
+    });
 });
