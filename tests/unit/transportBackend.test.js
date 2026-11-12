@@ -13,7 +13,7 @@ vi.mock('pedigree/model/export', () => ({
 vi.mock('pedigree/view/templateSelector', () => ({ default: vi.fn() }));
 
 import TemplateSelector from 'pedigree/view/templateSelector';
-import { createTransportBackend, NOT_SENT_MESSAGE, STILL_LOADING_MESSAGE } from 'pedigree/transportBackend';
+import { createTransportBackend, NOT_SENT_MESSAGE, RECEIVE_TIMEOUT_MS } from 'pedigree/transportBackend';
 
 const URL_CLOSING = 'local:pedigreeData?format=GA4GH&closeOnSave=true';
 
@@ -129,7 +129,8 @@ describe('createTransportBackend', () => {
         await flush();
         expect(t.send).not.toHaveBeenCalled();
         expect(early.setSaveInProgress).not.toHaveBeenCalledWith(true);
-        expect(alertSpy).toHaveBeenCalledWith(STILL_LOADING_MESSAGE);
+        // (skipped quietly, as the editor skips saves while waiting for its first load)
+        expect(alertSpy).not.toHaveBeenCalled();
 
         t.received[0].resolve({ value: 'STORED', context: { field: 'f' } });
         await flush();
@@ -167,15 +168,67 @@ describe('createTransportBackend', () => {
         expect(t.sent[0].data.context).toBeUndefined();
     });
 
-    it('a failure after delivery is logged, not reported as not delivered', async () => {
+    it('a failure after delivery is logged, not reported as not delivered, and the save has ended', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        globalThis.editor.flagClosing = () => { throw new Error('boom'); };
+        close.mockImplementation(() => { throw new Error('boom'); });
         const backend = createTransportBackend({ receive: () => null, send: () => Promise.resolve() });
-        backend.save(saveArgs());
+        const args = saveArgs();
+        backend.save(args);
         await flush();
         expect(alertSpy).not.toHaveBeenCalled();
         expect(errorSpy).toHaveBeenCalled();
+        expect(args.setSaveInProgress).toHaveBeenLastCalledWith(false);
+        // (not left flagged as closing, which would drop the leave-page warning)
+        expect(globalThis.editor.flagClosing).toHaveBeenLastCalledWith(false);
         errorSpy.mockRestore();
+    });
+
+    it('falls back to the generic message when the host gives an empty one', async () => {
+        const t = deferredTransport();
+        createTransportBackend(t).save(saveArgs());
+        t.sent[0].reject(Object.assign(new Error('refused'), { pedigreeMessage: '  ' }));
+        await flush();
+        expect(alertSpy).toHaveBeenCalledWith(NOT_SENT_MESSAGE);
+    });
+
+    it("ignores an earlier load's late answer", async () => {
+        const t = deferredTransport();
+        const backend = createTransportBackend(t);
+        backend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        backend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+        t.received[0].resolve({ value: 'OLD', context: { field: 'old' } });
+        await flush();
+        expect(engine.createGraphFromSerializedData).not.toHaveBeenCalled();
+        backend.save(saveArgs('local:pedigreeData'));
+        expect(t.send).not.toHaveBeenCalled();
+
+        t.received[1].resolve({ value: 'NEW', context: { field: 'new' } });
+        await flush();
+        expect(engine.createGraphFromSerializedData).toHaveBeenCalledWith('NEW');
+        backend.save(saveArgs('local:pedigreeData'));
+        expect(t.sent[0].data.context).toEqual({ field: 'new' });
+    });
+
+    it('gives up on a receive that never settles, and ignores it if it answers later', async () => {
+        vi.useFakeTimers();
+        try {
+            const t = deferredTransport();
+            const backend = createTransportBackend(t);
+            backend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
+            vi.advanceTimersByTime(RECEIVE_TIMEOUT_MS - 1);
+            expect(TemplateSelector).not.toHaveBeenCalled();
+            vi.advanceTimersByTime(1);
+            expect(TemplateSelector).toHaveBeenCalledTimes(1);
+
+            backend.save(saveArgs('local:pedigreeData'));
+            expect(t.sent).toHaveLength(1);
+
+            t.received[0].resolve({ value: 'LATE' });
+            await vi.runAllTimersAsync();
+            expect(engine.createGraphFromSerializedData).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('shows the template chooser when nothing is received', async () => {

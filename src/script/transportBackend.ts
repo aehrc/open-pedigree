@@ -24,15 +24,17 @@ const PedigreeExport: any = PedigreeExportModule;
  * one (e.g. the host refused the pedigree and says why), else NOT_SENT_MESSAGE.
  *
  * A save while this backend's load is still waiting for `receive` isn't sent (it would send the
- * canvas from before the pedigree arrived): it ends at once and the user is asked to try again.
- * So `receive` must settle - a transport that can wait on something else gives it a timeout.
+ * canvas from before the pedigree arrived): it is skipped, as the editor skips saves while it
+ * waits for its first load. A load gives up on a `receive` that hasn't settled after
+ * RECEIVE_TIMEOUT_MS, and an answer after that is ignored.
  */
 export interface PedigreeTransport {
   receive(key: string): any;
   send(key: string, data: { value: any; svg: any; context?: any }): any;
 }
 
-export const STILL_LOADING_MESSAGE = 'The pedigree is still loading. Try saving again in a moment.';
+// How long a load waits for `receive` before giving up (the template chooser).
+export const RECEIVE_TIMEOUT_MS = 30000;
 
 export const NOT_SENT_MESSAGE = 'The pedigree could not be sent back (the page that opened this editor '
   + 'may have been closed or reloaded). Your changes are still here: keep this window open and try '
@@ -44,9 +46,9 @@ const IMPORT_FORMATS = ['fhir', 'fhir_v1', 'GA4GH', 'PED', 'PEDX', 'DADA2', 'DAD
 // value is handled straight away, so a synchronous transport behaves synchronously. An error in
 // `then` itself is logged, not passed to `fail`: the transport did its part.
 function settle(produce: () => any, then: (value: any) => void, fail: (err: any) => void): void {
-  const handle = (value: any) => {
+  const guarded = (fn: (arg: any) => void) => (arg: any) => {
     try {
-      then(value);
+      fn(arg);
     } catch (err) {
       console.error(err);
     }
@@ -55,14 +57,14 @@ function settle(produce: () => any, then: (value: any) => void, fail: (err: any)
   try {
     result = produce();
   } catch (err) {
-    fail(err);
+    guarded(fail)(err);
     return;
   }
   if (result && typeof result.then === 'function') {
-    result.then(handle, fail);
+    result.then(guarded(then), guarded(fail));
     return;
   }
-  handle(result);
+  guarded(then)(result);
 }
 
 // The key and options of a `local:` patientDataUrl, or null for any other.
@@ -106,6 +108,8 @@ function exportAs(format: string, jsonData: any, svg: any): any {
 export function createTransportBackend(transport: PedigreeTransport): any {
   // While true, the pedigree hasn't arrived from `receive` yet, and a save isn't sent.
   let loading = false;
+  // Which load is current: an answer to an earlier one is ignored.
+  let currentLoad = 0;
 
   const backend: any = {
     _context: undefined,
@@ -117,7 +121,6 @@ export function createTransportBackend(transport: PedigreeTransport): any {
       }
       if (loading) {
         console.warn('[SAVE] Skipped: the pedigree has not arrived yet');
-        alert(STILL_LOADING_MESSAGE);
         return;
       }
       args.setSaveInProgress(true);
@@ -155,13 +158,17 @@ export function createTransportBackend(transport: PedigreeTransport): any {
         if (options.closeOnSave) {
           console.log('Attempt to close the window');
           editor.flagClosing(true);
-          window.close();
-          editor.flagClosing(false);
+          try {
+            window.close();
+          } finally {
+            editor.flagClosing(false);
+          }
         }
       }, (err) => {
         console.warn('[SAVE] not delivered: ' + options.key, err);
         args.setSaveInProgress(false);
-        alert(err && typeof err.pedigreeMessage === 'string' ? err.pedigreeMessage : NOT_SENT_MESSAGE);
+        const hostMessage = err && typeof err.pedigreeMessage === 'string' ? err.pedigreeMessage.trim() : '';
+        alert(hostMessage || NOT_SENT_MESSAGE);
       });
     },
 
@@ -173,18 +180,31 @@ export function createTransportBackend(transport: PedigreeTransport): any {
       }
       console.log('initiating load process : ' + options.key + ' as ' + options.format);
       const engine = this;
+      const thisLoad = ++currentLoad;
       // A fresh load forgets the last one's context: a save goes back with what this one got.
       backend._context = undefined;
-      // (a transport must settle receive - e.g. with a timeout - or saving stays refused)
       loading = true;
-      settle(() => transport.receive(options.key), (data) => {
+      let timer: any = null;
+      // Runs once, for the current load only.
+      const settled = (fn: () => void) => {
+        if (thisLoad !== currentLoad || !loading) {
+          return;
+        }
+        clearTimeout(timer);
         loading = false;
-        backend._display(engine, data, options.format);
-      }, (err) => {
-        loading = false;
+        fn();
+      };
+      const nothing = (err: any) => settled(() => {
         console.warn('[LOAD] nothing received: ' + options.key, err);
         new TemplateSelector(true);
       });
+      settle(() => transport.receive(options.key), (data) => settled(() => {
+        backend._context = data && data.context ? data.context : undefined;
+        backend._display(engine, data, options.format);
+      }), nothing);
+      if (loading && thisLoad === currentLoad) {
+        timer = setTimeout(() => nothing(new Error('receive did not settle')), RECEIVE_TIMEOUT_MS);
+      }
     },
 
     _display: function (engine: any, data: any, format: string) {
@@ -192,7 +212,6 @@ export function createTransportBackend(transport: PedigreeTransport): any {
       let createCalled = false;
       try {
         if (data) {
-          backend._context = data.context ? data.context : undefined;
           let jsonData = data.value;
           if (jsonData && jsonData.length > 0) {
             createCalled = true;
