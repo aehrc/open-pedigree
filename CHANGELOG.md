@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.7.0...open-pedigree-v1.8.0) (2026-11-12)
+
+
+### Features
+
+* a host can supply the transport for the local editor's save and load ([#99](https://github.com/aehrc/open-pedigree/issues/99)) ([7202ab0](https://github.com/aehrc/open-pedigree/commit/7202ab0561b56c864a51aef8a647a1b7ca64f35a))
+
+
+### Bug Fixes
+
+* resolve CodeQL incomplete-sanitization alerts ([#97](https://github.com/aehrc/open-pedigree/issues/97)) ([02e6625](https://github.com/aehrc/open-pedigree/commit/02e6625d00a30406eb6687869faf2bc0a602efc9))
+* the GA4GH export honours its privacy options ([#96](https://github.com/aehrc/open-pedigree/issues/96)) ([2b1346b](https://github.com/aehrc/open-pedigree/commit/2b1346b5f2171c1590a744cd00179ab598775a40))
+
 ## [1.7.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.6.0...open-pedigree-v1.7.0) (2026-11-11)
 
 
