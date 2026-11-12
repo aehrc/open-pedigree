@@ -74,6 +74,15 @@ function newEditor(page, options) {
     }
     // A backend built in the page: 'slow' answers with the stored pedigree after 1 s (as a fetch
     // does), 'throws' throws from load. Saves are counted in window.backendSaves.
+    // A transport backend whose receive answers only when the test calls window.__answer().
+    if (opts.transport) {
+      window.transportSends = 0;
+      editorOptions.backend = window.OpenPedigree.createTransportBackend({
+        receive: () => new Promise((resolve) => { window.__answer = () => resolve({ value: window.__serialized }); }),
+        send: () => { window.transportSends++; },
+      });
+      editorOptions.patientDataUrl = 'local:transport';
+    }
     if (opts.backend) {
       window.backendSaves = 0;
       editorOptions.backend = {
@@ -362,3 +371,34 @@ test('a blank questionnaireWaitMs means the default wait, not none', async ({ pa
   await page.waitForTimeout(1500);
   expect(await probandName(page)).toBe('no proband');
 });
+
+for (const withQuestionnaireUrl of [false, true]) {
+  test(`a transport backend's pedigree loads under the cover, and saving waits for it (${withQuestionnaireUrl ? 'with' : 'without'} a questionnaireUrl)`, async ({ page }) => {
+    await storePedigree(page);
+    await newEditor(page, { local: CUSTOM_LEGEND_QUESTIONNAIRE });
+    await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+    await page.evaluate(() => { window.__serialized = window.editor.getGraph().toJSON(); });
+    await retireAutoCreatedEditor(page);
+    if (withQuestionnaireUrl) {
+      await routeQuestionnaire(page, { delayMs: 200 });
+    }
+    const choosersBefore = await visibleTemplateChoosers(page);
+    await newEditor(page, withQuestionnaireUrl ? { transport: true } : { transport: true, local: CUSTOM_LEGEND_QUESTIONNAIRE });
+
+    // The Questionnaire is in (if fetched); the pedigree hasn't arrived: the cover stays, saves are held.
+    await page.waitForTimeout(withQuestionnaireUrl ? 600 : 200);
+    expect(await coverShown(page)).toBe(1);
+    expect(await coverOnTop(page)).toBe(true);
+    expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(true);
+    await page.evaluate(() => window.editor.getSaveLoadEngine().save('local:transport'));
+    expect(await page.evaluate(() => window.transportSends)).toBe(0);
+
+    await page.evaluate(() => window.__answer());
+    await expect.poll(() => probandName(page), { timeout: 10000 }).toBe('Stored');
+    await expect.poll(() => coverShown(page)).toBe(0);
+    expect(await page.evaluate(() => window.editor.isAwaitingFirstLoad())).toBe(false);
+    expect(await visibleTemplateChoosers(page)).toBe(choosersBefore);
+    await page.evaluate(() => window.editor.getSaveLoadEngine().save('local:transport'));
+    expect(await page.evaluate(() => window.transportSends)).toBe(1);
+  });
+}

@@ -23,7 +23,7 @@ describe('LocalStorageBackend.save options', () => {
         LocalStorageBackend._context = undefined;
         globalThis.editor = {
             getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
-            getGraph: () => ({ DG: {} }),
+            getGraph: () => ({ DG: {}, getMaxNodeId: () => -1 }),
             flagClosing: vi.fn(),
         };
         close = vi.spyOn(window, 'close').mockImplementation(() => {});
@@ -81,7 +81,7 @@ describe('LocalStorageBackend.load format', () => {
             createGraphFromImportData: vi.fn().mockReturnValue(true),
             createGraphFromSerializedData: vi.fn(),
         };
-        globalThis.editor = { getVersionUpdater: () => ({ updateToCurrentVersion: (d) => d }) };
+        globalThis.editor = { getVersionUpdater: () => ({ updateToCurrentVersion: (d) => d }), getGraph: () => ({ getMaxNodeId: () => -1 }) };
         localStorage.setItem('pedigreeData', JSON.stringify({ value: 'STORED', context: { field: 'f' } }));
     });
 
@@ -101,5 +101,25 @@ describe('LocalStorageBackend.load format', () => {
         LocalStorageBackend.load.call(engine, { patientDataUrl: 'local:pedigreeData' });
         expect(engine.createGraphFromSerializedData).toHaveBeenCalledWith('STORED');
         expect(engine.createGraphFromImportData).not.toHaveBeenCalled();
+    });
+
+    it('says what went wrong when the pedigree cannot be stored', () => {
+        const alertSpy = vi.fn();
+        globalThis.alert = alertSpy;
+        globalThis.editor = {
+            getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
+            getGraph: () => ({ DG: {} }),
+            flagClosing: vi.fn(),
+        };
+        const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+        });
+        try {
+            LocalStorageBackend.save({ patientDataUrl: 'local:pedigreeData?format=PED', setSaveInProgress: vi.fn(), jsonData: '' });
+            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Error saving pedigree: QuotaExceededError'));
+        } finally {
+            setItem.mockRestore();
+            delete globalThis.alert;
+        }
     });
 });
