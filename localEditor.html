@@ -13,14 +13,9 @@
   <body id='body'>
   <script type="text/javascript">
 
+    // A query-string parameter's value: null when absent, '' when present without a value.
     function getParameterByName(name, url) {
-      if (!url) url = window.location.href;
-      name = name.replace(/[\[\]]/g, '\\$&');
-      var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-              results = regex.exec(url);
-      if (!results) return null;
-      if (!results[2]) return '';
-      return decodeURIComponent(results[2].replace(/\+/g, ' '));
+      return new URL(url || window.location.href).searchParams.get(name);
     }
 
     var editor;
