@@ -168,6 +168,11 @@ export default class Controller {
         if (propertySetFunction == 'setDeathDate') {
           remember('setLifeStatus', node.getLifeStatus());
         }
+        // Dropping a gene drops its result: undo brings both back. (Recorded after setGenes, so
+        // undo restores the genes first and then their results.)
+        if (propertySetFunction == 'setGenes' && node.getGeneResults) {
+          remember('setGeneResults', node.getGeneResults());
+        }
         if (propertySetFunction == 'setDisorders') {
           remember('setCarrierStatus', node.getCarrierStatus());
         }

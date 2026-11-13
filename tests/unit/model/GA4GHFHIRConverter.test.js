@@ -705,3 +705,81 @@ describe('GA4GHFHIRConverter and a couple with no children', () => {
     expect(placeholders(graph).length).toBe(1);
   });
 });
+
+describe('GA4GHFHIRConverter gene results', () => {
+  const plain = (o) => JSON.parse(JSON.stringify(o));
+  // The gene Observations: a gene as text, or coded in the gene system.
+  const isGene = (r) => (r.valueString || '').startsWith('gene: ')
+    || Boolean(r.valueCodeableConcept && r.valueCodeableConcept.coding && r.valueCodeableConcept.coding[0].system === 'http://www.genenames.org');
+  const geneObservations = (bundle) => bundle.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Observation' && isGene(r));
+  const component = (code, valueCode) => ({ code: { coding: [expect.objectContaining({ system: 'http://loinc.org', code })] },
+    valueCodeableConcept: { coding: [expect.objectContaining({ system: 'http://loinc.org', code: valueCode })] } });
+
+  function withGenes(results) {
+    const baseGraph = PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG));
+    baseGraph.properties[1].candidateGenes = ['BRCA1', 'BRCA2', 'TP53', 'MLH1', 'ATM'];
+    if (results) {
+      baseGraph.properties[1].geneResults = results;
+    }
+    return baseGraph;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('writes each result as LOINC components on its gene Observation, whose value is still the gene', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous', TP53: 'negative', MLH1: 'hemizygous', ATM: 'homozygous' }) }, 'all', null, null));
+    const byGene = Object.fromEntries(geneObservations(bundle).map((o) => [o.valueString.slice('gene: '.length), o]));
+    expect(Object.keys(byGene).sort()).toEqual(['ATM', 'BRCA1', 'BRCA2', 'MLH1', 'TP53']);
+    expect(byGene.BRCA1.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6706-1')]);
+    expect(byGene.ATM.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6705-3')]);
+    expect(byGene.MLH1.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6707-9')]);
+    expect(byGene.TP53.component).toEqual([component('69548-6', 'LA9634-2')]);
+    expect(byGene.BRCA2.component).toBeUndefined();
+    expect(byGene.BRCA1.code).toBeUndefined();
+  });
+
+  it('reads them back', () => {
+    const results = { BRCA1: 'heterozygous', TP53: 'negative', MLH1: 'hemizygous', ATM: 'homozygous' };
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes(results) }, 'all', null, null);
+    const read = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find((p) => (p.candidateGenes || []).length);
+    expect(read.candidateGenes.sort()).toEqual(['ATM', 'BRCA1', 'BRCA2', 'MLH1', 'TP53']);
+    expect(read.geneResults).toEqual(results);
+  });
+
+  it('writes no components when there are no results', () => {
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes(null) }, 'all', null, null);
+    expect(exported).not.toContain('"component"');
+    const read = Object.values(GA4GHFHIRConverter.initFromFHIR(exported).properties).find((p) => (p.candidateGenes || []).length);
+    expect(read.geneResults).toBeUndefined();
+  });
+
+  it('puts the components on a coded gene Observation too', () => {
+    vi.stubGlobal('editor', Object.assign({}, mockEditor, {
+      getFhirTerminologyHelper: () => Object.assign({}, mockTerminologyHelper, {
+        getCodeableConceptFromGene: (gene) => ({ coding: [{ system: 'http://www.genenames.org', code: gene, display: gene }] }),
+      }),
+    }));
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueCodeableConcept && o.valueCodeableConcept.coding[0].code === 'BRCA1');
+    expect(plain(brca1.valueCodeableConcept.coding[0])).toEqual({ system: 'http://www.genenames.org', code: 'BRCA1', display: 'BRCA1' });
+    expect(brca1.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6706-1')]);
+  });
+
+  it('ignores a result it cannot read, and says so', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
+    // (Present, but with no allelic state)
+    brca1.component = brca1.component.slice(0, 1);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const read = Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).properties).find((p) => (p.candidateGenes || []).length);
+      expect(read.candidateGenes).toContain('BRCA1');
+      expect(read.geneResults).toBeUndefined();
+      expect(warn.mock.calls.some((c) => String(c[0]).startsWith('Ignoring an unreadable gene result'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

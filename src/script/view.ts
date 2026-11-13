@@ -373,6 +373,8 @@ export default class View {
         visuals.updateExternalIDLabel();
         visuals.updateAgeLabel();
         visuals.updateCommentsLabel();
+        // (kept when de-identified, but drawn afresh with the rest)
+        visuals.updateGeneResultsLabel && visuals.updateGeneResultsLabel();
       }
     }
     this.updateGenerationNumbering();

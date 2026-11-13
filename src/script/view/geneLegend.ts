@@ -14,6 +14,19 @@ export default class GeneLegend extends Legend {
     super('Candidate Genes', terminology, 'gene');
   }
 
+  // A gene's name has arrived: its people's result lines show it too (PersonVisuals.updateGeneResultsLabel).
+  _updateTermName(id: any): void {
+    super._updateTermName(id);
+    var view = editor.getView && editor.getView();
+    (this._affectedNodes[id] || []).forEach(function(nodeID: any) {
+      var node = view && view.getNode(nodeID);
+      var graphics = node && node.getGraphics && node.getGraphics();
+      if (graphics && typeof graphics.updateGeneResultsLabel === 'function') {
+        graphics.updateGeneResultsLabel();
+      }
+    });
+  }
+
   /**
    * Generate the element that will display information about the given disorder in the legend
    *

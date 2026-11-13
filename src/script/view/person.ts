@@ -6,6 +6,7 @@ import { evaluateEnableWhen } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, RECORD_LINK_ACTIONS } from 'pedigree/questionnaire/questionnaireParser';
 import { evaluatePerOptionPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
 import { parseLocalIsoDate } from 'pedigree/model/localDate';
+import { isGeneResultCode } from 'pedigree/model/geneResults';
 
 declare const editor: any;
 
@@ -62,6 +63,8 @@ export default class Person extends AbstractPerson {
   _disorders: any;
   _phenotypes: any;
   _candidateGenes: any;
+  // A result for some of _candidateGenes, keyed by the same (sanitised) gene IDs (model/geneResults).
+  _geneResults: { [geneID: string]: string };
   _twinGroup: any;
   _monozygotic: any;
   _evaluated: any;
@@ -264,6 +267,7 @@ export default class Person extends AbstractPerson {
     this._disorders = [];
     this._phenotypes = [];
     this._candidateGenes = [];
+    this._geneResults = {};
     this._twinGroup = null;
     this._monozygotic = false;
     this._evaluated = false;
@@ -960,6 +964,11 @@ export default class Person extends AbstractPerson {
     if (this.hasGene(geneID)) {
       editor.getGeneLegend().removeCase(geneID, this.getID());
       this._candidateGenes = this.getGenes().filter((g: any) => g !== geneID);
+      // (a result belongs to its gene)
+      if (this._geneResults.hasOwnProperty(geneID)) {
+        delete this._geneResults[geneID];
+        this._updateGeneResultsLabel();
+      }
     } else {
       console.log('This person doesn\'t have the specified gene');
     }
@@ -985,7 +994,62 @@ export default class Person extends AbstractPerson {
       function(ids: any[]) { _this._candidateGenes = ids; });
     if (changed) {
       this.getGraphics().updateDisorderShapes();
+      // (results follow the genes' order)
+      this._updateGeneResultsLabel();
     }
+  }
+
+  // (a placeholder's visuals draw no labels)
+  _updateGeneResultsLabel(): void {
+    var graphics = this.getGraphics();
+    if (graphics && typeof graphics.updateGeneResultsLabel === 'function') {
+      graphics.updateGeneResultsLabel();
+    }
+  }
+
+  /**
+   * This person's gene results, `{ <gene>: <code> }`, keyed by the genes' readable IDs (as
+   * getGenesForExport gives them). A new object each time.
+   *
+   * @method getGeneResults
+   */
+  getGeneResults(): { [gene: string]: string } {
+    var results: { [gene: string]: string } = {};
+    if (Object.keys(this._geneResults).length === 0) {
+      return results;
+    }
+    var legend = editor.getGeneLegend();
+    for (var i = 0; i < this._candidateGenes.length; i++) {
+      var id = this._candidateGenes[i];
+      if (this._geneResults.hasOwnProperty(id)) {
+        results[legend.desanitizeID(id)] = this._geneResults[id];
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Sets this person's gene results from `{ <gene>: <code> }` (readable gene IDs). Only results for
+   * genes in the Genes list, with a known code, are kept; anything else is ignored.
+   *
+   * @method setGeneResults
+   */
+  setGeneResults(results: any): void {
+    var legend = editor.getGeneLegend();
+    var kept: { [geneID: string]: string } = {};
+    if (results && typeof results === 'object' && !Array.isArray(results)) {
+      for (var gene in results) {
+        if (!Object.prototype.hasOwnProperty.call(results, gene)) {
+          continue;
+        }
+        var id = legend.sanitizeID(gene);
+        if (this.hasGene(id) && isGeneResultCode(results[gene])) {
+          kept[id] = results[gene];
+        }
+      }
+    }
+    this._geneResults = kept;
+    this._updateGeneResultsLabel();
   }
 
 
@@ -1186,6 +1250,10 @@ export default class Person extends AbstractPerson {
     }
     if (this.getGenes().length > 0) {
       info['candidateGenes'] = this.getGenesForExport();
+      var geneResults = this.getGeneResults();
+      if (Object.keys(geneResults).length > 0) {
+        info['geneResults'] = geneResults;
+      }
     }
     if (this._twinGroup !== null) {
       info['twinGroup'] = this._twinGroup;
@@ -1273,6 +1341,8 @@ export default class Person extends AbstractPerson {
       this.setDisorders(Array.isArray(info.disorders) ? info.disorders : []);
       this.setPhenotypes(Array.isArray(info.hpoTerms) ? info.hpoTerms : []);
       this.setGenes(Array.isArray(info.candidateGenes) ? info.candidateGenes : []);
+      // (after the genes: a result needs its gene)
+      this.setGeneResults(info.geneResults || {});
       if (info.hasOwnProperty('isAdopted') && this.isAdopted() !== info.isAdopted) {
         this.setAdopted(info.isAdopted);
       }

@@ -5,6 +5,7 @@ import { toLocalIsoDate, localUtcOffset, dateAnswer } from 'pedigree/model/local
 import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
+import { geneResultComponents, geneResultFromComponents } from 'pedigree/model/geneResults';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 import {
@@ -602,6 +603,10 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     return;
   }
 
+  // A gene's result (model/geneResults), read before any branch below claims (or returns early on)
+  // the Observation: it's on the gene's Observation, whichever way the gene itself is read.
+  readGeneResult(observationResource, nodeData);
+
   const mappedItem = this.findMappedQuestionnaireItem(observationResource.code, 'observation');
   if (mappedItem) {
     if (!nodeData.properties.questionnaireAnswers) {
@@ -746,6 +751,32 @@ GA4GHFHIRConverter.extractDataFromObservation = function (observationResource, n
     }
   }
 };
+
+// A gene Observation's result components, kept as nodeData.properties.geneResults[<gene>] under the
+// gene ID the gene list gets from the same Observation (Person keeps only those of listed genes).
+function readGeneResult(observationResource: any, nodeData: any): void {
+  if (!Array.isArray(observationResource.component) || observationResource.code) {
+    return;
+  }
+  const result = geneResultFromComponents(observationResource.component);
+  if (!result) {
+    if (observationResource.component.length > 0) {
+      console.warn('Ignoring an unreadable gene result on ' + (observationResource.id || 'an Observation'));
+    }
+    return;
+  }
+  let gene = null;
+  const cc = observationResource.valueCodeableConcept;
+  if (cc) {
+    const helper = editor.getFhirTerminologyHelper();
+    gene = helper.getGeneFromCodeableConcept(cc, true) || helper.getGeneFromCodeableConcept(cc, false);
+  } else if (typeof observationResource.valueString === 'string' && observationResource.valueString.startsWith('gene: ')) {
+    gene = observationResource.valueString.substring('gene: '.length);
+  }
+  if (gene) {
+    (nodeData.properties.geneResults = nodeData.properties.geneResults || {})[gene] = result;
+  }
+}
 
 // A coding's system|code: how a QuestionnaireResponse answer is matched to an Observation.
 function codingKey(coding) {
@@ -1846,6 +1877,13 @@ GA4GHFHIRConverter.addObservations = function (nodeProperties, ref, observations
         fhirObservation['valueCodeableConcept'] = cc;
       } else {
         fhirObservation['valueString'] = genePrefix + candidateGenes[j];
+      }
+      // What testing found for this gene, if anything (model/geneResults): standard LOINC components;
+      // the value stays the gene, so a reader that ignores components reads it as before.
+      const geneResults = nodeProperties['geneResults'] || {};
+      const components = geneResultComponents(Object.prototype.hasOwnProperty.call(geneResults, candidateGenes[j]) ? geneResults[candidateGenes[j]] : null);
+      if (components.length > 0) {
+        fhirObservation['component'] = components;
       }
       observationsForRef.push(fhirObservation);
     }

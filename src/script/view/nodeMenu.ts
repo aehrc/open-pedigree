@@ -27,6 +27,8 @@ import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
 import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { isBlankValue } from 'pedigree/model/helpers';
+import { GENE_RESULT_CHOICES } from 'pedigree/model/geneResults';
+import { LOADING_NAME } from 'pedigree/terminology/loadingName';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -1198,9 +1200,74 @@ export default class NodeMenu {
         // codings; none (not the last person's) if not a list
         var ids = (Array.isArray(values) ? values : []).filter(function(v: any) { return v && v.code; }).map(function(v: any) { return v.code; });
         refillLegendPicker(container, (target[0] as any).selectize, legend, ids, true);
+        // (the built-in Genes field: a result for each gene, under the picker)
+        if (linkId === 'candidate_genes') {
+          this._renderGeneResults(container);
+        }
       }
     }
   };
+
+  /**
+   * Under the Genes picker, a row per selected gene - its name and a result drop-down (Not tested,
+   * Heterozygous, ...: model/geneResults). Redrawn whenever the field is, so it follows the genes
+   * added or removed; a change is one setGeneResults step.
+   */
+  _renderGeneResults(container: any): void {
+    var box = container.querySelector('.gene-results');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'gene-results';
+      container.appendChild(box);
+    }
+    box.textContent = '';
+    var node = this.targetNode;
+    if (!node || typeof node.getGeneResults !== 'function') {
+      return;
+    }
+    var _this = this;
+    var legend = editor.getGeneLegend();
+    var results = node.getGeneResults();
+    node.getGenes().forEach(function(id: any) {
+      var gene = legend.desanitizeID(id);
+      var term = legend.getTerm(id);
+      var name = term && term.getName && term.getName() && term.getName() !== LOADING_NAME ? term.getName() : gene;
+      var row = document.createElement('div');
+      row.className = 'gene-result';
+      row.dataset.gene = gene;
+      var label = document.createElement('span');
+      label.className = 'gene-result-name';
+      label.textContent = name;
+      var select = document.createElement('select');
+      select.className = 'gene-result-value';
+      select.setAttribute('aria-label', 'Result for ' + name);
+      GENE_RESULT_CHOICES.forEach(function(choice) {
+        var option = document.createElement('option');
+        option.value = choice.code;
+        option.textContent = choice.label;
+        select.appendChild(option);
+      });
+      select.value = results.hasOwnProperty(gene) ? results[gene] : '';
+      select.addEventListener('change', function() {
+        if (_this._updating || !_this.targetNode) {
+          return;
+        }
+        var updated = _this.targetNode.getGeneResults();
+        if (select.value) {
+          updated[gene] = select.value;
+        } else {
+          delete updated[gene];
+        }
+        _this._startNewUndoStep();
+        document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+          detail: { 'nodeID': _this.targetNode.getID(), 'properties': { 'setGeneResults': updated } }
+        }));
+      });
+      row.appendChild(label);
+      row.appendChild(select);
+      box.appendChild(row);
+    });
+  }
 
   _toggleFieldVisibility(container: any, doHide: any): any {
     if (doHide) {
