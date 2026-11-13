@@ -392,7 +392,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     gg[0].prop.isAdopted = true;
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
     const john = patients(exported).find((p) => p.name && p.name[0].given[0] === 'John');
-    expect(john.extension).toContainEqual({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    expect(john.extension).toContainEqual({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueCode: 'in' });
     expect(exported).not.toContain('KIN:022');
 
     const graph = GA4GHFHIRConverter.initFromFHIR(exported);
@@ -400,6 +400,61 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     expect(read.isAdopted).toBe(true);
     // and only John: the others aren't adopted
     expect(Object.values(graph.properties).filter((p) => p.isAdopted).map((p) => p.fName)).toEqual(['John']);
+  });
+
+  it('reads neither the adoption nor a fetus date of death under the URLs used before 2.0.0, and says so', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const retired = exported
+      .replace('https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted')
+      .replace('"valueCode":"in"', '"valueBoolean":true');
+    expect(retired).toContain('https://github.com/aehrc/open-pedigree/StructureDefinition/adopted');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const graph = GA4GHFHIRConverter.initFromFHIR(retired);
+      expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain('Ignoring https://github.com/aehrc/open-pedigree/StructureDefinition/adopted: '
+        + 'open-pedigree no longer reads it (now https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted, '
+        + 'with valueCode "in" instead of valueBoolean true)');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns about a retired extension once per import, however many people carry it', () => {
+    const gg = structuredClone(simpleGG);
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const bundle = JSON.parse(exported);
+    // (a published name under the retired base, on every person)
+    const url = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+    let people = 0;
+    for (const entry of bundle.entry) {
+      if (entry.resource.resourceType === 'Patient') {
+        people++;
+        entry.resource.extension = (entry.resource.extension || []).concat([{ url, valueString: '{}' }]);
+      }
+    }
+    expect(people).toBeGreaterThan(1);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+      // (two imports, one warning each)
+      const expected = 'Ignoring ' + url + ': open-pedigree no longer reads it (now '
+        + 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-snapshot)';
+      expect(warn.mock.calls.filter((c) => String(c[0]) === expected).length).toBe(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('exports none of its own URLs under the retired base', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).not.toMatch(/github\.com\/aehrc\/open-pedigree\/(StructureDefinition|Questionnaire|questionnaire-)/);
+    expect(exported).toContain('https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted');
   });
 
   it('writes no adopted extension for someone who isn\'t adopted', () => {
@@ -441,7 +496,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     gg[4].prop.fName = 'Kid';
     const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
     const patient = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === who);
-    patient.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean });
+    patient.extension.push({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueBoolean });
     return GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
   };
 
@@ -458,7 +513,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     gg[0].prop.lifeStatus = 'stillborn';
     const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
     const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
-    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    john.extension.push({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueBoolean: true });
     const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
     expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
   });
@@ -470,7 +525,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     const resources = exported.entry.map((e) => e.resource);
     const ref = (name) => resources.find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === name).id;
     const kid = ref('Kid');
-    resources.find((r) => r.id === kid).extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted', valueBoolean: true });
+    resources.find((r) => r.id === kid).extension.push({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueBoolean: true });
     // without Jane: only John is placed
     const jane = ref('Jane');
     exported.entry = exported.entry.filter((e) => !JSON.stringify(e.resource).includes(jane)
@@ -495,7 +550,7 @@ describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
     gg[0].prop.lifeStatus = 'alive';
     const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
     const john = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'John');
-    john.extension.push({ url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death', valueDate: '2020-03-04' });
+    john.extension.push({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/fetus-date-of-death', valueDate: '2020-03-04' });
     const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
     const read = Object.values(graph.properties).find((p) => p.fName === 'John');
     expect(read.dod).toBeUndefined();

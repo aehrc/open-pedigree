@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "linked-record-ref",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-ref",
+  "name": "LinkedRecordRef",
+  "title": "Linked record reference",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "A pedigree person's link to a record in the host application, on their Patient in a GA4GH pedigree, as an opaque string the host's record-link provider understands. redcap_pedigree_editor writes `record:<record id>/instance:<n>`, a row of a repeating instrument.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Patient"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Linked record reference",
+        "definition": "A pedigree person's link to a record in the host application, on their Patient in a GA4GH pedigree, as an opaque string the host's record-link provider understands. redcap_pedigree_editor writes `record:<record id>/instance:<n>`, a row of a repeating instrument."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-ref"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  }
+}

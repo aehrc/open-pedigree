@@ -37,6 +37,8 @@ jobs:
           mkdir _site
           cp localEditor.html _site/index.html
           cp -r dist _site/dist
+          # open-pedigree's FHIR definitions, at their canonical URLs (fhirUrls.ts, fhir/)
+          node scripts/build-fhir-site.js _site/fhir
 
       - uses: actions/configure-pages@v4
 
@@ -46,3 +48,25 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deployment
+
+      # The definitions' canonical URLs are written into saved pedigrees: fail the run if any built
+      # definition doesn't resolve once deployed (its page and its JSON). Pages can take a moment.
+      - name: Check the FHIR definitions resolve
+        run: |
+          base=https://aehrc.github.io/open-pedigree/fhir
+          check() {
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -s -L -o /dev/null -w '%{http_code}' "$1")
+              [ "$code" = 200 ] && { echo "200 $1"; return 0; }
+              [ "$attempt" = 6 ] || sleep 10
+            done
+            echo "$code $1"; return 1
+          }
+          check "$base/" || exit 1
+          pages=$(cd _site/fhir && find . -mindepth 3 -name index.html | sed 's|^\./||; s|/index.html$||' | sort)
+          # every definition in fhir/, and the default Questionnaire, was built
+          expected=$(( $(find fhir -mindepth 2 -maxdepth 2 -type f -name '*.json' | wc -l) + 1 ))
+          [ "$(echo "$pages" | grep -c .)" = "$expected" ] || { echo "built $(echo "$pages" | grep -c .) definitions, expected $expected"; exit 1; }
+          for page in $pages; do
+            check "$base/$page" && check "$base/$page.json" || exit 1
+          done

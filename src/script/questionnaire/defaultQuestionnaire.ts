@@ -1,3 +1,4 @@
+import { DEFAULT_QUESTIONNAIRE_URL } from 'pedigree/fhirUrls';
 import { MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, MAPS_TO_FIELD_DEFINITIONS } from 'pedigree/questionnaire/questionnaireParser';
 
 const ITEM_CONTROL_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl';
@@ -38,7 +39,7 @@ function predicateCondition(predicate: string, negate?: boolean): any {
  */
 export const DEFAULT_QUESTIONNAIRE: any = {
   resourceType: 'Questionnaire',
-  url: 'https://github.com/aehrc/open-pedigree/Questionnaire/default',
+  url: DEFAULT_QUESTIONNAIRE_URL,
   version: '1.0',
   title: 'Open Pedigree default node-edit form',
   status: 'active',

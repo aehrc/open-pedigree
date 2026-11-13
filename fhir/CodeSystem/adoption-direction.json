@@ -1,0 +1,25 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "adoption-direction",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/CodeSystem/adoption-direction",
+  "name": "AdoptionDirection",
+  "title": "Adoption direction",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "Which way a person was adopted, as the `adopted` extension records it.",
+  "caseSensitive": true,
+  "valueSet": "https://aehrc.github.io/open-pedigree/fhir/ValueSet/adoption-direction",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "in",
+      "display": "Adopted in",
+      "definition": "Adopted into this family."
+    },
+    {
+      "code": "out",
+      "display": "Adopted out",
+      "definition": "Adopted away from this family."
+    }
+  ]
+}

@@ -17,4 +17,6 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+      # (the FHIR definitions the Pages deploy publishes still build)
+      - run: node scripts/build-fhir-site.js "$RUNNER_TEMP/fhir-site"
       - run: npm test

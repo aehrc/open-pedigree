@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "questionnaire-field-mapping",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping",
+  "name": "QuestionnaireFieldMapping",
+  "title": "Questionnaire field mapping",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "How a Questionnaire item's answer maps onto a pedigree person: `mapsToField`; `mapsToCondition`; `mapsToObservation`; `mapsToLegendCondition`; `mapsToLegendObservation`; `invokesAction`. `mapsToField` binds the item to a person property named by item.definition (a Patient element, or a PedigreeIndividual element); `mapsToCondition`/`mapsToObservation` make a Condition/Observation with item.code; the legend kinds make a repeating, terminology-backed, colour-legend item; `invokesAction` makes a button (see questionnaire-action).",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Questionnaire.item"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Questionnaire field mapping",
+        "definition": "How a Questionnaire item's answer maps onto a pedigree person: `mapsToField`; `mapsToCondition`; `mapsToObservation`; `mapsToLegendCondition`; `mapsToLegendObservation`; `invokesAction`. `mapsToField` binds the item to a person property named by item.definition (a Patient element, or a PedigreeIndividual element); `mapsToCondition`/`mapsToObservation` make a Condition/Observation with item.code; the legend kinds make a repeating, terminology-backed, colour-legend item; `invokesAction` makes a button (see questionnaire-action)."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      }
+    ]
+  }
+}

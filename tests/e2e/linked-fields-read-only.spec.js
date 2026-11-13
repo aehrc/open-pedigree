@@ -6,8 +6,8 @@ import { retireAutoCreatedEditor } from './helpers/singleEditor';
 // draws must honour that, not just text/number/checkbox; and the same kind of field, not linked,
 // stays editable.
 
-const LINKED = { url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' };
-const LEGEND = (kind) => ({ url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: kind });
+const LINKED = { url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' };
+const LEGEND = (kind) => ({ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping', valueCode: kind });
 const RADIO = {
   url: 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl',
   valueCodeableConcept: { coding: [{ system: 'http://hl7.org/fhir/questionnaire-item-control', code: 'radio-button' }] },

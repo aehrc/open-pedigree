@@ -5,7 +5,7 @@ import { retireAutoCreatedEditor } from './helpers/singleEditor';
 // editor, and the node form shows an option as chosen only when it's the answer
 // (pedigree-editor-choice-defaults; play-test follow-ups 5 and 7).
 
-const FIELD_MAPPING = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
+const FIELD_MAPPING = 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping';
 const CARRIER_DEFINITION = 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus';
 
 // The default form plus an "Extra" tab: a drop-down mapped to carrier status with no "not affected"
@@ -61,7 +61,7 @@ async function loadEditor(page, { mappedDefault = false } = {}) {
             answerOption: [option('childless', 'Childless'), option('infertile', 'Infertile'), option('0', 'No')] },
           // shown only for a fetus, with a default
           { linkId: 'fetal_note', type: 'choice', text: 'Fetal note',
-            enableWhen: [{ extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate', valueCode: 'isFetus' }] }],
+            enableWhen: [{ extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-enable-predicate', valueCode: 'isFetus' }] }],
             answerOption: [option('p', 'P', true), option('q', 'Q')] },
           { linkId: 'heredity_numbered', type: 'choice', text: 'Heredity (numbered)',
             definition: 'http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual#PedigreeIndividual.childlessStatus',

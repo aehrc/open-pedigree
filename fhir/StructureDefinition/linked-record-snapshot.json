@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "linked-record-snapshot",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-snapshot",
+  "name": "LinkedRecordSnapshot",
+  "title": "Linked record snapshot",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "What the linked record sent at the person's last refresh, on their Patient in a GA4GH pedigree, as a JSON string. Application bookkeeping, not clinical data: it lets the next refresh tell what changed in the record since.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Patient"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Linked record snapshot",
+        "definition": "What the linked record sent at the person's last refresh, on their Patient in a GA4GH pedigree, as a JSON string. Application bookkeeping, not clinical data: it lets the next refresh tell what changed in the record since."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-snapshot"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  }
+}

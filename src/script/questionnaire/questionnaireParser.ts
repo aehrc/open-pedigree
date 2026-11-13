@@ -1,6 +1,9 @@
-export const MAPPING_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
-export const PREDICATE_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate';
-export const ACTION_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-action';
+import {
+  MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL,
+  PEDIGREE_INDIVIDUAL_URL, RETIRED_BASE, replacementFor,
+} from 'pedigree/fhirUrls';
+
+export { MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL };
 export const SUPPORTED_ACTIONS = ['linkPatient', 'importClinicalData', 'linkRecord', 'createNewRecord', 'editRecord'];
 
 // The three built-in record-link-provider actions (see record-link-provider design D1/D2) -
@@ -13,7 +16,6 @@ export const RECORD_LINK_ACTIONS = ['linkRecord', 'createNewRecord', 'editRecord
 // host-application-specific "data source" extension (e.g. redcap_pedigree_editor's own
 // questionnaire-redcap-source), since it carries no information about *where* the data comes
 // from, only that it does, and is meaningful with no recordLinkProvider configured at all.
-export const LINKED_RECORD_SOURCE_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source';
 
 // Reserved tab (see record-link-provider design D6) that linked-record-sourced items are
 // regrouped onto regardless of their authored tab/group, and that pedigree.ts's
@@ -30,7 +32,7 @@ export const LINKED_RECORD_TAB = { key: '__linked_record__', label: 'Linked Reco
 // (see https://hl7.org/fhir/R4/questionnaire-definitions.html#Questionnaire.item.definition),
 // so this documents our own model's shape rather than misrepresenting these as Patient elements.
 const PATIENT_SD = 'http://hl7.org/fhir/StructureDefinition/Patient';
-const PEDIGREE_INDIVIDUAL_SD = 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual';
+
 
 // Keyed by the terminal (last '.') segment of the item.definition fragment - e.g.
 // ".../Patient#Patient.name.given" matches on "given" - so it doesn't matter whether an
@@ -72,15 +74,15 @@ export const MAPS_TO_FIELD_DEFINITIONS: any = {
   'identifier':       PATIENT_SD + '#Patient.identifier',
   'birthDate':        PATIENT_SD + '#Patient.birthDate',
   'deceasedDateTime': PATIENT_SD + '#Patient.deceasedDateTime',
-  'lifeStatus':       PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.lifeStatus',
-  'gestationAge':     PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.gestationAge',
-  'carrierStatus':    PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.carrierStatus',
-  'comments':         PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.comments',
-  'childlessStatus':  PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.childlessStatus',
-  'isAdopted':        PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.isAdopted',
-  'monozygotic':      PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.monozygotic',
-  'evaluated':        PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.evaluated',
-  'lostContact':      PEDIGREE_INDIVIDUAL_SD + '#PedigreeIndividual.lostContact'
+  'lifeStatus':       PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.lifeStatus',
+  'gestationAge':     PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.gestationAge',
+  'carrierStatus':    PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.carrierStatus',
+  'comments':         PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.comments',
+  'childlessStatus':  PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.childlessStatus',
+  'isAdopted':        PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.isAdopted',
+  'monozygotic':      PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.monozygotic',
+  'evaluated':        PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.evaluated',
+  'lostContact':      PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.lostContact'
 };
 
 const SUPPORTED_ITEM_TYPES = ['string', 'text', 'boolean', 'date', 'integer', 'decimal', 'choice', 'open-choice', 'group'];
@@ -383,7 +385,35 @@ function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
   }
 }
 
+// The extensions this parser reads; one of these under its pre-2.0.0 URL would otherwise be
+// silently ignored. (Others, e.g. a host's own questionnaire-redcap-source, aren't read here.)
+const READ_EXTENSIONS = [MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL];
+
+// Throws when the Questionnaire uses one of the extensions this parser reads under the URL it had
+// before 2.0.0 (no longer read): naming it and its replacement, rather than quietly losing the
+// item's mapping.
+function refuseRetiredExtensions(node: any): void {
+  if (Array.isArray(node)) {
+    node.forEach(refuseRetiredExtensions);
+    return;
+  }
+  if (!node || typeof node !== 'object') {
+    return;
+  }
+  const replacement = typeof node.url === 'string' && node.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(node.url) : null;
+  // (compared without any |version, which a canonical may carry)
+  if (replacement && READ_EXTENSIONS.indexOf(replacement.split('|')[0]) !== -1) {
+    throw new Error('The Questionnaire uses ' + node.url + ', which open-pedigree no longer reads: use ' + replacement + ' instead.');
+  }
+  for (const key in node) {
+    if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'url') {
+      refuseRetiredExtensions(node[key]);
+    }
+  }
+}
+
 export function parseQuestionnaire(questionnaire: any): any {
+  refuseRetiredExtensions(questionnaire.item || []);
   const items: any[] = [];
   const tabs: any[] = [];
   walkTopLevelItems(questionnaire.item || [], items, tabs);

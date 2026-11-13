@@ -1,6 +1,6 @@
 {
   "resourceType": "Questionnaire",
-  "url": "https://github.com/aehrc/open-pedigree/Questionnaire/current-forms",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/current-forms",
   "version": "1.0",
   "title": "Open Pedigree current form fields (mapsToField reference)",
   "status": "active",
@@ -16,42 +16,42 @@
         { "valueString": "U" }
       ],
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.gender",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "first_name",
       "type": "string",
       "text": "First name",
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.given",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "last_name",
       "type": "string",
       "text": "Last name",
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.family",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "external_id",
       "type": "string",
       "text": "Identifier",
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.identifier",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "date_of_birth",
       "type": "date",
       "text": "Date of birth",
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.birthDate",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "date_of_death",
       "type": "date",
       "text": "Date of death",
       "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.deceasedDateTime",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "life_status",
@@ -65,15 +65,15 @@
         { "valueString": "miscarriage" },
         { "valueString": "unborn" }
       ],
-      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus",
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "gestation_age",
       "type": "integer",
       "text": "Gestation age (weeks)",
-      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.gestationAge",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.gestationAge",
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "carrier_status",
@@ -83,15 +83,15 @@
         { "valueString": "carrier" },
         { "valueString": "presymptomatic" }
       ],
-      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     },
     {
       "linkId": "comments",
       "type": "text",
       "text": "Comments",
-      "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
-      "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+      "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
+      "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
     }
   ]
 }
