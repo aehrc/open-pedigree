@@ -76,6 +76,15 @@ describe('open-pedigree FHIR URLs', () => {
       + FHIR_BASE + 'StructureDefinition/questionnaire-field-mapping instead.');
   });
 
+  it('a retired extension URL with a |version is refused too', () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{ linkId: 'tab', type: 'group', text: 'Tab', item: [{ linkId: 'note', type: 'string', text: 'Note',
+        extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping|1.0', valueCode: 'mapsToField' }] }] }],
+    };
+    expect(() => parseQuestionnaire(questionnaire)).toThrow('no longer reads');
+  });
+
   it('a Questionnaire on the published URLs, or linking the repository, parses', () => {
     const questionnaire = {
       resourceType: 'Questionnaire',

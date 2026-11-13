@@ -401,7 +401,8 @@ function refuseRetiredExtensions(node: any): void {
     return;
   }
   const replacement = typeof node.url === 'string' && node.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(node.url) : null;
-  if (replacement && READ_EXTENSIONS.indexOf(replacement) !== -1) {
+  // (compared without any |version, which a canonical may carry)
+  if (replacement && READ_EXTENSIONS.indexOf(replacement.split('|')[0]) !== -1) {
     throw new Error('The Questionnaire uses ' + node.url + ', which open-pedigree no longer reads: use ' + replacement + ' instead.');
   }
   for (const key in node) {

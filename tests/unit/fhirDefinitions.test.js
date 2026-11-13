@@ -8,7 +8,8 @@ import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnai
 // shape checks only, not full FHIR validation.
 const FHIR_DIR = path.resolve(import.meta.dirname, '../../fhir');
 
-const definitions = fs.readdirSync(FHIR_DIR).flatMap((type) => fs.readdirSync(path.join(FHIR_DIR, type))
+const definitions = fs.readdirSync(FHIR_DIR).filter((type) => fs.statSync(path.join(FHIR_DIR, type)).isDirectory())
+  .flatMap((type) => fs.readdirSync(path.join(FHIR_DIR, type))
   .filter((file) => file.endsWith('.json'))
   .map((file) => ({ type, id: file.slice(0, -5), resource: JSON.parse(fs.readFileSync(path.join(FHIR_DIR, type, file), 'utf8')) })));
 

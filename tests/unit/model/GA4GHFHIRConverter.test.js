@@ -415,7 +415,8 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
       const graph = GA4GHFHIRConverter.initFromFHIR(retired);
       expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
       expect(warn.mock.calls.map((c) => String(c[0]))).toContain('Ignoring https://github.com/aehrc/open-pedigree/StructureDefinition/adopted: '
-        + 'open-pedigree no longer reads it (now https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted)');
+        + 'open-pedigree no longer reads it (now https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted, '
+        + 'with valueCode "in" instead of valueBoolean true)');
     } finally {
       warn.mockRestore();
     }

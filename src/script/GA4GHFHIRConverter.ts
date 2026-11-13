@@ -928,7 +928,8 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     const replacement = ext && typeof ext.url === 'string' && ext.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(ext.url) : null;
     if (replacement && !warnedRetired.has(ext.url)) {
       warnedRetired.add(ext.url);
-      console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacement + ')');
+      console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacement
+        + (replacement === ADOPTED_EXTENSION_URL ? ', with valueCode "in" instead of valueBoolean true' : '') + ')');
     }
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;

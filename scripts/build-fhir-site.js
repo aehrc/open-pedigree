@@ -54,7 +54,7 @@ function details(resource) {
         + (value.fixedBoolean !== undefined ? ' (always <code>' + value.fixedBoolean + '</code>)' : '')]);
     }
     if (subs.length) {
-      rows.push(['Parts', subs.map((s) => '<code>' + escapeHtml(s.sliceName) + '</code>: ' + escapeHtml(s.definition)).join('<br>')]);
+      rows.push(['Parts', subs.map((s) => '<code>' + escapeHtml(s.sliceName) + '</code>: ' + describe(s.definition)).join('<br>')]);
     }
     return rows;
   }
@@ -87,9 +87,13 @@ ${resource.description ? '<p>' + describe(resource.description) + '</p>' : ''}
 function definitions() {
   const out = [];
   const fhirDir = path.join(ROOT, 'fhir');
+  // fhir/<Type>/<id>.json only: other files (a README) and deeper folders aren't definitions.
   for (const type of fs.readdirSync(fhirDir).sort()) {
+    if (!fs.statSync(path.join(fhirDir, type)).isDirectory()) {
+      continue;
+    }
     for (const file of fs.readdirSync(path.join(fhirDir, type)).sort()) {
-      if (file.endsWith('.json')) {
+      if (file.endsWith('.json') && fs.statSync(path.join(fhirDir, type, file)).isFile()) {
         out.push({ type, id: file.slice(0, -5), resource: JSON.parse(fs.readFileSync(path.join(fhirDir, type, file), 'utf8')) });
       }
     }
