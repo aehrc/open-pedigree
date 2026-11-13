@@ -35,12 +35,13 @@ function generateUUID() {
 
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
-const FETUS_DATE_OF_DEATH_EXTENSION = FETUS_DATE_OF_DEATH_EXTENSION_URL;
+// Retired extension URLs already warned about (see extractDataFromPatient).
+const warnedRetired = new Set<string>();
 // An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
 // are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
 // to carry it (redcap_pedigree_editor#7).
-// Its value is a code, in (adopted into this family) or out (adopted away from it; not written yet).
-const ADOPTED_EXTENSION = ADOPTED_EXTENSION_URL;
+// ADOPTED_EXTENSION_URL's value is a code: in (adopted into this family) or out (adopted away from
+// it; not written yet).
 
 var GA4GHFHIRConverter = function () {
 };
@@ -276,7 +277,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     }
     let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
     let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
-    // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION): with any parent relationship
+    // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION_URL): with any parent relationship
     // in the file (placed or not), those codes say whether the person is adopted, and the extension
     // is left alone.
     if (nextPerson.adoptedWithoutParents && (nextPerson.parentClaims || []).length === 0 && !fetus && newG.properties[personID]) {
@@ -920,9 +921,12 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     properties.linkedPatientRef = 'Patient/' + rawId;
   }
   for (const ext of (patientResource.extension || [])) {
-    // An extension under the URL open-pedigree used before 2.0.0 isn't read (as any unknown one).
-    if (ext && typeof ext.url === 'string' && ext.url.indexOf(RETIRED_BASE) === 0 && replacementFor(ext.url)) {
-      console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacementFor(ext.url) + ')');
+    // An extension under the URL open-pedigree used before 2.0.0 isn't read (as any unknown one);
+    // said once per URL, not once per person.
+    const replacement = ext && typeof ext.url === 'string' && ext.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(ext.url) : null;
+    if (replacement && !warnedRetired.has(ext.url)) {
+      warnedRetired.add(ext.url);
+      console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacement + ')');
     }
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;
@@ -1081,14 +1085,14 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   // A fetus's date of death (see the export), read only for a fetus: on anyone else it would make
   // them deceased.
   if (patientResource.extension && FETAL_STATUSES.indexOf((properties as any).lifeStatus) !== -1) {
-    const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION);
+    const fetusDod = patientResource.extension.find((ext: any) => ext.url === FETUS_DATE_OF_DEATH_EXTENSION_URL);
     const fetusDodSplit = fetusDod && typeof fetusDod.valueDate === 'string' ? dateTimeSplitter.exec(fetusDod.valueDate) : null;
     if (fetusDodSplit) {
       (properties as any).dod = (fetusDodSplit[5] || '01') + '/' + (fetusDodSplit[7] || '01') + '/' + fetusDodSplit[1];
     }
   }
   // Adopted, with no parents in the pedigree: applied once the person's parents are known (initFromFHIR)
-  const adopted = patientResource.extension && patientResource.extension.find((ext: any) => ext.url === ADOPTED_EXTENSION);
+  const adopted = patientResource.extension && patientResource.extension.find((ext: any) => ext.url === ADOPTED_EXTENSION_URL);
   if (adopted && adopted.valueCode === ADOPTED_IN) {
     (result as any).adoptedWithoutParents = true;
   }
@@ -1496,7 +1500,7 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   // (written whatever the privacy setting, as an adopted child's KIN:022 relationships are)
   if (pedigree.GG.isAdopted(index) && pedigree.GG.getParents(index).length === 0
     && FETAL_STATUSES.indexOf(nodeProperties.lifeStatus) === -1) {
-    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION, 'valueCode': ADOPTED_IN });
+    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION_URL, 'valueCode': ADOPTED_IN });
   }
 
 
@@ -1700,7 +1704,7 @@ GA4GHFHIRConverter.buildPedigreeIndividual = function (containedId, nodeProperti
   }
   );
   if (fetusDateOfDeath) {
-    patientResource.extension.push({ 'url': FETUS_DATE_OF_DEATH_EXTENSION, 'valueDate': fetusDateOfDeath });
+    patientResource.extension.push({ 'url': FETUS_DATE_OF_DEATH_EXTENSION_URL, 'valueDate': fetusDateOfDeath });
   }
 
   // twin groups are numbered from 0

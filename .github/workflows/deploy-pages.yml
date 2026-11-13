@@ -49,18 +49,20 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
 
-      # The definitions' canonical URLs are written into saved pedigrees: fail the run if one
-      # doesn't resolve once deployed (each page, and its JSON). Pages can take a moment to serve.
+      # The definitions' canonical URLs are written into saved pedigrees: fail the run if any built
+      # definition doesn't resolve once deployed (its page and its JSON). Pages can take a moment.
       - name: Check the FHIR definitions resolve
         run: |
           base=https://aehrc.github.io/open-pedigree/fhir
-          urls="$base/ $base/StructureDefinition/adopted $base/StructureDefinition/adopted.json $base/StructureDefinition/questionnaire-field-mapping $base/StructureDefinition/questionnaire-field-mapping.json $base/Questionnaire/default.json"
-          for url in $urls; do
+          check() {
             for attempt in 1 2 3 4 5 6; do
-              code=$(curl -s -L -o /dev/null -w '%{http_code}' "$url")
-              [ "$code" = 200 ] && break
-              sleep 10
+              code=$(curl -s -L -o /dev/null -w '%{http_code}' "$1")
+              [ "$code" = 200 ] && { echo "200 $1"; return 0; }
+              [ "$attempt" = 6 ] || sleep 10
             done
-            echo "$code $url"
-            [ "$code" = 200 ] || exit 1
+            echo "$code $1"; return 1
+          }
+          check "$base/"
+          for page in $(cd _site/fhir && find . -mindepth 3 -name index.html | sed 's|^\./||; s|/index.html$||' | sort); do
+            check "$base/$page" && check "$base/$page.json" || exit 1
           done

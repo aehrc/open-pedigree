@@ -18,9 +18,17 @@ function rewrite(text) {
       NEW.replace(/\//g, '\\/') + 'StructureDefinition\\/$1')
     .replace(/https:\\\/\\\/github\.com\\\/aehrc\\\/open-pedigree\\\/((?:StructureDefinition|Questionnaire)\\\/)/g,
       NEW.replace(/\//g, '\\/') + '$1');
-  // The adopted extension's value: true -> "in" (any quoting style, next to its url).
-  out = out.replace(/(StructureDefinition\\?\/adopted(?:&quot;|\\?")[^{}]{0,40}?)(?:&quot;|\\?")valueBoolean(?:&quot;|\\?")\s*:\s*true/g,
-    (m, head) => head + m.slice(head.length).replace(/valueBoolean((?:&quot;|\\?")\s*:\s*)true/, 'valueCode$1' + (m.includes('&quot;') ? '&quot;in&quot;' : m.includes('\\"') ? '\\"in\\"' : '"in"')));
+  // The adopted extension's value: true -> "in", in an object that names the adopted url, whichever
+  // order its keys are in, in any quoting style (plain, JSON-escaped, XML-escaped).
+  out = out.replace(/\{[^{}]*\}/g, (object) => {
+    if (!/StructureDefinition\\?\/adopted(?:&quot;|\\?")/.test(object)) {
+      return object;
+    }
+    return object.replace(/valueBoolean((?:&quot;|\\?")\s*:\s*)true/, (m, sep) => {
+      const quote = sep.startsWith('&quot;') ? '&quot;' : sep.startsWith('\\"') ? '\\"' : '"';
+      return 'valueCode' + sep + quote + 'in' + quote;
+    });
+  });
   return out;
 }
 
@@ -34,4 +42,4 @@ if (require.main === module) {
     }
   }
 }
-module.exports = { rewrite };
+module.exports = { rewrite, OLD, NEW };

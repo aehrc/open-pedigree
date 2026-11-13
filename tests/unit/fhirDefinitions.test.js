@@ -21,6 +21,12 @@ describe('published FHIR definitions', () => {
     expect(DEFAULT_QUESTIONNAIRE.url).toBe(DEFAULT_QUESTIONNAIRE_URL);
   });
 
+  it('every definition in fhir/ is one open-pedigree lists as published', () => {
+    for (const { resource } of definitions) {
+      expect(PUBLISHED_DEFINITION_URLS, resource.url).toContain(resource.url);
+    }
+  });
+
   it('each sits at the path its canonical URL names, and says what it is', () => {
     for (const { type, id, resource } of definitions) {
       expect(resource.resourceType, `${type}/${id}`).toBe(type);

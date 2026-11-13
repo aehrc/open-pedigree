@@ -24,6 +24,25 @@ describe('open-pedigree FHIR URLs', () => {
     expect(replacementFor('https://github.com/aehrc/open-pedigree?externalID')).toBeNull();
     expect(replacementFor('https://github.com/aehrc/open-pedigree')).toBeNull();
     expect(replacementFor('http://hl7.org/fhir/StructureDefinition/Patient')).toBeNull();
+    // (a name that was never published gets no made-up replacement)
+    expect(replacementFor('https://github.com/aehrc/open-pedigree/questionnaire-foo')).toBeNull();
+    expect(replacementFor('https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus'))
+      .toBe(FHIR_BASE + 'StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus');
+  });
+
+  it("a retired URL of an extension open-pedigree doesn't read (a host's own) doesn't reject the Questionnaire", () => {
+    const questionnaire = {
+      resourceType: 'Questionnaire',
+      item: [{
+        linkId: 'tab', type: 'group', text: 'Tab',
+        item: [{
+          linkId: 'note', type: 'string', text: 'Note',
+          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-redcap-source',
+            extension: [{ url: 'instrument', valueString: 'f' }, { url: 'field', valueString: 'x' }] }],
+        }],
+      }],
+    };
+    expect(() => parseQuestionnaire(questionnaire)).not.toThrow();
   });
 
   it('every published URL is under the published base', () => {

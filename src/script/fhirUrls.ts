@@ -46,16 +46,15 @@ export const PUBLISHED_DEFINITION_URLS = [
 // longer read; this says what replaced one, for error messages.
 export const RETIRED_BASE = 'https://github.com/aehrc/open-pedigree/';
 
+// The published URL that replaced a retired one, or null when it names nothing published
+// (the identifier systems, plain repository links, or a name that never existed).
 export function replacementFor(retiredUrl: string): string | null {
   if (typeof retiredUrl !== 'string' || retiredUrl.indexOf(RETIRED_BASE) !== 0) {
     return null;
   }
   const rest = retiredUrl.slice(RETIRED_BASE.length);
-  if (rest.indexOf('questionnaire-') === 0) {
-    return structureDefinition(rest);
-  }
-  if (rest.indexOf('StructureDefinition/') === 0 || rest.indexOf('Questionnaire/') === 0) {
-    return FHIR_BASE + rest;
-  }
-  return null;
+  const candidate = rest.indexOf('questionnaire-') === 0 ? structureDefinition(rest) : FHIR_BASE + rest;
+  // (an item.definition-style fragment, #PedigreeIndividual.x, keeps its fragment)
+  const hash = candidate.indexOf('#');
+  return PUBLISHED_DEFINITION_URLS.indexOf(hash === -1 ? candidate : candidate.slice(0, hash)) === -1 ? null : candidate;
 }

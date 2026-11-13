@@ -421,6 +421,30 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     }
   });
 
+  it('warns about a retired extension once, however many people carry it', () => {
+    const gg = structuredClone(simpleGG);
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const bundle = JSON.parse(exported);
+    // (a published name under the retired base, on every person)
+    const url = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+    let people = 0;
+    for (const entry of bundle.entry) {
+      if (entry.resource.resourceType === 'Patient') {
+        people++;
+        entry.resource.extension = (entry.resource.extension || []).concat([{ url, valueString: '{}' }]);
+      }
+    }
+    expect(people).toBeGreaterThan(1);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+      expect(warn.mock.calls.filter((c) => String(c[0]).includes(url)).length).toBeLessThanOrEqual(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('exports none of its own URLs under the retired base', () => {
     const gg = structuredClone(simpleGG);
     gg[0].prop.isAdopted = true;
