@@ -153,8 +153,12 @@ test('results round-trip through GA4GH FHIR, with the genes coded and their answ
   await resultSelect(page, '1100').selectOption('heterozygous');
   // (no name yet: the gene's ID)
   expect(await resultLine(page)).toBe(`1100 +/${MINUS}`);
+  await expect(page.locator('.menu-box .gene-result[data-gene="1100"] .gene-result-name')).toHaveText('1100');
   release();
   await expect.poll(() => resultLine(page)).toBe(`BRCA1 +/${MINUS}`);
+  // (and the open menu's row)
+  await expect(page.locator('.menu-box .gene-result[data-gene="1100"] .gene-result-name')).toHaveText('BRCA1');
+  await expect(resultSelect(page, '1100')).toHaveAttribute('aria-label', 'Result for BRCA1');
   await page.evaluate(() => window.editor.getNodeMenu().hide());
   await openMenu(page);
   await resultSelect(page, '11998').selectOption('negative');
@@ -172,4 +176,26 @@ test('results round-trip through GA4GH FHIR, with the genes coded and their answ
     JSON.stringify(saved));
   expect(await results(page)).toEqual({ 1100: 'heterozygous', 11998: 'negative' });
   await expect.poll(() => resultLine(page)).toBe(`BRCA1 +/${MINUS}\nTP53 ${MINUS}/${MINUS}`);
+});
+
+test('a result drop-down keeps the focus through a keyboard change, and is locked with the Genes field', async ({ page }) => {
+  await open(page);
+  await setGenes(page, ['BRCA1', 'TP53']);
+  await openMenu(page);
+  await resultSelect(page, 'TP53').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => results(page)).toEqual({ TP53: 'heterozygous' });
+  // (the menu was redrawn, and the same drop-down still has the focus)
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.closest('.gene-result')
+    && document.activeElement.closest('.gene-result').dataset.gene)).toBe('TP53');
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => results(page)).toEqual({ TP53: 'homozygous' });
+
+  // Locked with the genes (as a Questionnaire's disabledWhen or a linked record does).
+  await page.evaluate(() => {
+    const menu = window.editor.getNodeMenu();
+    menu._setFieldDisabled['questionnaire-legend-picker'].call(menu, document.querySelector('.menu-box .field-candidate_genes'), true);
+  });
+  await expect(resultSelect(page, 'BRCA1')).toBeDisabled();
+  await expect(resultSelect(page, 'TP53')).toBeDisabled();
 });

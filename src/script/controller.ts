@@ -168,8 +168,9 @@ export default class Controller {
         if (propertySetFunction == 'setDeathDate') {
           remember('setLifeStatus', node.getLifeStatus());
         }
-        // Dropping a gene drops its result: undo brings both back. (Recorded after setGenes, so
-        // undo restores the genes first and then their results.)
+        // Dropping a gene drops its result: undo brings both back. Remembered here, before the
+        // setters run (so before setGenes drops any result), and after setGenes in the memo's key
+        // order, so undo restores the genes first and then their results.
         if (propertySetFunction == 'setGenes' && node.getGeneResults) {
           remember('setGeneResults', node.getGeneResults());
         }

@@ -994,12 +994,14 @@ export default class Person extends AbstractPerson {
       function(ids: any[]) { _this._candidateGenes = ids; });
     if (changed) {
       this.getGraphics().updateDisorderShapes();
-      // (results follow the genes' order)
+    }
+    // (results follow the genes' order, which a reordering alone changes)
+    if (Object.keys(this._geneResults).length > 0) {
       this._updateGeneResultsLabel();
     }
   }
 
-  // (a placeholder's visuals draw no labels)
+  // (also for a placeholder, whose PlaceholderVisuals hides whatever it draws)
   _updateGeneResultsLabel(): void {
     var graphics = this.getGraphics();
     if (graphics && typeof graphics.updateGeneResultsLabel === 'function') {

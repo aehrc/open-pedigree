@@ -7,8 +7,7 @@ import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { getElementHalfHeight, sector } from 'pedigree/view/graphicHelpers';
 import getAge from 'pedigree/view/ageCalc';
 import { deidentifiedAgeLabel } from 'pedigree/model/ageBand';
-import { GENE_RESULT_MARKERS } from 'pedigree/model/geneResults';
-import { LOADING_NAME } from 'pedigree/terminology/loadingName';
+import { GENE_RESULT_MARKERS, geneDisplayName } from 'pedigree/model/geneResults';
 
 /**
  * Class for organizing graphics for Person nodes.
@@ -702,10 +701,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     for (var i = 0; i < genes.length; i++) {
       var gene = legend.desanitizeID(genes[i]);
       if (results.hasOwnProperty(gene)) {
-        var term = legend.getTerm(genes[i]);
         // (the gene's ID until its name has loaded: GeneLegend redraws this when it does)
-        var name = term && term.getName && term.getName() && term.getName() !== LOADING_NAME ? term.getName() : gene;
-        lines.push(name + ' ' + GENE_RESULT_MARKERS[results[gene]]);
+        lines.push(geneDisplayName(legend, genes[i]) + ' ' + GENE_RESULT_MARKERS[results[gene]]);
       }
     }
     if (lines.length > 0) {

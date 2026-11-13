@@ -27,8 +27,7 @@ import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
 import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { isBlankValue } from 'pedigree/model/helpers';
-import { GENE_RESULT_CHOICES } from 'pedigree/model/geneResults';
-import { LOADING_NAME } from 'pedigree/terminology/loadingName';
+import { GENE_RESULT_CHOICES, geneDisplayName } from 'pedigree/model/geneResults';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -1220,6 +1219,9 @@ export default class NodeMenu {
       box.className = 'gene-results';
       container.appendChild(box);
     }
+    // (rebuilt, but the drop-down being used keeps the focus: a keyboard change re-renders this)
+    var focused: any = document.activeElement;
+    var focusedGene = focused && box.contains(focused) && focused.parentNode ? focused.parentNode.dataset.gene : null;
     box.textContent = '';
     var node = this.targetNode;
     if (!node || typeof node.getGeneResults !== 'function') {
@@ -1228,10 +1230,12 @@ export default class NodeMenu {
     var _this = this;
     var legend = editor.getGeneLegend();
     var results = node.getGeneResults();
+    // (locked with the Genes picker: see _setFieldDisabled)
+    var picker = container.querySelector('select.suggest-questionnaire-legend');
+    var locked = !!(picker && picker.selectize && (picker.selectize.isDisabled || picker.selectize.isLocked));
     node.getGenes().forEach(function(id: any) {
       var gene = legend.desanitizeID(id);
-      var term = legend.getTerm(id);
-      var name = term && term.getName && term.getName() && term.getName() !== LOADING_NAME ? term.getName() : gene;
+      var name = geneDisplayName(legend, id);
       var row = document.createElement('div');
       row.className = 'gene-result';
       row.dataset.gene = gene;
@@ -1248,6 +1252,7 @@ export default class NodeMenu {
         select.appendChild(option);
       });
       select.value = results.hasOwnProperty(gene) ? results[gene] : '';
+      select.disabled = locked;
       select.addEventListener('change', function() {
         if (_this._updating || !_this.targetNode) {
           return;
@@ -1266,7 +1271,18 @@ export default class NodeMenu {
       row.appendChild(label);
       row.appendChild(select);
       box.appendChild(row);
+      if (gene === focusedGene) {
+        select.focus();
+      }
     });
+  }
+
+  // A gene's name has arrived (GeneLegend): the rows show it, if this menu is showing that gene.
+  refreshGeneResults(): void {
+    var container = this.menuBox && this.menuBox.querySelector('.field-candidate_genes');
+    if (container && this.targetNode && container.querySelector('.gene-results')) {
+      this._renderGeneResults(container);
+    }
   }
 
   _toggleFieldVisibility(container: any, doHide: any): any {
@@ -1443,6 +1459,10 @@ export default class NodeMenu {
     },
     'questionnaire-legend-picker' : function(this: any, container: any, disabled: any): any {
       this._setSelectizeDisabled(container, disabled);
+      // (a gene's result is locked with the genes)
+      Array.from(container.querySelectorAll('.gene-results select')).forEach(function(select: any) {
+        select.disabled = !!disabled;
+      });
     }
   };
 

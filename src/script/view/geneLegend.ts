@@ -25,6 +25,10 @@ export default class GeneLegend extends Legend {
         graphics.updateGeneResultsLabel();
       }
     });
+    var menu = editor.getNodeMenu && editor.getNodeMenu();
+    if (menu && typeof menu.refreshGeneResults === 'function') {
+      menu.refreshGeneResults();
+    }
   }
 
   /**

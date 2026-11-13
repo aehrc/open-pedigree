@@ -119,6 +119,14 @@ describe('Person gene results', () => {
     expect(geneLines().pop()).toBe('name BRCA1 +/−\nname TP53 −/−\nname MLH1 +/0\nname ATM +/+');
   });
 
+  it('redraws the lines in the new order when the genes are only reordered', () => {
+    const p = person(['BRCA1', 'TP53']);
+    p.setGeneResults({ BRCA1: 'heterozygous', TP53: 'homozygous' });
+    texts.length = 0;
+    p.setGenes(['TP53', 'BRCA1']);
+    expect(geneLines().pop()).toBe('name TP53 +/+\nname BRCA1 +/\u2212');
+  });
+
   it('draws no gene line without results', () => {
     const p = person(['BRCA1']);
     p.setGeneResults({});

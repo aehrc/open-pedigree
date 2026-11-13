@@ -782,4 +782,14 @@ describe('GA4GHFHIRConverter gene results', () => {
       warn.mockRestore();
     }
   });
+
+  it('reads a result on the older form of gene Observation, named by its id', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
+    brca1.id = 'x_gene_1';
+    brca1.valueString = 'BRCA1';
+    const read = Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).properties).find((p) => (p.candidateGenes || []).length);
+    expect(read.candidateGenes).toContain('BRCA1');
+    expect(read.geneResults).toEqual({ BRCA1: 'heterozygous' });
+  });
 });

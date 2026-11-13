@@ -770,8 +770,13 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   if (cc) {
     const helper = editor.getFhirTerminologyHelper();
     gene = helper.getGeneFromCodeableConcept(cc, true) || helper.getGeneFromCodeableConcept(cc, false);
-  } else if (typeof observationResource.valueString === 'string' && observationResource.valueString.startsWith('gene: ')) {
-    gene = observationResource.valueString.substring('gene: '.length);
+  } else if (typeof observationResource.valueString === 'string') {
+    if (observationResource.valueString.startsWith('gene: ')) {
+      gene = observationResource.valueString.substring('gene: '.length);
+    } else if (typeof observationResource.id === 'string' && observationResource.id.includes('_gene_')) {
+      // (an older form, read as a gene below by its id)
+      gene = observationResource.valueString;
+    }
   }
   if (gene) {
     (nodeData.properties.geneResults = nodeData.properties.geneResults || {})[gene] = result;
