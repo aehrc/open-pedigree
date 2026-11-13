@@ -184,12 +184,12 @@ test('a result drop-down keeps the focus through a keyboard change, and is locke
   await openMenu(page);
   await resultSelect(page, 'TP53').focus();
   await page.keyboard.press('ArrowDown');
-  await expect.poll(() => results(page)).toEqual({ TP53: 'positive' });
+  await expect.poll(() => results(page)).toEqual({ TP53: 'heterozygous' });
   // (the menu was redrawn, and the same drop-down still has the focus)
   expect(await page.evaluate(() => document.activeElement && document.activeElement.closest('.gene-result')
     && document.activeElement.closest('.gene-result').dataset.gene)).toBe('TP53');
   await page.keyboard.press('ArrowDown');
-  await expect.poll(() => results(page)).toEqual({ TP53: 'heterozygous' });
+  await expect.poll(() => results(page)).toEqual({ TP53: 'homozygous' });
 
   // Locked with the genes (as a Questionnaire's disabledWhen or a linked record does).
   await page.evaluate(() => {

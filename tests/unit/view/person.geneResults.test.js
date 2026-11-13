@@ -128,6 +128,13 @@ describe('Person gene results', () => {
     expect(geneLines().pop()).toBe('name TP53 +/+\nname BRCA1 +/\u2212');
   });
 
+  it('draws the mitochondrial states in words', () => {
+    const p = person(['MT-ND4', 'MT-ATP6']);
+    texts.length = 0;
+    p.setGeneResults({ 'MT-ND4': 'heteroplasmic', 'MT-ATP6': 'homoplasmic' });
+    expect(texts.pop()).toBe('name MT-ND4 + (heteroplasmic)\nname MT-ATP6 + (homoplasmic)');
+  });
+
   it('draws no gene line without results', () => {
     const p = person(['BRCA1']);
     p.setGeneResults({});

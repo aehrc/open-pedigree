@@ -165,10 +165,12 @@ Each gene in a person's **Genes** list can have a result: what testing found. In
 | Result | Drawn as |
 | --- | --- |
 | Not tested (the default) | nothing |
-| Positive, zygosity unknown | `BRCA1 +` |
 | Heterozygous | `BRCA1 +/−` |
 | Homozygous | `BRCA1 +/+` |
 | Hemizygous (e.g. an X-linked gene in a male) | `BRCA1 +/0` |
+| Heteroplasmic (mitochondrial) | `MT-ND4 + (heteroplasmic)` |
+| Homoplasmic (mitochondrial) | `MT-ND4 + (homoplasmic)` |
+| Positive, zygosity unknown | `BRCA1 +` |
 | Negative | `BRCA1 −/−` |
 
 Each tested gene is a line under the symbol, after the external ID and before the comments, in the Genes list's order. The de-identified exports keep these lines, as they keep the genes. Removing a gene removes its result, and a change of result is one undo step.
@@ -176,9 +178,9 @@ Each tested gene is a line under the symbol, after the external ID and before th
 Results are saved as the property `geneResults` (`{ "BRCA1": "heterozygous" }`, keyed like `candidateGenes`). In GA4GH FHIR, the gene's own `Observation` carries them as `component`s, using the LOINC codes of the HL7 Genomics Reporting pattern:
 
 - `69548-6` *Genetic variant assessment*: `LA9633-4` *Present* or `LA9634-2` *Absent* (negative);
-- `53034-5` *Allelic state*, when present and known: `LA6706-1` *Heterozygous*, `LA6705-3` *Homozygous* or `LA6707-9` *Hemizygous*.
+- `53034-5` *Allelic state*, when present and known: `LA6706-1` *Heterozygous*, `LA6705-3` *Homozygous*, `LA6707-9` *Hemizygous*, `LA6703-8` *Heteroplasmic* or `LA6704-6` *Homoplasmic* - every state LOINC lists.
 
-On import, a variant marked *Present* with no allelic state, or with one the editor doesn't list (e.g. *Heteroplasmic* or *Homoplasmic*, for mitochondrial genes), is read as *Positive* - a found variant is never dropped - and the console says which state wasn't kept.
+On import, a variant marked *Present* with no allelic state reads as *Positive*. So does one whose allelic state can't be read (coded outside LOINC, or given only as text): a found variant is never dropped, and the console says what the state was.
 
 The Observation's value is still the gene, so a reader that ignores components reads the genes as before. PED, PEDX, DADA2 and BOADICEA have nowhere to put a result.
 

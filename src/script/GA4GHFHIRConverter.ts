@@ -758,8 +758,8 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   if (!Array.isArray(observationResource.component) || observationResource.code) {
     return;
   }
-  const result = geneResultFromComponents(observationResource.component, (state) => console.warn('Read gene result '
-    + (observationResource.id || '') + ' as positive: allelic state ' + state + ' is not one the editor keeps'));
+  let unreadState: string | null = null;
+  const result = geneResultFromComponents(observationResource.component, (state) => { unreadState = state; });
   if (!result) {
     if (observationResource.component.length > 0) {
       console.warn('Ignoring an unreadable gene result on ' + (observationResource.id || 'an Observation'));
@@ -782,6 +782,11 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   }
   if (gene) {
     (nodeData.properties.geneResults = nodeData.properties.geneResults || {})[gene] = result;
+    // (said once it's known to be a gene's)
+    if (unreadState) {
+      console.warn('Read the result for gene ' + gene + ' (' + (observationResource.id || 'an Observation')
+        + ') as positive: its allelic state (' + unreadState + ') is not one the editor can read');
+    }
   }
 }
 

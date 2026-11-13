@@ -777,15 +777,37 @@ describe('GA4GHFHIRConverter gene results', () => {
     expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'positive' });
   });
 
-  it('never loses a found variant: an allelic state it does not keep reads as positive, and says so', () => {
+  it('keeps the mitochondrial allelic states, heteroplasmic and homoplasmic', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heteroplasmic', TP53: 'homoplasmic' }) }, 'all', null, null));
+    const byGene = Object.fromEntries(geneObservations(bundle).map((o) => [o.valueString.slice('gene: '.length), o]));
+    expect(byGene.BRCA1.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6703-8')]);
+    expect(byGene.TP53.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6704-6')]);
+    expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'heteroplasmic', TP53: 'homoplasmic' });
+  });
+
+  it('never loses a found variant: an allelic state it cannot read reads as positive, and says what it was', () => {
     const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
     const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
-    // (heteroplasmic: a mitochondrial gene's state)
-    brca1.component[1].valueCodeableConcept.coding[0] = { system: 'http://loinc.org', code: 'LA6703-8', display: 'Heteroplasmic' };
+    // (an allelic state as text only)
+    brca1.component[1].valueCodeableConcept = { text: 'compound heterozygous' };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'positive' });
-      expect(warn.mock.calls.some((c) => String(c[0]).includes('as positive: allelic state LA6703-8'))).toBe(true);
+      expect(warn.mock.calls.some((c) => String(c[0]).includes('gene BRCA1') && String(c[0]).includes('"compound heterozygous"'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("says nothing of a state it couldn't read on an Observation that isn't a gene's", () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
+    brca1.valueString = 'something else';
+    brca1.component[1].valueCodeableConcept = { text: 'unknown' };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+      expect(warn.mock.calls.some((c) => String(c[0]).includes('as positive'))).toBe(false);
     } finally {
       warn.mockRestore();
     }

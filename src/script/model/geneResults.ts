@@ -5,25 +5,31 @@
  */
 
 // 'positive': a variant was found, its zygosity unknown (e.g. a family's report, or another tool's
-// record without one).
-export const GENE_RESULT_CODES = ['positive', 'heterozygous', 'homozygous', 'hemizygous', 'negative'];
+// record without one). Heteroplasmic and homoplasmic are mitochondrial genes' states: with them,
+// every allelic state LOINC lists (53034-5) is kept.
+export const GENE_RESULT_CODES = ['heterozygous', 'homozygous', 'hemizygous', 'heteroplasmic', 'homoplasmic', 'positive', 'negative'];
 
 // Drawn under the symbol after the gene (U+2212 minus, as typeset pedigrees use).
 export const GENE_RESULT_MARKERS: { [code: string]: string } = {
-  positive: '+',
   heterozygous: '+/−',
   homozygous: '+/+',
   hemizygous: '+/0',
+  heteroplasmic: '+ (heteroplasmic)',
+  homoplasmic: '+ (homoplasmic)',
+  positive: '+',
   negative: '−/−',
 };
 
-// The result drop-down's choices beside each gene, in order ('' = not tested).
+// The result drop-down's choices beside each gene, in order ('' = not tested): the specific
+// findings first, so a key press from Not tested lands on one.
 export const GENE_RESULT_CHOICES: Array<{ code: string; label: string }> = [
   { code: '', label: 'Not tested' },
-  { code: 'positive', label: 'Positive, zygosity unknown (+)' },
   { code: 'heterozygous', label: 'Heterozygous (+/−)' },
   { code: 'homozygous', label: 'Homozygous (+/+)' },
   { code: 'hemizygous', label: 'Hemizygous (+/0)' },
+  { code: 'heteroplasmic', label: 'Heteroplasmic (mitochondrial)' },
+  { code: 'homoplasmic', label: 'Homoplasmic (mitochondrial)' },
+  { code: 'positive', label: 'Positive, zygosity unknown (+)' },
   { code: 'negative', label: 'Negative (−/−)' },
 ];
 
@@ -41,23 +47,18 @@ const ALLELIC_STATES: { [code: string]: any } = {
   heterozygous: { system: LOINC, code: 'LA6706-1', display: 'Heterozygous' },
   homozygous: { system: LOINC, code: 'LA6705-3', display: 'Homozygous' },
   hemizygous: { system: LOINC, code: 'LA6707-9', display: 'Hemizygous' },
+  heteroplasmic: { system: LOINC, code: 'LA6703-8', display: 'Heteroplasmic' },
+  homoplasmic: { system: LOINC, code: 'LA6704-6', display: 'Homoplasmic' },
 };
 
-// The components for a result, or [] for none.
+// The components for a result, or [] for none: Present or Absent, and the allelic state when known.
 export function geneResultComponents(code: any): any[] {
   if (!isGeneResultCode(code)) {
     return [];
   }
-  if (code === 'negative') {
-    return [{ code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [ABSENT] } }];
-  }
-  if (code === 'positive') {
-    return [{ code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [PRESENT] } }];
-  }
-  return [
-    { code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [PRESENT] } },
-    { code: { coding: [ALLELIC_STATE] }, valueCodeableConcept: { coding: [ALLELIC_STATES[code]] } },
-  ];
+  const assessment = { code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [code === 'negative' ? ABSENT : PRESENT] } };
+  const state = ALLELIC_STATES[code];
+  return state ? [assessment, { code: { coding: [ALLELIC_STATE] }, valueCodeableConcept: { coding: [state] } }] : [assessment];
 }
 
 const codingOf = (component: any, wanted: any): any => {
@@ -71,9 +72,10 @@ const valueCode = (component: any): any => {
 };
 
 // The result an Observation's components say, or null for none (or one that can't be read). A
-// variant found with no allelic state, or one not listed here (e.g. heteroplasmic, homoplasmic), is
-// 'positive': that it was found is never lost (`dropped` hears of a state that wasn't kept).
-export function geneResultFromComponents(components: any, dropped?: (state: string) => void): string | null {
+// variant found with no allelic state is 'positive'; so is one whose state can't be read (coded
+// outside LOINC, or text only), so that it was found is never lost: `unread` is told what that state
+// was.
+export function geneResultFromComponents(components: any, unread?: (state: string) => void): string | null {
   if (!Array.isArray(components)) {
     return null;
   }
@@ -88,14 +90,25 @@ export function geneResultFromComponents(components: any, dropped?: (state: stri
   if (found !== PRESENT.code) {
     return null;
   }
-  const state = valueCode(components.find((c: any) => codingOf(c, ALLELIC_STATE)));
+  const stateComponent = components.find((c: any) => codingOf(c, ALLELIC_STATE));
+  if (!stateComponent) {
+    return 'positive';
+  }
+  const state = valueCode(stateComponent);
   for (const code in ALLELIC_STATES) {
     if (ALLELIC_STATES[code].code === state) {
       return code;
     }
   }
-  if (state && dropped) {
-    dropped(state);
+  if (unread) {
+    unread(describeValue(stateComponent));
   }
   return 'positive';
+}
+
+// What a component's value says, for a message: its codings (system|code display), or its text.
+function describeValue(component: any): string {
+  const value = (component && component.valueCodeableConcept) || {};
+  const codings = (value.coding || []).map((c: any) => (c.system || '') + '|' + (c.code || '') + (c.display ? ' ' + c.display : ''));
+  return codings.length ? codings.join(', ') : (value.text ? '"' + value.text + '"' : 'no value');
 }
