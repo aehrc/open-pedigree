@@ -1051,8 +1051,12 @@ export default class Person extends AbstractPerson {
         }
       }
     }
+    // (no redraw when there were and are none: every person is assigned on load)
+    var hadAny = Object.keys(this._geneResults).length > 0;
     this._geneResults = kept;
-    this._updateGeneResultsLabel();
+    if (hadAny || Object.keys(kept).length > 0) {
+      this._updateGeneResultsLabel();
+    }
   }
 
 

@@ -27,9 +27,14 @@ export default class GeneLegend extends Legend {
   _updateTermName(id: any): void {
     super._updateTermName(id);
     var view = editor.getView && editor.getView();
+    var gene = this.desanitizeID(id);
     (this._affectedNodes[id] || []).forEach(function(nodeID: any) {
       var node = view && view.getNode(nodeID);
-      var graphics = node && node.getGraphics && node.getGraphics();
+      // (only people with a result for this gene have a line naming it)
+      if (!node || typeof node.getGeneResults !== 'function' || !node.getGeneResults().hasOwnProperty(gene)) {
+        return;
+      }
+      var graphics = node.getGraphics && node.getGraphics();
       if (graphics && typeof graphics.updateGeneResultsLabel === 'function') {
         graphics.updateGeneResultsLabel();
       }
