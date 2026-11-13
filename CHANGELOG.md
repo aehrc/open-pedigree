@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.8.0...open-pedigree-v2.0.0) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* publish open-pedigree's FHIR definitions at resolvable URLs ([#100](https://github.com/aehrc/open-pedigree/issues/100))
+
+### Features
+
+* publish open-pedigree's FHIR definitions at resolvable URLs ([#100](https://github.com/aehrc/open-pedigree/issues/100)) ([fb46ceb](https://github.com/aehrc/open-pedigree/commit/fb46ceb47fcc84ee83751877f0a307b6ce39ea76))
+
 ## [1.8.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.7.0...open-pedigree-v1.8.0) (2026-11-12)
 
 
