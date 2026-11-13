@@ -986,6 +986,7 @@ export default class Person extends AbstractPerson {
       return;
     }
     var _this = this;
+    var before = this.getGenes().join('\u0000');
     var changed = this._syncLegendList(genes,
       function() { return _this.getGenes(); },
       function(value: any) { return editor.getGeneLegend().getTerm(value); },
@@ -996,7 +997,7 @@ export default class Person extends AbstractPerson {
       this.getGraphics().updateDisorderShapes();
     }
     // (results follow the genes' order, which a reordering alone changes)
-    if (Object.keys(this._geneResults).length > 0) {
+    if (Object.keys(this._geneResults).length > 0 && this.getGenes().join('\u0000') !== before) {
       this._updateGeneResultsLabel();
     }
   }

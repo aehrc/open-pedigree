@@ -38,6 +38,7 @@ function makeLegend() {
     getObjectColor: () => '#ffffff',
     sanitizeID: (id) => id,
     desanitizeID: (id) => id,
+    displayName: (id) => `name ${id}`,
   };
 }
 

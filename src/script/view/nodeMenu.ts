@@ -27,7 +27,7 @@ import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
 import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { isBlankValue } from 'pedigree/model/helpers';
-import { GENE_RESULT_CHOICES, geneDisplayName } from 'pedigree/model/geneResults';
+import { GENE_RESULT_CHOICES } from 'pedigree/model/geneResults';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -1220,22 +1220,26 @@ export default class NodeMenu {
       container.appendChild(box);
     }
     // (rebuilt, but the drop-down being used keeps the focus: a keyboard change re-renders this)
-    var focused: any = document.activeElement;
-    var focusedGene = focused && box.contains(focused) && focused.parentNode ? focused.parentNode.dataset.gene : null;
-    box.textContent = '';
+    // (only for the same person: on another, the same gene's drop-down mustn't take keys meant for this one)
     var node = this.targetNode;
+    var focused: any = document.activeElement;
+    var samePerson = node && box.dataset.node === String(node.getID());
+    var focusedGene = samePerson && focused && box.contains(focused) && focused.parentNode ? focused.parentNode.dataset.gene : null;
+    box.textContent = '';
     if (!node || typeof node.getGeneResults !== 'function') {
+      delete box.dataset.node;
       return;
     }
+    box.dataset.node = String(node.getID());
     var _this = this;
     var legend = editor.getGeneLegend();
     var results = node.getGeneResults();
     // (locked with the Genes picker: see _setFieldDisabled)
     var picker = container.querySelector('select.suggest-questionnaire-legend');
-    var locked = !!(picker && picker.selectize && (picker.selectize.isDisabled || picker.selectize.isLocked));
+    var locked = !!(picker && picker.selectize && picker.selectize.isDisabled);
     node.getGenes().forEach(function(id: any) {
       var gene = legend.desanitizeID(id);
-      var name = geneDisplayName(legend, id);
+      var name = legend.displayName(id);
       var row = document.createElement('div');
       row.className = 'gene-result';
       row.dataset.gene = gene;
@@ -1277,12 +1281,14 @@ export default class NodeMenu {
     });
   }
 
-  // A gene's name has arrived (GeneLegend): the rows show it, if this menu is showing that gene.
-  refreshGeneResults(): void {
-    var container = this.menuBox && this.menuBox.querySelector('.field-candidate_genes');
-    if (container && this.targetNode && container.querySelector('.gene-results')) {
-      this._renderGeneResults(container);
-    }
+  // A gene's name has arrived (GeneLegend): that gene's row, if the open menu shows it, takes the
+  // name - in place, so a drop-down someone has open stays open.
+  refreshGeneName(gene: any, name: string): void {
+    var rows = this.menuBox ? Array.from(this.menuBox.querySelectorAll('.gene-results .gene-result')) : [];
+    rows.filter(function(row: any) { return row.dataset.gene === gene; }).forEach(function(row: any) {
+      row.querySelector('.gene-result-name').textContent = name;
+      row.querySelector('.gene-result-value').setAttribute('aria-label', 'Result for ' + name);
+    });
   }
 
   _toggleFieldVisibility(container: any, doHide: any): any {

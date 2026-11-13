@@ -91,10 +91,25 @@ export default class Controller {
     }
   }
 
+  // Genes are set before their results, whatever order an event lists them in: a result needs its
+  // gene listed (Person.setGeneResults), and the undo memo, built from these, keeps the same order.
+  static _genesBeforeResults(properties: any): any {
+    if (!properties || !properties.hasOwnProperty('setGenes') || !properties.hasOwnProperty('setGeneResults')) {
+      return properties;
+    }
+    var ordered: any = { setGenes: properties.setGenes };
+    for (var key in properties) {
+      if (properties.hasOwnProperty(key) && key !== 'setGenes') {
+        ordered[key] = properties[key];
+      }
+    }
+    return ordered;
+  }
+
   handleSetProperty(event: any): void {
     var nodeID     = event.detail.nodeID;
     var node    = editor.getView().getNode(nodeID);
-    var properties = Controller._orderDatePair(node, event.detail.properties);
+    var properties = Controller._genesBeforeResults(Controller._orderDatePair(node, event.detail.properties));
     var undoEvent  = {'eventName': event.type, 'memo': {'nodeID': nodeID, 'properties': cloneObject(properties)}};
     // Record each property's value from before this event only once: setters change other
     // properties as side effects (setLifeStatus clears the death date, and so on), so a later

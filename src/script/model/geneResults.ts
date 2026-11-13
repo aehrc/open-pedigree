@@ -4,8 +4,6 @@
  * gene with no entry is not tested.
  */
 
-import { isLoadingName } from 'pedigree/terminology/loadingName';
-
 export const GENE_RESULT_CODES = ['heterozygous', 'homozygous', 'hemizygous', 'negative'];
 
 // Drawn under the symbol after the gene (U+2212 minus, as typeset pedigrees use).
@@ -24,16 +22,6 @@ export const GENE_RESULT_CHOICES: Array<{ code: string; label: string }> = [
   { code: 'hemizygous', label: 'Hemizygous (+/0)' },
   { code: 'negative', label: 'Negative (−/−)' },
 ];
-
-// How a gene is named beside its result: its terminology name, or its ID while that is loading.
-export function geneDisplayName(legend: any, id: any): string {
-  const term = legend && legend.getTerm ? legend.getTerm(id) : null;
-  const name = term && term.getName ? term.getName() : null;
-  if (typeof name === 'string' && name && !isLoadingName(name)) {
-    return name;
-  }
-  return legend && legend.desanitizeID ? legend.desanitizeID(id) : id;
-}
 
 export function isGeneResultCode(code: any): boolean {
   return typeof code === 'string' && GENE_RESULT_CODES.indexOf(code) !== -1;

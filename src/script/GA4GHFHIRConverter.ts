@@ -773,7 +773,8 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   } else if (typeof observationResource.valueString === 'string') {
     if (observationResource.valueString.startsWith('gene: ')) {
       gene = observationResource.valueString.substring('gene: '.length);
-    } else if (typeof observationResource.id === 'string' && observationResource.id.includes('_gene_')) {
+    } else if (typeof observationResource.id === 'string' && observationResource.id.includes('_gene_')
+      && !observationResource.id.includes('_clinical_')) {
       // (an older form, read as a gene below by its id)
       gene = observationResource.valueString;
     }

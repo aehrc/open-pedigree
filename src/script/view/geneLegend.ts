@@ -1,5 +1,6 @@
 import Raphael from 'pedigree/raphael';
 import Legend from 'pedigree/view/legend';
+import { isLoadingName } from 'pedigree/terminology/loadingName';
 
 /**
  * Class responsible for keeping track of candidate genes.
@@ -14,6 +15,14 @@ export default class GeneLegend extends Legend {
     super('Candidate Genes', terminology, 'gene');
   }
 
+  // How a gene is named beside its result: its terminology name, or its ID while that is loading.
+  // (from the terms already known, without creating one: creating a term can call back into this)
+  displayName(id: any): string {
+    const term = this._cache[this.sanitizeID(id)];
+    const name = term && term.getName ? term.getName() : null;
+    return typeof name === 'string' && name && !isLoadingName(name) ? name : this.desanitizeID(id);
+  }
+
   // A gene's name has arrived: its people's result lines show it too (PersonVisuals.updateGeneResultsLabel).
   _updateTermName(id: any): void {
     super._updateTermName(id);
@@ -26,8 +35,8 @@ export default class GeneLegend extends Legend {
       }
     });
     var menu = editor.getNodeMenu && editor.getNodeMenu();
-    if (menu && typeof menu.refreshGeneResults === 'function') {
-      menu.refreshGeneResults();
+    if (menu && typeof menu.refreshGeneName === 'function') {
+      menu.refreshGeneName(this.desanitizeID(id), this.displayName(id));
     }
   }
 
