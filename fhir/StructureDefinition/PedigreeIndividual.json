@@ -1,0 +1,143 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "PedigreeIndividual",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual",
+  "name": "PedigreeIndividual",
+  "title": "Pedigree individual",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "A logical model of the pedigree person properties that aren't a single Patient element. A Questionnaire item's item.definition can point at one (`https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus`) to bind its answer to that property; in a GA4GH pedigree they become fixed-code Observations or drive several Patient fields at once.",
+  "fhirVersion": "4.0.1",
+  "kind": "logical",
+  "abstract": false,
+  "type": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Base",
+  "derivation": "specialization",
+  "differential": {
+    "element": [
+      {
+        "id": "PedigreeIndividual",
+        "path": "PedigreeIndividual",
+        "short": "Pedigree individual",
+        "definition": "A person in a pedigree."
+      },
+      {
+        "id": "PedigreeIndividual.lifeStatus",
+        "path": "PedigreeIndividual.lifeStatus",
+        "short": "Life status: `alive`; `deceased`; `stillborn`; `miscarriage`; `unborn`; `aborted`.",
+        "definition": "Life status: `alive`; `deceased`; `stillborn`; `miscarriage`; `unborn`; `aborted`.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.gestationAge",
+        "path": "PedigreeIndividual.gestationAge",
+        "short": "Gestation age, in weeks, of an unborn or a fetus.",
+        "definition": "Gestation age, in weeks, of an unborn or a fetus.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.carrierStatus",
+        "path": "PedigreeIndividual.carrierStatus",
+        "short": "Carrier status: `carrier`; `affected`; `presymptomatic`, or none.",
+        "definition": "Carrier status: `carrier`; `affected`; `presymptomatic`, or none.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.comments",
+        "path": "PedigreeIndividual.comments",
+        "short": "Free-text comments.",
+        "definition": "Free-text comments.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.childlessStatus",
+        "path": "PedigreeIndividual.childlessStatus",
+        "short": "Childless status: `none`; `childless`; `infertile`.",
+        "definition": "Childless status: `none`; `childless`; `infertile`.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.isAdopted",
+        "path": "PedigreeIndividual.isAdopted",
+        "short": "Adopted.",
+        "definition": "Adopted.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.monozygotic",
+        "path": "PedigreeIndividual.monozygotic",
+        "short": "A monozygotic twin.",
+        "definition": "A monozygotic twin.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.evaluated",
+        "path": "PedigreeIndividual.evaluated",
+        "short": "Documented evaluation.",
+        "definition": "Documented evaluation.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "PedigreeIndividual.lostContact",
+        "path": "PedigreeIndividual.lostContact",
+        "short": "Not in contact with the proband.",
+        "definition": "Not in contact with the proband.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      }
+    ]
+  }
+}

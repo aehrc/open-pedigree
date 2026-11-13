@@ -116,8 +116,8 @@ An item can optionally map onto something the editor already knows how to export
 {
   "linkId": "carrier",
   "type": "boolean",
-  "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
-  "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+  "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
+  "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
 }
 ```
 
@@ -134,6 +134,29 @@ See [`tests/unit/fixtures/current-forms-questionnaire.json`](tests/unit/fixtures
 - Per-node only — there's no equivalent mechanism for relationship/partnership-level fields.
 - `mapsToCondition`/`mapsToObservation` codes should be chosen to not collide with codes your disorder/phenotype terminology might independently produce — a collision causes the generic disorders/phenotypes extraction to route that fact to the mapped item instead of the disorders list.
 - PED/BOADICEA/GEDCOM/DADA2 import/export do not carry Questionnaire answers — only GA4GH FHIR does.
+
+## FHIR definitions
+
+open-pedigree's own FHIR extensions, and the other definitions its GA4GH pedigrees and Questionnaires point at, are published under **`https://aehrc.github.io/open-pedigree/fhir/`**. Each canonical URL opens a page describing it, with its JSON beside it, and the [index](https://aehrc.github.io/open-pedigree/fhir/) lists them all:
+
+| Definition | Kind | Used in |
+| --- | --- | --- |
+| `StructureDefinition/adopted` | extension, a code from `adoption-direction` (`in`, `out`) | saved pedigrees (Patient) |
+| `StructureDefinition/fetus-date-of-death` | extension, `valueDate` | saved pedigrees (Patient) |
+| `StructureDefinition/linked-record-ref` | extension, `valueString` | saved pedigrees (Patient) |
+| `StructureDefinition/linked-record-snapshot` | extension, `valueString` (JSON) | saved pedigrees (Patient) |
+| `StructureDefinition/questionnaire-field-mapping` | extension, `valueCode` | Questionnaire items |
+| `StructureDefinition/questionnaire-action` | extension, `valueCode` | Questionnaire items |
+| `StructureDefinition/questionnaire-enable-predicate` | extension, `valueCode` | Questionnaire `enableWhen` / `disabledWhen` |
+| `StructureDefinition/questionnaire-linked-record-source` | extension, `valueBoolean` (`true`) | Questionnaire items |
+| `StructureDefinition/questionnaire-redcap-source` | extension (`instrument`, `field`); used by redcap_pedigree_editor | Questionnaire items |
+| `StructureDefinition/PedigreeIndividual` | logical model | Questionnaire `item.definition` |
+| `CodeSystem/adoption-direction`, `ValueSet/adoption-direction` | code system, value set | `adopted` |
+| `Questionnaire/default` | Questionnaire | saved pedigrees (`QuestionnaireResponse.questionnaire`) |
+
+The JSON lives in [`fhir/`](fhir/) (the default Questionnaire is built from `defaultQuestionnaire.ts`), the URLs in [`src/script/fhirUrls.ts`](src/script/fhirUrls.ts), and the Pages deploy publishes them with `scripts/build-fhir-site.js`.
+
+**Since 2.0.0.** Before 2.0.0 these URLs were under `https://github.com/aehrc/open-pedigree/`, which never resolved, and `adopted` was a `valueBoolean`. They are no longer read: a pedigree saved by an earlier version loses these fields when opened, and a Questionnaire that still uses an old extension URL isn't used (the built-in default is, and the console names the URL to use instead). `scripts/rewrite-fhir-urls.js <file>...` rewrites stored pedigrees and Questionnaires to the new URLs.
 
 ## Testing
 

@@ -37,6 +37,8 @@ jobs:
           mkdir _site
           cp localEditor.html _site/index.html
           cp -r dist _site/dist
+          # open-pedigree's FHIR definitions, at their canonical URLs (fhirUrls.ts, fhir/)
+          node scripts/build-fhir-site.js _site/fhir
 
       - uses: actions/configure-pages@v4
 
@@ -46,3 +48,19 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deployment
+
+      # The definitions' canonical URLs are written into saved pedigrees: fail the run if one
+      # doesn't resolve once deployed (each page, and its JSON). Pages can take a moment to serve.
+      - name: Check the FHIR definitions resolve
+        run: |
+          base=https://aehrc.github.io/open-pedigree/fhir
+          urls="$base/ $base/StructureDefinition/adopted $base/StructureDefinition/adopted.json $base/StructureDefinition/questionnaire-field-mapping $base/StructureDefinition/questionnaire-field-mapping.json $base/Questionnaire/default.json"
+          for url in $urls; do
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -s -L -o /dev/null -w '%{http_code}' "$url")
+              [ "$code" = 200 ] && break
+              sleep 10
+            done
+            echo "$code $url"
+            [ "$code" = 200 ] || exit 1
+          done

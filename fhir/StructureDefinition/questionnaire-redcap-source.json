@@ -1,0 +1,95 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "questionnaire-redcap-source",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-redcap-source",
+  "name": "QuestionnaireRedcapSource",
+  "title": "Questionnaire REDCap source",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "redcap_pedigree_editor: the REDCap instrument and field an item's answer is brought in from, from the person's linked row (Edit in REDCap, Create in REDCap). Not read by open-pedigree itself.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Questionnaire.item"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Questionnaire REDCap source",
+        "definition": "redcap_pedigree_editor: the REDCap instrument and field an item's answer is brought in from, from the person's linked row (Edit in REDCap, Create in REDCap). Not read by open-pedigree itself."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "min": 2
+      },
+      {
+        "id": "Extension.extension:instrument",
+        "path": "Extension.extension",
+        "sliceName": "instrument",
+        "short": "Instrument",
+        "definition": "The REDCap instrument (form) name.",
+        "min": 1,
+        "max": "1"
+      },
+      {
+        "id": "Extension.extension:instrument.url",
+        "path": "Extension.extension.url",
+        "fixedUri": "instrument"
+      },
+      {
+        "id": "Extension.extension:instrument.value[x]",
+        "path": "Extension.extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Extension.extension:field",
+        "path": "Extension.extension",
+        "sliceName": "field",
+        "short": "Field",
+        "definition": "The REDCap field name.",
+        "min": 1,
+        "max": "1"
+      },
+      {
+        "id": "Extension.extension:field.url",
+        "path": "Extension.extension.url",
+        "fixedUri": "field"
+      },
+      {
+        "id": "Extension.extension:field.value[x]",
+        "path": "Extension.extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-redcap-source"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "max": "0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "questionnaire-enable-predicate",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-enable-predicate",
+  "name": "QuestionnaireEnablePredicate",
+  "title": "Questionnaire enable predicate",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "On an enableWhen (or open-pedigree's disabledWhen) condition: the condition tests a named pedigree predicate instead of another item's answer. Predicates: `isFetus`; `hasRelationships`; `isProband`; `isRelatedToProband`; `hasToBeAdopted`; `isTwin`; `isTwinWithConsistentGender`; `canLinkPatient`; `canImportClinicalData`; `canLinkRecord`; `canCreateNewRecord`; `canEditLinkedRecord`. A sibling `negate` on the condition inverts it.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Questionnaire.item.enableWhen"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Questionnaire enable predicate",
+        "definition": "On an enableWhen (or open-pedigree's disabledWhen) condition: the condition tests a named pedigree predicate instead of another item's answer. Predicates: `isFetus`; `hasRelationships`; `isProband`; `isRelatedToProband`; `hasToBeAdopted`; `isTwin`; `isTwinWithConsistentGender`; `canLinkPatient`; `canImportClinicalData`; `canLinkRecord`; `canCreateNewRecord`; `canEditLinkedRecord`. A sibling `negate` on the condition inverts it."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-enable-predicate"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      }
+    ]
+  }
+}

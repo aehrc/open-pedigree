@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "fetus-date-of-death",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/fetus-date-of-death",
+  "name": "FetusDateOfDeath",
+  "title": "Fetus date of death",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "The date of death of a fetus (miscarriage, stillbirth or termination), on its Patient in a GA4GH pedigree. Patient.deceased[x] carries the fetal status itself, so the date is carried here. Read only for a fetus.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Patient"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Fetus date of death",
+        "definition": "The date of death of a fetus (miscarriage, stillbirth or termination), on its Patient in a GA4GH pedigree. Patient.deceased[x] carries the fetal status itself, so the date is carried here. Read only for a fetus."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/fetus-date-of-death"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      }
+    ]
+  }
+}

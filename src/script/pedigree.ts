@@ -126,7 +126,13 @@ export default class PedigreeEditor {
     this._questionnaireTerminologies = {};
     this._questionnaireLegends = {};
     if (options.questionnaireLocal) {
-      this._questionnaireConfig = this._parseQuestionnaireConfig(options.questionnaireLocal);
+      try {
+        this._questionnaireConfig = this._parseQuestionnaireConfig(options.questionnaireLocal);
+      } catch (err) {
+        // (as a questionnaireUrl that can't be read: the built-in default, and why in the console)
+        console.error('Could not read questionnaireLocal - continuing with the built-in default Questionnaire', err);
+        this._questionnaireConfig = this._parseQuestionnaireConfig(DEFAULT_QUESTIONNAIRE);
+      }
     } else {
       // Always an effective Questionnaire (see questionnaire-source-of-truth design D14) -
       // the built-in default until/unless a questionnaireUrl fetch resolves.
@@ -629,7 +635,7 @@ export default class PedigreeEditor {
         _this._rebuildNodeMenu();
       })
       .catch(function(err: any) {
-        console.warn('Failed to load questionnaireUrl - continuing with the built-in default Questionnaire', err);
+        console.error('Failed to load questionnaireUrl - continuing with the built-in default Questionnaire', err);
       });
   }
 

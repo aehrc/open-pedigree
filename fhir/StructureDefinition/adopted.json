@@ -1,0 +1,56 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "adopted",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted",
+  "name": "Adopted",
+  "title": "Adopted",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. `out` is defined for a later version and not yet written or read.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Patient"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Adopted",
+        "definition": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. `out` is defined for a later version and not yet written or read."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "code"
+          }
+        ],
+        "binding": {
+          "strength": "required",
+          "valueSet": "https://aehrc.github.io/open-pedigree/fhir/ValueSet/adoption-direction"
+        }
+      }
+    ]
+  }
+}

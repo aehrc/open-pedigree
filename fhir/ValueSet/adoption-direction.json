@@ -1,0 +1,17 @@
+{
+  "resourceType": "ValueSet",
+  "id": "adoption-direction",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/ValueSet/adoption-direction",
+  "name": "AdoptionDirection",
+  "title": "Adoption direction",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "Every adoption direction.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://aehrc.github.io/open-pedigree/fhir/CodeSystem/adoption-direction"
+      }
+    ]
+  }
+}

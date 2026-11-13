@@ -20,7 +20,7 @@ const CUSTOM_LEGEND_QUESTIONNAIRE = {
         {
           linkId: 'comorbidities', type: 'choice', text: 'Comorbidities', repeats: true,
           answerValueSet: 'http://example.org/ValueSet/comorbidities',
-          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: 'mapsToLegendCondition' }],
+          extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping', valueCode: 'mapsToLegendCondition' }],
         },
         { linkId: 'note', type: 'string', text: 'Note' },
       ],

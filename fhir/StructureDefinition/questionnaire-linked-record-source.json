@@ -1,0 +1,53 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "questionnaire-linked-record-source",
+  "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source",
+  "name": "QuestionnaireLinkedRecordSource",
+  "title": "Questionnaire linked-record source",
+  "status": "active",
+  "publisher": "AEHRC, CSIRO (open-pedigree)",
+  "description": "Marks an item whose answer comes from the person's linked record in the host application: it is shown read-only, on the Linked Record tab. Says nothing about where the data comes from (see questionnaire-redcap-source for REDCap). Its value is always true.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Questionnaire.item"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Questionnaire linked-record source",
+        "definition": "Marks an item whose answer comes from the person's linked record in the host application: it is shown read-only, on the Linked Record tab. Says nothing about where the data comes from (see questionnaire-redcap-source for REDCap). Its value is always true."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ],
+        "fixedBoolean": true
+      }
+    ]
+  }
+}

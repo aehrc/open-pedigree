@@ -435,8 +435,8 @@ describe('DEFAULT_QUESTIONNAIRE end-to-end GA4GH export/import round trip', () =
 });
 
 describe('linked record round trip (linked-record-round-trip)', () => {
-  const LINK_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
-  const SNAPSHOT_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+  const LINK_URL = 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-ref';
+  const SNAPSHOT_URL = 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-snapshot';
 
   function johnGraph() {
     return PedigreeImport.initFromPhenotipsInternal(JSON.parse(JSON.stringify(simpleGG)));

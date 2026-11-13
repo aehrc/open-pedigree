@@ -18,7 +18,7 @@ const LINKED_RECORD_QUESTIONNAIRE = {
         { linkId: 'notes', type: 'string', text: 'Notes' },
         {
           linkId: 'ext_field_a', type: 'string', text: 'External field A',
-          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+          extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }],
         },
       ],
     },
@@ -27,12 +27,12 @@ const LINKED_RECORD_QUESTIONNAIRE = {
       item: [
         {
           linkId: 'ext_field_b', type: 'string', text: 'External field B',
-          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+          extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }],
         },
         {
           linkId: 'disorders', type: 'choice', text: 'Disorders', repeats: true,
           answerValueSet: 'http://purl.bioontology.org/ontology/OMIM',
-          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: 'mapsToLegendCondition' }],
+          extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping', valueCode: 'mapsToLegendCondition' }],
         },
       ],
     },
@@ -168,7 +168,7 @@ const ALL_LINKED_GROUP_QUESTIONNAIRE = {
       item: [
         {
           linkId: 'ext_field_a', type: 'string', text: 'External field A',
-          extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+          extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }],
         },
       ],
     },
@@ -201,7 +201,7 @@ test('a tab left with only a nested group\'s heading isn\'t shown, and the headi
           linkId: 'section_a', type: 'group', text: 'Section A',
           item: [{
             linkId: 'ext_field_a', type: 'string', text: 'External field A',
-            extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }],
+            extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }],
           }],
         }],
       },
@@ -225,7 +225,7 @@ test('without a recordLinkProvider the same tab keeps its (disabled) linked item
   await expect(page.locator(`${VISIBLE_MENU} #tab_basic_info .field-ext_field_a input[type=text]`)).toBeDisabled();
 });
 
-const LINKED_EXTENSION = [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }];
+const LINKED_EXTENSION = [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }];
 
 // A tab that stays (it has "age"), holding a nested group whose fields are all linked
 // ("Vitals", two levels deep inside "Measurements") and one that still has a field ("History").
@@ -303,17 +303,17 @@ const NESTED_INTERRUPTED_GROUP_QUESTIONNAIRE = {
   item: [{
     linkId: 'demographics', type: 'group', text: 'Demographics',
     item: [
-      { linkId: 'ext_a', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
-      { linkId: 'ext_b', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+      { linkId: 'ext_a', type: 'string', extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }] },
+      { linkId: 'ext_b', type: 'string', extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }] },
       {
         linkId: 'subsection', type: 'group', text: 'Sub Section',
         item: [
-          { linkId: 'ext_c1', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+          { linkId: 'ext_c1', type: 'string', extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }] },
         ],
       },
       // Authored as a direct Demographics child AFTER the nested Sub Section, so it lands
       // after ext_c1 in document order despite belonging to Demographics, not Sub Section.
-      { linkId: 'ext_d', type: 'string', extension: [{ url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' }] },
+      { linkId: 'ext_d', type: 'string', extension: [{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' }] },
     ],
   }],
 };
@@ -573,7 +573,7 @@ test('a getActionLabel that throws keeps the default labels and does not stop th
 // ---- linked-record-round-trip ----------------------------------------------------------------
 // A Questionnaire with mapped fields (gender, birth date, adopted), a plain integer and a string
 // item, and the disorders legend - enough to exercise every refresh rule end to end.
-const FIELD_MAPPING_URL = 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping';
+const FIELD_MAPPING_URL = 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping';
 const ROUND_TRIP_QUESTIONNAIRE = {
   resourceType: 'Questionnaire',
   url: 'http://example.org/Questionnaire/e2e-linked-record-round-trip',
@@ -595,7 +595,7 @@ const ROUND_TRIP_QUESTIONNAIRE = {
         },
         {
           linkId: 'adopted', type: 'boolean', text: 'Adopted',
-          definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.isAdopted',
+          definition: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.isAdopted',
           extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
         },
         {
@@ -605,7 +605,7 @@ const ROUND_TRIP_QUESTIONNAIRE = {
         },
         {
           linkId: 'weeks', type: 'integer', text: 'Gestation age',
-          definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.gestationAge',
+          definition: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.gestationAge',
           extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
         },
         { linkId: 'count', type: 'integer', text: 'Count' },
@@ -622,7 +622,7 @@ const ROUND_TRIP_QUESTIONNAIRE = {
         },
         {
           linkId: 'life', type: 'choice', text: 'Life status',
-          definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus',
+          definition: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus',
           extension: [{ url: FIELD_MAPPING_URL, valueCode: 'mapsToField' }],
           answerOption: [{ valueCoding: { code: 'alive', display: 'Alive' } }, { valueCoding: { code: 'deceased', display: 'Deceased' } }],
         },

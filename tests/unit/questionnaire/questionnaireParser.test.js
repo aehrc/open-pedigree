@@ -3,15 +3,15 @@ import { parseQuestionnaire, isSupportedItemType, MAPS_TO_FIELD_TARGETS } from '
 import smartDemoQuestionnaireBundle from '../../fixtures/smart/questionnaire.json';
 
 function mappingExtension(kind) {
-  return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-field-mapping', valueCode: kind };
+  return { url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping', valueCode: kind };
 }
 
 function actionExtension(action) {
-  return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-action', valueCode: action };
+  return { url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-action', valueCode: action };
 }
 
 function predicateExtension(predicate) {
-  return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate', valueCode: predicate };
+  return { url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-enable-predicate', valueCode: predicate };
 }
 
 describe('parseQuestionnaire', () => {
@@ -162,7 +162,7 @@ describe('parseQuestionnaire', () => {
       item: [{
         linkId: 'q1',
         type: 'boolean',
-        definition: 'https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus',
+        definition: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus',
         extension: [mappingExtension('mapsToField')],
       }],
     };
@@ -278,7 +278,7 @@ describe('parseQuestionnaire', () => {
 
 describe('linkedRecordSource extension (record-link-provider)', () => {
   function linkedRecordSourceExtension() {
-    return { url: 'https://github.com/aehrc/open-pedigree/questionnaire-linked-record-source' };
+    return { url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-linked-record-source' };
   }
 
   it('parses an item carrying the extension to linkedRecordSource: true', () => {

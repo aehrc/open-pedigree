@@ -7,11 +7,15 @@ import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
-// A node's link to an external record (record-link-provider), on its Patient resource.
-export const LINKED_RECORD_REF_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-ref';
-// What the linked record sent at its last refresh (linked-record-round-trip), on the same
-// Patient resource, as JSON: application bookkeeping for the next refresh, not clinical data.
-export const LINKED_RECORD_SNAPSHOT_EXTENSION_URL = 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot';
+import {
+  LINKED_RECORD_REF_EXTENSION_URL, LINKED_RECORD_SNAPSHOT_EXTENSION_URL, FETUS_DATE_OF_DEATH_EXTENSION_URL,
+  ADOPTED_EXTENSION_URL, ADOPTED_IN, RETIRED_BASE, replacementFor,
+} from 'pedigree/fhirUrls';
+
+// A node's link to an external record (record-link-provider), on its Patient resource; and what
+// the linked record sent at its last refresh (linked-record-round-trip), on the same Patient
+// resource, as JSON: application bookkeeping for the next refresh, not clinical data.
+export { LINKED_RECORD_REF_EXTENSION_URL, LINKED_RECORD_SNAPSHOT_EXTENSION_URL };
 
 
 
@@ -31,11 +35,12 @@ function generateUUID() {
 
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
-const FETUS_DATE_OF_DEATH_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death';
+const FETUS_DATE_OF_DEATH_EXTENSION = FETUS_DATE_OF_DEATH_EXTENSION_URL;
 // An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
 // are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
 // to carry it (redcap_pedigree_editor#7).
-const ADOPTED_EXTENSION = 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted';
+// Its value is a code, in (adopted into this family) or out (adopted away from it; not written yet).
+const ADOPTED_EXTENSION = ADOPTED_EXTENSION_URL;
 
 var GA4GHFHIRConverter = function () {
 };
@@ -915,6 +920,10 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
     properties.linkedPatientRef = 'Patient/' + rawId;
   }
   for (const ext of (patientResource.extension || [])) {
+    // An extension under the URL open-pedigree used before 2.0.0 isn't read (as any unknown one).
+    if (ext && typeof ext.url === 'string' && ext.url.indexOf(RETIRED_BASE) === 0 && replacementFor(ext.url)) {
+      console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacementFor(ext.url) + ')');
+    }
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;
     }
@@ -1080,7 +1089,7 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   }
   // Adopted, with no parents in the pedigree: applied once the person's parents are known (initFromFHIR)
   const adopted = patientResource.extension && patientResource.extension.find((ext: any) => ext.url === ADOPTED_EXTENSION);
-  if (adopted && adopted.valueBoolean === true) {
+  if (adopted && adopted.valueCode === ADOPTED_IN) {
     (result as any).adoptedWithoutParents = true;
   }
 
@@ -1487,7 +1496,7 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   // (written whatever the privacy setting, as an adopted child's KIN:022 relationships are)
   if (pedigree.GG.isAdopted(index) && pedigree.GG.getParents(index).length === 0
     && FETAL_STATUSES.indexOf(nodeProperties.lifeStatus) === -1) {
-    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION, 'valueBoolean': true });
+    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION, 'valueCode': ADOPTED_IN });
   }
 
 

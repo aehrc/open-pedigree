@@ -29,7 +29,7 @@
                 "columns": 3,
                 "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.gender",
                 "extension": [
-                  { "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" },
+                  { "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" },
                   { "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl", "valueCodeableConcept": { "coding": [{ "system": "http://hl7.org/fhir/questionnaire-item-control", "code": "radio-button" }] } }
                 ]
               },
@@ -38,31 +38,31 @@
                 "type": "string",
                 "text": "First name",
                 "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.given",
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
               },
               {
                 "linkId": "last_name",
                 "type": "string",
                 "text": "Last name",
                 "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.name.family",
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
               },
               {
                 "linkId": "link_patient",
                 "type": "display",
                 "text": "Link to patient",
                 "extension": [
-                  { "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "invokesAction" },
-                  { "url": "https://github.com/aehrc/open-pedigree/questionnaire-action", "valueCode": "linkPatient" }
+                  { "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "invokesAction" },
+                  { "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-action", "valueCode": "linkPatient" }
                 ],
-                "enableWhen": [{ "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-enable-predicate", "valueCode": "canLinkPatient" }] }]
+                "enableWhen": [{ "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-enable-predicate", "valueCode": "canLinkPatient" }] }]
               },
               {
                 "linkId": "external_id",
                 "type": "string",
                 "text": "Identifier",
                 "definition": "http://hl7.org/fhir/StructureDefinition/Patient#Patient.identifier",
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
               },
               {
                 "linkId": "state",
@@ -77,9 +77,9 @@
                   { "valueCoding": { "code": "aborted", "display": "Aborted" } }
                 ],
                 "columns": 3,
-                "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus",
+                "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.lifeStatus",
                 "extension": [
-                  { "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" },
+                  { "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" },
                   { "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl", "valueCodeableConcept": { "coding": [{ "system": "http://hl7.org/fhir/questionnaire-item-control", "code": "radio-button" }] } }
                 ],
                 "disablingPredicate": "lifeStatusAvailability",
@@ -102,9 +102,9 @@
                   { "valueCoding": { "code": "affected", "display": "Affected" } },
                   { "valueCoding": { "code": "presymptomatic", "display": "Pre-symptomatic" } }
                 ],
-                "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
+                "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.carrierStatus",
                 "extension": [
-                  { "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" },
+                  { "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" },
                   { "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl", "valueCodeableConcept": { "coding": [{ "system": "http://hl7.org/fhir/questionnaire-item-control", "code": "radio-button" }] } }
                 ],
                 "disablingPredicate": "carrierAvailability",
@@ -116,14 +116,14 @@
                 "text": "Disorders",
                 "repeats": true,
                 "answerValueSet": "http://purl.bioontology.org/ontology/OMIM",
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToLegendCondition" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToLegendCondition" }]
               },
               {
                 "linkId": "comments",
                 "type": "text",
                 "text": "Comments",
-                "definition": "https://github.com/aehrc/open-pedigree/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToField" }]
+                "definition": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/PedigreeIndividual#PedigreeIndividual.comments",
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToField" }]
               }
             ]
           },
@@ -137,7 +137,7 @@
                 "type": "boolean",
                 "text": "Diagnosed with diabetes?",
                 "code": [{ "system": "http://snomed.info/sct", "code": "73211009", "display": "Diabetes mellitus" }],
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToCondition" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToCondition" }]
               },
               {
                 "linkId": "smoking_status",
@@ -149,7 +149,7 @@
                   { "valueString": "current" }
                 ],
                 "code": [{ "system": "http://loinc.org", "code": "72166-2", "display": "Tobacco smoking status" }],
-                "extension": [{ "url": "https://github.com/aehrc/open-pedigree/questionnaire-field-mapping", "valueCode": "mapsToObservation" }]
+                "extension": [{ "url": "https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping", "valueCode": "mapsToObservation" }]
               },
               {
                 "linkId": "research_consent",
