@@ -158,6 +158,32 @@ The JSON lives in [`fhir/`](fhir/) (the default Questionnaire is built from `def
 
 **Since 2.0.0.** Before 2.0.0 these URLs were under `https://github.com/aehrc/open-pedigree/`, which never resolved, and `adopted` was a `valueBoolean`. They are no longer read: a pedigree saved by an earlier version loses these fields when opened, and a Questionnaire that uses an old URL for one of the extensions open-pedigree reads (`questionnaire-field-mapping`, `-action`, `-enable-predicate`, `-linked-record-source`) isn't used: the built-in default is, and the console names the URL to use instead. A host's own extensions (e.g. redcap_pedigree_editor's `questionnaire-redcap-source`) are the host's to check. `scripts/rewrite-fhir-urls.js <file>...` rewrites stored pedigrees and Questionnaires to the new URLs.
 
+## Gene results
+
+Each gene in a person's **Genes** list can have a result: what testing found. In the node menu, each selected gene has a result drop-down under the Genes picker:
+
+| Result | Drawn as |
+| --- | --- |
+| Not tested (the default) | nothing |
+| Heterozygous | `BRCA1 +/−` |
+| Homozygous | `BRCA1 +/+` |
+| Hemizygous (e.g. an X-linked gene in a male) | `BRCA1 +/0` |
+| Heteroplasmic (mitochondrial) | `MT-ND4 + (heteroplasmic)` |
+| Homoplasmic (mitochondrial) | `MT-ND4 + (homoplasmic)` |
+| Positive, zygosity unknown | `BRCA1 +` |
+| Negative | `BRCA1 −/−` |
+
+Each tested gene is a line under the symbol, after the external ID and before the comments, in the Genes list's order. The de-identified exports keep these lines, as they keep the genes. Removing a gene removes its result, and a change of result is one undo step.
+
+Results are saved as the property `geneResults` (`{ "BRCA1": "heterozygous" }`, keyed like `candidateGenes`). In GA4GH FHIR, the gene's own `Observation` carries them as `component`s, using the LOINC codes of the HL7 Genomics Reporting pattern:
+
+- `69548-6` *Genetic variant assessment*: `LA9633-4` *Present* or `LA9634-2` *Absent* (negative);
+- `53034-5` *Allelic state*, when present and known: `LA6706-1` *Heterozygous*, `LA6705-3` *Homozygous*, `LA6707-9` *Hemizygous*, `LA6703-8` *Heteroplasmic* or `LA6704-6` *Homoplasmic* - every state LOINC lists.
+
+On import, a variant marked *Present* with no allelic state reads as *Positive*. So does one whose allelic state can't be read (coded outside LOINC, or given only as text): a found variant is never dropped, and the console says what the state was.
+
+The Observation's value is still the gene, so a reader that ignores components reads the genes as before. PED, PEDX, DADA2 and BOADICEA have nowhere to put a result.
+
 ## Testing
 
 ### Unit tests

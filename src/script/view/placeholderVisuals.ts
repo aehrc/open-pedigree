@@ -5,7 +5,7 @@ const DRAWING_METHODS = [
   'drawAdoptedShape', 'drawCarrierGraphic', 'drawDeadShape', 'drawLabels', 'drawUnbornShape',
   'setGenderGraphics', 'setGenerationLabel', 'setHighlightBox', 'setLinkedRecordChangedMark', 'setPos', 'setSelected',
   'updateAgeLabel', 'updateCarrierGraphic', 'updateChildlessShapes', 'updateChildlessStatusLabel',
-  'updateCommentsLabel', 'updateDisorderShapes', 'updateEvaluationLabel', 'updateExternalIDLabel',
+  'updateCommentsLabel', 'updateDisorderShapes', 'updateEvaluationLabel', 'updateExternalIDLabel', 'updateGeneResultsLabel',
   'updateIDLabel', 'updateLifeStatusShapes', 'updateNameLabel', 'updateSBLabel',
 ];
 

@@ -27,6 +27,7 @@ import jQuery from 'jquery';
 import { toLocalIsoDate } from 'pedigree/model/localDate';
 import { currentAnswerValue } from 'pedigree/questionnaire/enableWhenEvaluator';
 import { isBlankValue } from 'pedigree/model/helpers';
+import { GENE_RESULT_CHOICES } from 'pedigree/model/geneResults';
 
 var SELECTIZE_DELIMITER = '|';
 
@@ -1198,9 +1199,97 @@ export default class NodeMenu {
         // codings; none (not the last person's) if not a list
         var ids = (Array.isArray(values) ? values : []).filter(function(v: any) { return v && v.code; }).map(function(v: any) { return v.code; });
         refillLegendPicker(container, (target[0] as any).selectize, legend, ids, true);
+        // (the built-in Genes field: a result for each gene, under the picker)
+        if (linkId === 'candidate_genes') {
+          this._renderGeneResults(container);
+        }
       }
     }
   };
+
+  /**
+   * Under the Genes picker, a row per selected gene - its name and a result drop-down (Not tested,
+   * Heterozygous, ...: model/geneResults). Redrawn whenever the field is, so it follows the genes
+   * added or removed; a change is one setGeneResults step.
+   */
+  _renderGeneResults(container: any): void {
+    var box = container.querySelector('.gene-results');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'gene-results';
+      container.appendChild(box);
+    }
+    // (rebuilt, but the drop-down being used keeps the focus: a keyboard change re-renders this)
+    // (only for the same person: on another, the same gene's drop-down mustn't take keys meant for this one)
+    var node = this.targetNode;
+    var focused: any = document.activeElement;
+    var samePerson = node && box.dataset.node === String(node.getID());
+    var focusedGene = samePerson && focused && box.contains(focused) && focused.parentNode ? focused.parentNode.dataset.gene : null;
+    box.textContent = '';
+    if (!node || typeof node.getGeneResults !== 'function') {
+      delete box.dataset.node;
+      return;
+    }
+    box.dataset.node = String(node.getID());
+    var _this = this;
+    var legend = editor.getGeneLegend();
+    var results = node.getGeneResults();
+    // (locked with the Genes picker: see _setFieldDisabled)
+    var picker = container.querySelector('select.suggest-questionnaire-legend');
+    var locked = !!(picker && picker.selectize && picker.selectize.isDisabled);
+    node.getGenes().forEach(function(id: any) {
+      var gene = legend.desanitizeID(id);
+      var name = legend.displayName(id);
+      var row = document.createElement('div');
+      row.className = 'gene-result';
+      row.dataset.gene = gene;
+      var label = document.createElement('span');
+      label.className = 'gene-result-name';
+      label.textContent = name;
+      var select = document.createElement('select');
+      select.className = 'gene-result-value';
+      select.setAttribute('aria-label', 'Result for ' + name);
+      GENE_RESULT_CHOICES.forEach(function(choice) {
+        var option = document.createElement('option');
+        option.value = choice.code;
+        option.textContent = choice.label;
+        select.appendChild(option);
+      });
+      select.value = results.hasOwnProperty(gene) ? results[gene] : '';
+      select.disabled = locked;
+      select.addEventListener('change', function() {
+        if (_this._updating || !_this.targetNode) {
+          return;
+        }
+        var updated = _this.targetNode.getGeneResults();
+        if (select.value) {
+          updated[gene] = select.value;
+        } else {
+          delete updated[gene];
+        }
+        _this._startNewUndoStep();
+        document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', {
+          detail: { 'nodeID': _this.targetNode.getID(), 'properties': { 'setGeneResults': updated } }
+        }));
+      });
+      row.appendChild(label);
+      row.appendChild(select);
+      box.appendChild(row);
+      if (gene === focusedGene) {
+        select.focus();
+      }
+    });
+  }
+
+  // A gene's name has arrived (GeneLegend): that gene's row, if the open menu shows it, takes the
+  // name - in place, so a drop-down someone has open stays open.
+  refreshGeneName(gene: any, name: string): void {
+    var rows = this.menuBox ? Array.from(this.menuBox.querySelectorAll('.gene-results .gene-result')) : [];
+    rows.filter(function(row: any) { return row.dataset.gene === gene; }).forEach(function(row: any) {
+      row.querySelector('.gene-result-name').textContent = name;
+      row.querySelector('.gene-result-value').setAttribute('aria-label', 'Result for ' + name);
+    });
+  }
 
   _toggleFieldVisibility(container: any, doHide: any): any {
     if (doHide) {
@@ -1376,6 +1465,10 @@ export default class NodeMenu {
     },
     'questionnaire-legend-picker' : function(this: any, container: any, disabled: any): any {
       this._setSelectizeDisabled(container, disabled);
+      // (a gene's result is locked with the genes)
+      Array.from(container.querySelectorAll('.gene-results select')).forEach(function(select: any) {
+        select.disabled = !!disabled;
+      });
     }
   };
 

@@ -1,5 +1,6 @@
 import Raphael from 'pedigree/raphael';
 import Legend from 'pedigree/view/legend';
+import { isLoadingName } from 'pedigree/terminology/loadingName';
 
 /**
  * Class responsible for keeping track of candidate genes.
@@ -12,6 +13,36 @@ export default class GeneLegend extends Legend {
 
   constructor(terminology: any) {
     super('Candidate Genes', terminology, 'gene');
+  }
+
+  // How a gene is named beside its result: its terminology name, or its ID while that is loading.
+  // (from the terms already known, without creating one: creating a term can call back into this)
+  displayName(id: any): string {
+    const term = this._cache[this.sanitizeID(id)];
+    const name = term && term.getName ? term.getName() : null;
+    return typeof name === 'string' && name && !isLoadingName(name) ? name : this.desanitizeID(id);
+  }
+
+  // A gene's name has arrived: its people's result lines show it too (PersonVisuals.updateGeneResultsLabel).
+  _updateTermName(id: any): void {
+    super._updateTermName(id);
+    var view = editor.getView && editor.getView();
+    var gene = this.desanitizeID(id);
+    (this._affectedNodes[id] || []).forEach(function(nodeID: any) {
+      var node = view && view.getNode(nodeID);
+      // (only people with a result for this gene have a line naming it)
+      if (!node || typeof node.getGeneResults !== 'function' || !node.getGeneResults().hasOwnProperty(gene)) {
+        return;
+      }
+      var graphics = node.getGraphics && node.getGraphics();
+      if (graphics && typeof graphics.updateGeneResultsLabel === 'function') {
+        graphics.updateGeneResultsLabel();
+      }
+    });
+    var menu = editor.getNodeMenu && editor.getNodeMenu();
+    if (menu && typeof menu.refreshGeneName === 'function') {
+      menu.refreshGeneName(this.desanitizeID(id), this.displayName(id));
+    }
   }
 
   /**

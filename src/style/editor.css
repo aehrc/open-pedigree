@@ -911,3 +911,23 @@
   padding: 3px 12px;
   cursor: pointer;
 }
+
+/* A result for each gene, under the Genes picker (model/geneResults). */
+.menu-box .gene-results {
+  margin-top: 4px;
+}
+.menu-box .gene-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+}
+.menu-box .gene-result-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-box .gene-result-value {
+  flex: 0 0 auto;
+}

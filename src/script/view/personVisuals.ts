@@ -7,6 +7,7 @@ import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { getElementHalfHeight, sector } from 'pedigree/view/graphicHelpers';
 import getAge from 'pedigree/view/ageCalc';
 import { deidentifiedAgeLabel } from 'pedigree/model/ageBand';
+import { GENE_RESULT_MARKERS } from 'pedigree/model/geneResults';
 
 /**
  * Class for organizing graphics for Person nodes.
@@ -35,6 +36,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   _ageLabel: any;
   _externalIDLabel: any;
   _commentsLabel: any;
+  _geneResultsLabel: any;
   _childlessStatusLabel: any;
   _disorderShapes: any;
   _deadShape: any;
@@ -55,6 +57,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this._ageLabel = null;
     this._externalIDLabel = null;
     this._commentsLabel = null;
+    this._geneResultsLabel = null;
     this._childlessStatusLabel = null;
     this._disorderShapes = null;
     this._deadShape = null;
@@ -678,6 +681,41 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     return this._commentsLabel;
   }
 
+  getGeneResultsLabel(): any {
+    return this._geneResultsLabel;
+  }
+
+  /**
+   * One line per tested gene, `<gene> <marker>` (model/geneResults), in the Genes list's order.
+   * Clinical, so kept in the de-identified drawings, as the genes' colours are.
+   *
+   * @method updateGeneResultsLabel
+   */
+  updateGeneResultsLabel(): any {
+    this.getGeneResultsLabel() && this.getGeneResultsLabel().remove();
+    var node = this.getNode();
+    var results = node.getGeneResults ? node.getGeneResults() : {};
+    var lines: string[] = [];
+    var legend = Object.keys(results).length > 0 ? editor.getGeneLegend() : null;
+    var genes = legend && node.getGenes ? node.getGenes() : [];
+    for (var i = 0; i < genes.length; i++) {
+      var gene = legend.desanitizeID(genes[i]);
+      if (results.hasOwnProperty(gene)) {
+        // (the gene's ID until its name has loaded: GeneLegend redraws this when it does)
+        lines.push(legend.displayName(genes[i]) + ' ' + GENE_RESULT_MARKERS[results[gene]]);
+      }
+    }
+    if (lines.length > 0) {
+      this._geneResultsLabel = editor.getPaper().text(this.getX(), this.getY(), lines.join('\n'))
+        .attr((PedigreeEditorParameters as any).attributes.externalIDLabels);
+      this._geneResultsLabel.alignTop = true;
+      this._geneResultsLabel.node.setAttribute('class', 'gene-results-label');
+    } else {
+      this._geneResultsLabel = null;
+    }
+    this.drawLabels();
+  }
+
   /**
    * Updates the stillbirth label for this Person
    *
@@ -781,6 +819,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     this.getGenerationLabel() && labels.push(this.getGenerationLabel());
     this.getAgeLabel() && labels.push(this.getAgeLabel());
     this.getExternalIDLabel() && labels.push(this.getExternalIDLabel());
+    this.getGeneResultsLabel() && labels.push(this.getGeneResultsLabel());
     this.getCommentsLabel() && labels.push(this.getCommentsLabel());
     return labels;
   }
