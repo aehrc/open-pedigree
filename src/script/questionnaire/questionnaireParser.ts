@@ -400,10 +400,9 @@ function refuseRetiredExtensions(node: any): void {
   if (!node || typeof node !== 'object') {
     return;
   }
-  if (typeof node.url === 'string' && node.url.indexOf(RETIRED_BASE) === 0
-      && READ_EXTENSIONS.indexOf(replacementFor(node.url) as string) !== -1) {
-    throw new Error('The Questionnaire uses ' + node.url + ', which open-pedigree no longer reads: use '
-      + replacementFor(node.url) + ' instead.');
+  const replacement = typeof node.url === 'string' && node.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(node.url) : null;
+  if (replacement && READ_EXTENSIONS.indexOf(replacement) !== -1) {
+    throw new Error('The Questionnaire uses ' + node.url + ', which open-pedigree no longer reads: use ' + replacement + ' instead.');
   }
   for (const key in node) {
     if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'url') {

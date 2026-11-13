@@ -421,7 +421,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     }
   });
 
-  it('warns about a retired extension once, however many people carry it', () => {
+  it('warns about a retired extension once per import, however many people carry it', () => {
     const gg = structuredClone(simpleGG);
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
     const bundle = JSON.parse(exported);
@@ -439,7 +439,8 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     try {
       GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
       GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
-      expect(warn.mock.calls.filter((c) => String(c[0]).includes(url)).length).toBeLessThanOrEqual(1);
+      // (two imports, one warning each)
+      expect(warn.mock.calls.filter((c) => String(c[0]).includes(url)).length).toBe(2);
     } finally {
       warn.mockRestore();
     }

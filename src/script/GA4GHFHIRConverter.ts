@@ -35,7 +35,7 @@ function generateUUID() {
 
 
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
-// Retired extension URLs already warned about (see extractDataFromPatient).
+// Retired extension URLs already warned about in this import (see extractDataFromPatient).
 const warnedRetired = new Set<string>();
 // An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
 // are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
@@ -59,6 +59,8 @@ GA4GHFHIRConverter.prototype = {};
 
 
 GA4GHFHIRConverter.initFromFHIR = function (inputText) {
+  // (each import says once which retired URLs it ignored)
+  warnedRetired.clear();
   let inputResource = null;
   try {
     inputResource = JSON.parse(inputText);

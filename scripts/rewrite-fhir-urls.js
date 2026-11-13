@@ -2,7 +2,9 @@
 // Rewrites open-pedigree's FHIR URLs from the retired github.com/aehrc/open-pedigree/ base to the
 // published one (fhirUrls.ts), in each file named on the command line: plain, JSON-escaped (\/)
 // and XML/HTML-escaped forms. Identifier systems (?externalID) and plain repository links are left
-// alone. Also turns the `adopted` extension's old valueBoolean true into valueCode "in".
+// alone. Also turns the `adopted` extension's old valueBoolean true into valueCode "in". Meant for
+// open-pedigree's stored JSON (plain, JSON-escaped or XML-escaped, as hosts store it), not FHIR XML
+// or JavaScript source; it moves every name under the retired base, published or not.
 // Usage: node scripts/rewrite-fhir-urls.js <file>...
 const fs = require('fs');
 
@@ -21,7 +23,8 @@ function rewrite(text) {
   // The adopted extension's value: true -> "in", in an object that names the adopted url, whichever
   // order its keys are in, in any quoting style (plain, JSON-escaped, XML-escaped).
   out = out.replace(/\{[^{}]*\}/g, (object) => {
-    if (!/StructureDefinition\\?\/adopted(?:&quot;|\\?")/.test(object)) {
+    // (open-pedigree's own adopted extension, by then on the published base)
+    if (!/aehrc\.github\.io\\?\/open-pedigree\\?\/fhir\\?\/StructureDefinition\\?\/adopted(?:&quot;|\\?")/.test(object)) {
       return object;
     }
     return object.replace(/valueBoolean((?:&quot;|\\?")\s*:\s*)true/, (m, sep) => {

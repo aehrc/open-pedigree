@@ -54,7 +54,7 @@ export function replacementFor(retiredUrl: string): string | null {
   }
   const rest = retiredUrl.slice(RETIRED_BASE.length);
   const candidate = rest.indexOf('questionnaire-') === 0 ? structureDefinition(rest) : FHIR_BASE + rest;
-  // (an item.definition-style fragment, #PedigreeIndividual.x, keeps its fragment)
-  const hash = candidate.indexOf('#');
-  return PUBLISHED_DEFINITION_URLS.indexOf(hash === -1 ? candidate : candidate.slice(0, hash)) === -1 ? null : candidate;
+  // (an item.definition fragment, #PedigreeIndividual.x, or a canonical's |version, is kept)
+  const bare = candidate.split(/[#|]/)[0];
+  return PUBLISHED_DEFINITION_URLS.indexOf(bare) === -1 ? null : candidate;
 }

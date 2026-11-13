@@ -21,6 +21,8 @@ describe('open-pedigree FHIR URLs', () => {
       .toBe(FHIR_BASE + 'StructureDefinition/fetus-date-of-death');
     expect(replacementFor('https://github.com/aehrc/open-pedigree/Questionnaire/default'))
       .toBe(FHIR_BASE + 'Questionnaire/default');
+    expect(replacementFor('https://github.com/aehrc/open-pedigree/Questionnaire/default|1.0'))
+      .toBe(FHIR_BASE + 'Questionnaire/default|1.0');
     expect(replacementFor('https://github.com/aehrc/open-pedigree?externalID')).toBeNull();
     expect(replacementFor('https://github.com/aehrc/open-pedigree')).toBeNull();
     expect(replacementFor('http://hl7.org/fhir/StructureDefinition/Patient')).toBeNull();

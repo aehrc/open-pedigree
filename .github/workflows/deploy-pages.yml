@@ -62,7 +62,11 @@ jobs:
             done
             echo "$code $1"; return 1
           }
-          check "$base/"
-          for page in $(cd _site/fhir && find . -mindepth 3 -name index.html | sed 's|^\./||; s|/index.html$||' | sort); do
+          check "$base/" || exit 1
+          pages=$(cd _site/fhir && find . -mindepth 3 -name index.html | sed 's|^\./||; s|/index.html$||' | sort)
+          # every definition in fhir/, and the default Questionnaire, was built
+          expected=$(( $(find fhir -name '*.json' | wc -l) + 1 ))
+          [ "$(echo "$pages" | grep -c .)" = "$expected" ] || { echo "built $(echo "$pages" | grep -c .) definitions, expected $expected"; exit 1; }
+          for page in $pages; do
             check "$base/$page" && check "$base/$page.json" || exit 1
           done

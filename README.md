@@ -156,7 +156,7 @@ open-pedigree's own FHIR extensions, and the other definitions its GA4GH pedigre
 
 The JSON lives in [`fhir/`](fhir/) (the default Questionnaire is built from `defaultQuestionnaire.ts`), the URLs in [`src/script/fhirUrls.ts`](src/script/fhirUrls.ts), and the Pages deploy publishes them with `scripts/build-fhir-site.js`.
 
-**Since 2.0.0.** Before 2.0.0 these URLs were under `https://github.com/aehrc/open-pedigree/`, which never resolved, and `adopted` was a `valueBoolean`. They are no longer read: a pedigree saved by an earlier version loses these fields when opened, and a Questionnaire that still uses an old extension URL isn't used (the built-in default is, and the console names the URL to use instead). `scripts/rewrite-fhir-urls.js <file>...` rewrites stored pedigrees and Questionnaires to the new URLs.
+**Since 2.0.0.** Before 2.0.0 these URLs were under `https://github.com/aehrc/open-pedigree/`, which never resolved, and `adopted` was a `valueBoolean`. They are no longer read: a pedigree saved by an earlier version loses these fields when opened, and a Questionnaire that uses an old URL for one of the extensions open-pedigree reads (`questionnaire-field-mapping`, `-action`, `-enable-predicate`, `-linked-record-source`) isn't used: the built-in default is, and the console names the URL to use instead. A host's own extensions (e.g. redcap_pedigree_editor's `questionnaire-redcap-source`) are the host's to check. `scripts/rewrite-fhir-urls.js <file>...` rewrites stored pedigrees and Questionnaires to the new URLs.
 
 ## Testing
 

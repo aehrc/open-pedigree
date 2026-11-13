@@ -34,6 +34,11 @@ describe('scripts/rewrite-fhir-urls.js', () => {
       .toBe(`{\\"url\\":\\"${escaped(NEW_ADOPTED)}\\",\\"valueCode\\":\\"in\\"}`);
   });
 
+  it("leaves another system's adopted extension alone", () => {
+    const theirs = '{"url":"http://example.org/fhir/StructureDefinition/adopted","valueBoolean":true}';
+    expect(rewrite(theirs)).toBe(theirs);
+  });
+
   it("leaves another extension's boolean alone", () => {
     const other = '{"url":"https://github.com/aehrc/open-pedigree/StructureDefinition/fetus-date-of-death","valueBoolean":true}';
     expect(rewrite(other)).toBe('{"url":"' + NEW + 'StructureDefinition/fetus-date-of-death","valueBoolean":true}');
