@@ -116,8 +116,8 @@ describe('Person gene results', () => {
   it('draws one line per tested gene, in the list order, with its marker', () => {
     const p = person(['BRCA1', 'BRCA2', 'TP53', 'MLH1', 'ATM']);
     texts.length = 0;
-    p.setGeneResults({ TP53: 'negative', BRCA1: 'heterozygous', MLH1: 'hemizygous', ATM: 'homozygous' });
-    expect(geneLines().pop()).toBe('name BRCA1 +/−\nname TP53 −/−\nname MLH1 +/0\nname ATM +/+');
+    p.setGeneResults({ TP53: 'negative', BRCA1: 'heterozygous', MLH1: 'hemizygous', ATM: 'homozygous', BRCA2: 'positive' });
+    expect(geneLines().pop()).toBe('name BRCA1 +/−\nname BRCA2 +\nname TP53 −/−\nname MLH1 +/0\nname ATM +/+');
   });
 
   it('redraws the lines in the new order when the genes are only reordered', () => {

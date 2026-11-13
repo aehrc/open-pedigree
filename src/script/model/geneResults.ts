@@ -4,10 +4,13 @@
  * gene with no entry is not tested.
  */
 
-export const GENE_RESULT_CODES = ['heterozygous', 'homozygous', 'hemizygous', 'negative'];
+// 'positive': a variant was found, its zygosity unknown (e.g. a family's report, or another tool's
+// record without one).
+export const GENE_RESULT_CODES = ['positive', 'heterozygous', 'homozygous', 'hemizygous', 'negative'];
 
 // Drawn under the symbol after the gene (U+2212 minus, as typeset pedigrees use).
 export const GENE_RESULT_MARKERS: { [code: string]: string } = {
+  positive: '+',
   heterozygous: '+/−',
   homozygous: '+/+',
   hemizygous: '+/0',
@@ -17,6 +20,7 @@ export const GENE_RESULT_MARKERS: { [code: string]: string } = {
 // The result drop-down's choices beside each gene, in order ('' = not tested).
 export const GENE_RESULT_CHOICES: Array<{ code: string; label: string }> = [
   { code: '', label: 'Not tested' },
+  { code: 'positive', label: 'Positive, zygosity unknown (+)' },
   { code: 'heterozygous', label: 'Heterozygous (+/−)' },
   { code: 'homozygous', label: 'Homozygous (+/+)' },
   { code: 'hemizygous', label: 'Hemizygous (+/0)' },
@@ -47,6 +51,9 @@ export function geneResultComponents(code: any): any[] {
   if (code === 'negative') {
     return [{ code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [ABSENT] } }];
   }
+  if (code === 'positive') {
+    return [{ code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [PRESENT] } }];
+  }
   return [
     { code: { coding: [VARIANT_ASSESSMENT] }, valueCodeableConcept: { coding: [PRESENT] } },
     { code: { coding: [ALLELIC_STATE] }, valueCodeableConcept: { coding: [ALLELIC_STATES[code]] } },
@@ -63,8 +70,10 @@ const valueCode = (component: any): any => {
   return loinc ? loinc.code : null;
 };
 
-// The result an Observation's components say, or null for none (or one that can't be read).
-export function geneResultFromComponents(components: any): string | null {
+// The result an Observation's components say, or null for none (or one that can't be read). A
+// variant found with no allelic state, or one not listed here (e.g. heteroplasmic, homoplasmic), is
+// 'positive': that it was found is never lost (`dropped` hears of a state that wasn't kept).
+export function geneResultFromComponents(components: any, dropped?: (state: string) => void): string | null {
   if (!Array.isArray(components)) {
     return null;
   }
@@ -85,5 +94,8 @@ export function geneResultFromComponents(components: any): string | null {
       return code;
     }
   }
-  return null;
+  if (state && dropped) {
+    dropped(state);
+  }
+  return 'positive';
 }

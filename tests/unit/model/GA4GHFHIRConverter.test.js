@@ -767,14 +767,37 @@ describe('GA4GHFHIRConverter gene results', () => {
     expect(brca1.component).toEqual([component('69548-6', 'LA9633-4'), component('53034-5', 'LA6706-1')]);
   });
 
-  it('ignores a result it cannot read, and says so', () => {
+  const readBack = (bundle) => Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).properties)
+    .find((p) => (p.candidateGenes || []).length);
+
+  it('writes a positive result of unknown zygosity as Present alone, and reads it back', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'positive' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
+    expect(brca1.component).toEqual([component('69548-6', 'LA9633-4')]);
+    expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'positive' });
+  });
+
+  it('never loses a found variant: an allelic state it does not keep reads as positive, and says so', () => {
     const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
     const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
-    // (Present, but with no allelic state)
-    brca1.component = brca1.component.slice(0, 1);
+    // (heteroplasmic: a mitochondrial gene's state)
+    brca1.component[1].valueCodeableConcept.coding[0] = { system: 'http://loinc.org', code: 'LA6703-8', display: 'Heteroplasmic' };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const read = Object.values(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).properties).find((p) => (p.candidateGenes || []).length);
+      expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'positive' });
+      expect(warn.mock.calls.some((c) => String(c[0]).includes('as positive: allelic state LA6703-8'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('ignores an assessment it cannot read, and says so', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous' }) }, 'all', null, null));
+    const brca1 = geneObservations(bundle).find((o) => o.valueString === 'gene: BRCA1');
+    brca1.component = [{ code: { coding: [{ system: 'http://loinc.org', code: '69548-6' }] }, valueCodeableConcept: { coding: [{ system: 'http://loinc.org', code: 'LA-unknown' }] } }];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const read = readBack(bundle);
       expect(read.candidateGenes).toContain('BRCA1');
       expect(read.geneResults).toBeUndefined();
       expect(warn.mock.calls.some((c) => String(c[0]).startsWith('Ignoring an unreadable gene result'))).toBe(true);

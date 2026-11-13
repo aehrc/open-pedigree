@@ -184,12 +184,12 @@ test('a result drop-down keeps the focus through a keyboard change, and is locke
   await openMenu(page);
   await resultSelect(page, 'TP53').focus();
   await page.keyboard.press('ArrowDown');
-  await expect.poll(() => results(page)).toEqual({ TP53: 'heterozygous' });
+  await expect.poll(() => results(page)).toEqual({ TP53: 'positive' });
   // (the menu was redrawn, and the same drop-down still has the focus)
   expect(await page.evaluate(() => document.activeElement && document.activeElement.closest('.gene-result')
     && document.activeElement.closest('.gene-result').dataset.gene)).toBe('TP53');
   await page.keyboard.press('ArrowDown');
-  await expect.poll(() => results(page)).toEqual({ TP53: 'homozygous' });
+  await expect.poll(() => results(page)).toEqual({ TP53: 'heterozygous' });
 
   // Locked with the genes (as a Questionnaire's disabledWhen or a linked record does).
   await page.evaluate(() => {
@@ -198,4 +198,14 @@ test('a result drop-down keeps the focus through a keyboard change, and is locke
   });
   await expect(resultSelect(page, 'BRCA1')).toBeDisabled();
   await expect(resultSelect(page, 'TP53')).toBeDisabled();
+});
+
+test('a variant found with its zygosity unknown is drawn as +', async ({ page }) => {
+  await open(page);
+  await setGenes(page, ['BRCA1']);
+  await openMenu(page);
+  await expect(resultSelect(page, 'BRCA1').locator('option[value="positive"]')).toHaveText('Positive, zygosity unknown (+)');
+  await resultSelect(page, 'BRCA1').selectOption('positive');
+  expect(await results(page)).toEqual({ BRCA1: 'positive' });
+  expect(await resultLine(page)).toBe('BRCA1 +');
 });
