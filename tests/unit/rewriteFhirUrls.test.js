@@ -29,9 +29,11 @@ describe('scripts/rewrite-fhir-urls.js', () => {
     expect(rewrite(`{"valueBoolean":true,"url":"${OLD_ADOPTED}"}`)).toBe(`{"valueCode":"in","url":"${NEW_ADOPTED}"}`);
     expect(rewrite(`{&quot;valueBoolean&quot;:true,&quot;url&quot;:&quot;${OLD_ADOPTED}&quot;}`))
       .toBe(`{&quot;valueCode&quot;:&quot;in&quot;,&quot;url&quot;:&quot;${NEW_ADOPTED}&quot;}`);
-    const escaped = (url) => url.replace(/\//g, '\\/');
-    expect(rewrite(`{\\"url\\":\\"${escaped(OLD_ADOPTED)}\\",\\"valueBoolean\\":true}`))
-      .toBe(`{\\"url\\":\\"${escaped(NEW_ADOPTED)}\\",\\"valueCode\\":\\"in\\"}`);
+    // (JSON-escaped slashes, inside a JSON string)
+    const OLD_ESCAPED = 'https:\\/\\/github.com\\/aehrc\\/open-pedigree\\/StructureDefinition\\/adopted';
+    const NEW_ESCAPED = 'https:\\/\\/aehrc.github.io\\/open-pedigree\\/fhir\\/StructureDefinition\\/adopted';
+    expect(rewrite(`{\\"url\\":\\"${OLD_ESCAPED}\\",\\"valueBoolean\\":true}`))
+      .toBe(`{\\"url\\":\\"${NEW_ESCAPED}\\",\\"valueCode\\":\\"in\\"}`);
   });
 
   it("leaves another system's adopted extension alone", () => {

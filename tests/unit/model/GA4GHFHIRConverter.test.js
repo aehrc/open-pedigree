@@ -414,8 +414,8 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     try {
       const graph = GA4GHFHIRConverter.initFromFHIR(retired);
       expect(Object.values(graph.properties).filter((p) => p.isAdopted)).toEqual([]);
-      expect(warn.mock.calls.map((c) => String(c[0])).some((m) => m.includes('https://github.com/aehrc/open-pedigree/StructureDefinition/adopted')
-        && m.includes('https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted'))).toBe(true);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain('Ignoring https://github.com/aehrc/open-pedigree/StructureDefinition/adopted: '
+        + 'open-pedigree no longer reads it (now https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted)');
     } finally {
       warn.mockRestore();
     }
@@ -440,7 +440,9 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
       GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
       GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
       // (two imports, one warning each)
-      expect(warn.mock.calls.filter((c) => String(c[0]).includes(url)).length).toBe(2);
+      const expected = 'Ignoring ' + url + ': open-pedigree no longer reads it (now '
+        + 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/linked-record-snapshot)';
+      expect(warn.mock.calls.filter((c) => String(c[0]) === expected).length).toBe(2);
     } finally {
       warn.mockRestore();
     }
