@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.0.0...open-pedigree-v2.1.0) (2026-11-13)
+
+
+### Features
+
+* a result for each gene, drawn under the symbol and saved with standard codes ([#102](https://github.com/aehrc/open-pedigree/issues/102)) ([6c8bf6c](https://github.com/aehrc/open-pedigree/commit/6c8bf6c268855981c546d657dd846508f1e9a446))
+
 ## [2.0.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v1.8.0...open-pedigree-v2.0.0) (2026-11-13)
 
 
