@@ -3,6 +3,38 @@ import BaseGraph, { PLACEHOLDER_ID_PREFIX, addPlaceholderChild, isPlaceholderPro
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import validateImportedGraph from 'pedigree/model/validateImportedGraph';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
+import { ProblemList } from 'pedigree/model/importProblems';
+
+
+/**
+ * A child's parents in a PED-like file (PED, BOADICEA, DADA2), by the IDs it gives (0: not given; a
+ * parent not given is made up, as the editor shows two). Null, with the problem recorded, when an ID
+ * is no row's or a parent's sex contradicts their role - the child is then left without parents.
+ */
+function pedParents(found: ProblemList, newG: any, nameToId: any, fatherRef: any, motherRef: any, childRef: any): any {
+  let ok = true;
+  const check = (ref: any, role: string, otherSex: string, otherSexWord: string) => {
+    if (ref == 0) {
+      return;
+    }
+    if (!nameToId.hasOwnProperty(ref)) {
+      found.add('Unable to import pedigree: [' + ref + '] is not a valid ' + role + ' reference for [id: ' + childRef + '] (no person has that ID)');
+      ok = false;
+    } else if (newG.properties[nameToId[ref]].gender == otherSex) {
+      found.add('Unable to import pedigree: a person declared as ' + otherSexWord + ' [id: ' + ref + '] is also declared as being a ' + role + ' for [id: ' + childRef + ']');
+      ok = false;
+    }
+  };
+  check(fatherRef, 'father', 'F', 'female');
+  check(motherRef, 'mother', 'M', 'male');
+  if (!ok) {
+    return null;
+  }
+  return {
+    father: (fatherRef == 0) ? newG._addVertex(null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth) : nameToId[fatherRef],
+    mother: (motherRef == 0) ? newG._addVertex(null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth) : nameToId[motherRef],
+  };
+}
 
 var PedigreeImport = function () {
 };
@@ -186,10 +218,7 @@ PedigreeImport.initFromPhenotipsInternal = function(inputG) {
  */
 PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEvaluated, saveIDAsExternalID, affectedCodeOne, disorderNames) {
   let i;
-  var allInputLines = inputText.match(/[^\r\n]+/g);
-  if (allInputLines.length == 0) {
-    throw 'Unable to import: no data';
-  }
+  var allInputLines = inputText.match(/[^\r\n]+/g) || [];
   const inputLines = [];
   for (i = 0; i < allInputLines.length; i++) {
     const line = allInputLines[i].trim();
@@ -199,6 +228,11 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     }
     inputLines.push(line);
   }
+  if (inputLines.length == 0) {
+    throw 'Unable to import: no data';
+  }
+  // (every problem with a row or link is recorded, and the rest still checked: see importProblems)
+  var found = new ProblemList();
   // autodetect if data is in pre-makeped or post-makeped format
   var postMakeped = false;
   if (inputLines[0].indexOf('Ped:') > 0 && inputLines[0].indexOf('Per:') > 0) {
@@ -229,7 +263,8 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     //console.log("Parts: " + JSON.stringify(parts));
 
     if (parts.length < 6 || (postMakeped && parts.length < 10)) {
-      throw 'Input line has not enough columns: [' + inputLines[i] + ']';
+      found.add('Input line has not enough columns: [' + inputLines[i] + ']');
+      continue;
     }
 
     if (familyPrefix == '') {
@@ -242,7 +277,8 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
 
     var pedID = parts[1];
     if (nameToId.hasOwnProperty(pedID)) {
-      throw 'Multiple persons with the same ID [' + pedID + ']';
+      found.add('Multiple persons with the same ID [' + pedID + ']');
+      continue;
     }
 
     var genderValue = postMakeped ? parts[7] : parts[4];
@@ -284,7 +320,7 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
   // Use the "standard" by default, unless directed to use the other one by the user
   if (affectedCodeOne) {
     if (extendedPhenotypesFound || phenotypeValues.hasOwnProperty('2')) {
-      throw 'Phenotypes with codes other than 0 or 1 were found';
+      found.add('Phenotypes with codes other than 0 or 1 were found');
     }
     var affectedValues   = { '1':  true };
     var missingValues    = { '-9': true };
@@ -310,6 +346,9 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
   }
 
   var defaultEdgeWeight = 1;
+
+  // (no linking people when a row was set aside: every link to it would be reported again)
+  found.throwIfAny();
 
   var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
 
@@ -349,24 +388,13 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
       continue;
     }
 
-    // .PED supports specifying only mohter of father. Pedigree editor requires both (for now).
-    // So create a virtual parent in case one of the parents is missing
-    if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      fatherID = nameToId[fatherID];
-      if (newG.properties[fatherID].gender == 'F') {
-        throw 'Unable to import pedigree: a person declared as female [id: ' + fatherID + '] is also declared as being a father for [id: '+thisPersonName+']';
-      }
+    // (a parent not given is made up: the editor shows two)
+    var parents = pedParents(found, newG, nameToId, fatherID, motherID, thisPersonName);
+    if (!parents) {
+      continue;
     }
-    if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      motherID = nameToId[motherID];
-      if (newG.properties[motherID].gender == 'M') {
-        throw 'Unable to import pedigree: a person declared as male [id: ' + motherID + '] is also declared as being a mother for [id: '+thisPersonName+']';
-      }
-    }
+    fatherID = parents.father;
+    motherID = parents.mother;
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
 
@@ -377,10 +405,12 @@ PedigreeImport.initFromPED = function(inputText, acceptOtherPhenotypes, markEval
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
-  keepValidPlaceholders(newG);
-  PedigreeImport.validateBaseGraph(newG);
+  found.throwIfAny();
 
-  return newG;
+  keepValidPlaceholders(newG);
+  PedigreeImport.validateBaseGraph(newG, found);
+
+  return found.attachNotes(newG);
 };
 
 
@@ -438,7 +468,7 @@ PedigreeImport.initFromPEDX = function(inputText, acceptOtherPhenotypes, markEva
  * ===============================================================================================
  */
 PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
-  var inputLines = inputText.match(/[^\r\n]+/g);
+  var inputLines = inputText.match(/[^\r\n]+/g) || [];
 
   if (inputLines.length <= 2) {
     throw 'Unable to import: no data';
@@ -447,6 +477,9 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
     throw 'Unable to import: unsupported version of the BOADICEA format';
   }
   inputLines.splice(0,2); // remove 2 header lines
+
+  // (every problem with a row or link is recorded, and the rest still checked: see importProblems)
+  var found = new ProblemList();
 
   var familyPrefix = '';
 
@@ -466,7 +499,8 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
     //console.log("Parts: " + JSON.stringify(parts));
 
     if (parts.length < 24) {
-      throw 'Input line has not enough columns: [' + inputLines[i] + ']';
+      found.add('Input line has not enough columns: [' + inputLines[i] + ']');
+      continue;
     }
 
     if (familyPrefix == '') {
@@ -479,7 +513,8 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
 
     var extID = parts[3];
     if (nameToId.hasOwnProperty(extID)) {
-      throw 'Multiple persons with the same ID [' + extID + ']';
+      found.add('Multiple persons with the same ID [' + extID + ']');
+      continue;
     }
 
     var genderValue = parts[6];
@@ -559,6 +594,9 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
     nameToId[extID] = pedigreeID;
   }
 
+  // (no linking people when a row was set aside: every link to it would be reported again)
+  found.throwIfAny();
+
   var defaultEdgeWeight = 1;
 
   var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
@@ -581,24 +619,13 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
       continue;
     }
 
-    // .PED supports specifying only mother or father. Pedigree editor requires both (for now).
-    // So create a virtual parent in case one of the parents is missing
-    if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      fatherID = nameToId[fatherID];
-      if (newG.properties[fatherID].gender == 'F') {
-        throw 'Unable to import pedigree: a person declared as female [id: ' + fatherID + '] is also declared as being a father for [id: '+extID+']';
-      }
+    // (a parent not given is made up: the editor shows two)
+    var parents = pedParents(found, newG, nameToId, fatherID, motherID, extID);
+    if (!parents) {
+      continue;
     }
-    if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      motherID = nameToId[motherID];
-      if (newG.properties[motherID].gender == 'M') {
-        throw 'Unable to import pedigree: a person declared as male [id: ' + motherID + '] is also declared as being a mother for [id: '+extID+']';
-      }
-    }
+    fatherID = parents.father;
+    motherID = parents.mother;
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
 
@@ -609,9 +636,11 @@ PedigreeImport.initFromBOADICEA = function(inputText, saveIDAsExternalID) {
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
-  PedigreeImport.validateBaseGraph(newG);
+  found.throwIfAny();
 
-  return newG;
+  PedigreeImport.validateBaseGraph(newG, found);
+
+  return found.attachNotes(newG);
 };
 
 /* ===============================================================================================
@@ -660,8 +689,8 @@ function keepValidPlaceholders(newG) {
   }
 }
 
-PedigreeImport.validateBaseGraph = function(newG) {
-  validateImportedGraph(newG);
+PedigreeImport.validateBaseGraph = function(newG, found?) {
+  validateImportedGraph(newG, found);
 };
 
 /* ===============================================================================================
@@ -689,7 +718,7 @@ PedigreeImport.validateBaseGraph = function(newG) {
  * ===============================================================================================
  */
 PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExternalID) {
-  var inputLines = inputText.match(/[^\r\n]+/g);
+  var inputLines = inputText.match(/[^\r\n]+/g) || [];
   if (inputLines.length == 0) {
     throw 'Unable to import: no data';
   }
@@ -805,15 +834,19 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
   };
 
   var gedcom = convertToObject(inputLines);
+
+  // (every problem with an individual or family is recorded, and the rest still checked: see importProblems)
+  var found = new ProblemList();
   console.log('GEDCOM object: ' + JSON.stringify(gedcom));
 
-  if (gedcom.header.hasOwnProperty('GEDC')) {
-    if (gedcom.header.GEDC.hasOwnProperty('VERS')) {
-      if (gedcom.header.GEDC.VERS != '5.5' && gedcom.header.GEDC.VERS != '5.5.1') {
-        alert('Unsupported GEDCOM version detected: [' + gedcom.header.GEDC.VERS + ']. '+
-                     'Import will continue but the correctness is not guaranteed. Supportede versions are 5.5 and 5.5.1');
-      }
-    }
+  // (as parsed: GEDC holds a list of objects, each with a list of VERS values)
+  const gedc = (gedcom.header as any).GEDC;
+  const gedcomVersion = (gedc && gedc[0] && gedc[0].VERS && gedc[0].VERS[0]) ? gedc[0].VERS[0].value : undefined;
+  if (gedcomVersion !== undefined && gedcomVersion != '5.5' && gedcomVersion != '5.5.1') {
+    const versionWarning = 'Unsupported GEDCOM version detected: [' + gedcomVersion + ']. '
+      + 'Import will continue but the correctness is not guaranteed. Supported versions are 5.5 and 5.5.1';
+    console.warn(versionWarning);
+    found.note(versionWarning);
   }
 
   if (gedcom.individuals.length == 0) {
@@ -827,6 +860,11 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
   // first pass: add all vertices and assign vertex IDs
   for (var i = 0; i < gedcom.individuals.length; i++) {
     var nextPerson =  gedcom.individuals[i];
+
+    if (externalIDToID.hasOwnProperty(nextPerson.id)) {
+      found.add('Multiple persons with the same ID [' + nextPerson.id + ']');
+      continue;
+    }
 
     var pedigreeID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {}, newG.defaultPersonNodeWidth );
 
@@ -979,6 +1017,9 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     newG.properties[pedigreeID] = properties;
   }
 
+  // (no linking people when an individual was set aside: every link to them would be reported again)
+  found.throwIfAny();
+
   var defaultEdgeWeight = 1;
 
   var relationshipTracker = new RelationshipTracker(newG, defaultEdgeWeight);
@@ -991,23 +1032,48 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     var motherLink = nextFamily.hasOwnProperty('WIFE') ? getFirstValue(nextFamily['WIFE']) : null;
     var fatherLink = nextFamily.hasOwnProperty('HUSB') ? getFirstValue(nextFamily['HUSB']) : null;
 
+    // a family whose husband or wife can't be its father or mother is set aside
+    var familyOK = true;
+    if (fatherLink != null) {
+      if (!externalIDToID.hasOwnProperty(fatherLink)) {
+        found.add('Unable to import pedigree: [' + fatherLink + '] is not a valid father reference (no individual has that ID)');
+        familyOK = false;
+      } else if (newG.properties[externalIDToID[fatherLink]].gender == 'F') {
+        found.add('Unable to import pedigree: a person declared as female is also declared as being a father ('+fatherLink+')');
+        familyOK = false;
+      }
+    }
+    if (motherLink != null) {
+      if (!externalIDToID.hasOwnProperty(motherLink)) {
+        found.add('Unable to import pedigree: [' + motherLink + '] is not a valid mother reference (no individual has that ID)');
+        familyOK = false;
+      } else if (newG.properties[externalIDToID[motherLink]].gender == 'M') {
+        found.add('Unable to import pedigree: a person declared as male is also declared as being a mother ('+motherLink+')');
+        familyOK = false;
+      }
+    }
+    var children = nextFamily.hasOwnProperty('CHIL') ? nextFamily['CHIL'] : null;
+    // (every child link checked, whether or not the family is kept)
+    var childIDs = [];
+    for (var j = 0; j < (children || []).length; j++) {
+      var externalID = children[j].value;
+      if (!externalIDToID.hasOwnProperty(externalID)) {
+        found.add('Unable to import pedigree: child link does not point to an existing individual: [' + externalID + ']');
+      } else {
+        childIDs.push(externalIDToID[externalID]);
+      }
+    }
+    if (!familyOK) {
+      continue;
+    }
+
     // create a virtual parent in case one of the parents is missing
-    if (fatherLink == null) {
-      var fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      var fatherID = externalIDToID[fatherLink];
-      if (newG.properties[fatherID].gender == 'F') {
-        throw 'Unable to import pedigree: a person declared as female is also declared as being a father ('+fatherLink+')';
-      }
-    }
-    if (motherLink == null) {
-      var motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      var motherID = externalIDToID[motherLink];
-      if (newG.properties[motherID].gender == 'M') {
-        throw 'Unable to import pedigree: a person declared as male is also declared as being a mother ('+motherLink+')';
-      }
-    }
+    var fatherID = (fatherLink == null)
+      ? newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth )
+      : externalIDToID[fatherLink];
+    var motherID = (motherLink == null)
+      ? newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth )
+      : externalIDToID[motherLink];
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
 
@@ -1015,32 +1081,23 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
     // if there is no relationship, a new one is created together with the chldhub
     var chhubID = relationshipTracker.createOrGetChildhub(motherID, fatherID);
 
-    var children = nextFamily.hasOwnProperty('CHIL') ? nextFamily['CHIL'] : null;
-
     if (children == null) {
       // a family with no children is a couple with no children: their only child is a placeholder
       // (DynamicPositionedGraph.isPlaceholder)
       addPlaceholderChild(newG, chhubID, defaultEdgeWeight);
-      children = [];
     }
 
-    for (var j = 0; j < children.length; j++) {
-      var externalID = children[j].value;
-
-      var childID = externalIDToID.hasOwnProperty(externalID) ? externalIDToID[externalID] : null;
-
-      if (childID == null) {
-        throw 'Unable to import pedigree: child link does not point to an existing individual: [' + externalID + ']';
-      }
-
-      newG.addEdge( chhubID, childID, defaultEdgeWeight );
+    for (var j = 0; j < childIDs.length; j++) {
+      newG.addEdge( chhubID, childIDs[j], defaultEdgeWeight );
     }
   }
 
-  keepValidPlaceholders(newG);
-  PedigreeImport.validateBaseGraph(newG);
+  found.throwIfAny();
 
-  return newG;
+  keepValidPlaceholders(newG);
+  PedigreeImport.validateBaseGraph(newG, found);
+
+  return found.attachNotes(newG);
 };
 
 PedigreeImport.initFromGA4GH = function(inputText){
@@ -1088,10 +1145,7 @@ PedigreeImport.initFromGA4GH = function(inputText){
 
 PedigreeImport.initFromDADA2 = function(inputText) {
   let i;
-  var allInputLines = inputText.match(/[^\r\n]+/g);
-  if (allInputLines.length == 0) {
-    throw 'Unable to import: no data';
-  }
+  var allInputLines = inputText.match(/[^\r\n]+/g) || [];
   const inputLines = [];
   for (i = 0; i < allInputLines.length; i++) {
     const line = allInputLines[i].trim();
@@ -1101,6 +1155,11 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     }
     inputLines.push(line);
   }
+  if (inputLines.length == 0) {
+    throw 'Unable to import: no data';
+  }
+  // (every problem with a row or link is recorded, and the rest still checked: see importProblems)
+  var found = new ProblemList();
   // autodetect if data is in pre-makeped or post-makeped format
   var familyPrefix = '';
 
@@ -1123,7 +1182,8 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     //console.log("Parts: " + JSON.stringify(parts));
 
     if (parts.length < 6) {
-      throw 'Input line has not enough columns: [' + inputLines[i] + ']';
+      found.add('Input line has not enough columns: [' + inputLines[i] + ']');
+      continue;
     }
 
     if (familyPrefix == '') {
@@ -1136,7 +1196,8 @@ PedigreeImport.initFromDADA2 = function(inputText) {
 
     var pedID = parts[1];
     if (nameToId.hasOwnProperty(pedID)) {
-      throw 'Multiple persons with the same ID [' + pedID + ']';
+      found.add('Multiple persons with the same ID [' + pedID + ']');
+      continue;
     }
 
     var genderValue = parts[4];
@@ -1156,6 +1217,9 @@ PedigreeImport.initFromDADA2 = function(inputText) {
 
     nameToId[pedID] = pedigreeID;
   }
+
+  // (no linking people when a row was set aside: every link to it would be reported again)
+  found.throwIfAny();
 
   var defaultEdgeWeight = 1;
 
@@ -1223,24 +1287,13 @@ PedigreeImport.initFromDADA2 = function(inputText) {
       continue;
     }
 
-    // .PED supports specifying only mohter of father. Pedigree editor requires both (for now).
-    // So create a virtual parent in case one of the parents is missing
-    if (fatherID == 0) {
-      fatherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'M', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      fatherID = nameToId[fatherID];
-      if (newG.properties[fatherID].gender == 'F') {
-        throw 'Unable to import pedigree: a person declared as female [id: ' + fatherID + '] is also declared as being a father for [id: '+thisPersonName+']';
-      }
+    // (a parent not given is made up: the editor shows two)
+    var parents = pedParents(found, newG, nameToId, fatherID, motherID, thisPersonName);
+    if (!parents) {
+      continue;
     }
-    if (motherID == 0) {
-      motherID = newG._addVertex( null, BaseGraph.TYPE.PERSON, {'gender': 'F', 'comments': 'unknown'}, newG.defaultPersonNodeWidth );
-    } else {
-      motherID = nameToId[motherID];
-      if (newG.properties[motherID].gender == 'M') {
-        throw 'Unable to import pedigree: a person declared as male [id: ' + motherID + '] is also declared as being a mother for [id: '+thisPersonName+']';
-      }
-    }
+    fatherID = parents.father;
+    motherID = parents.mother;
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
 
@@ -1251,10 +1304,12 @@ PedigreeImport.initFromDADA2 = function(inputText) {
     newG.addEdge( chhubID, id, defaultEdgeWeight );
   }
 
-  keepValidPlaceholders(newG);
-  PedigreeImport.validateBaseGraph(newG);
+  found.throwIfAny();
 
-  return newG;
+  keepValidPlaceholders(newG);
+  PedigreeImport.validateBaseGraph(newG, found);
+
+  return found.attachNotes(newG);
 };
 
 PedigreeImport.initFromDADA2X = function(inputText) {
