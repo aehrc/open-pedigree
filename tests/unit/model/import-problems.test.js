@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import PedigreeImport from 'pedigree/model/import';
 import { ImportProblems } from 'pedigree/model/importProblems';
+import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
+import LegacyFHIRConverter from 'pedigree/LegacyFHIRConverter';
+import DefaultFhirTerminologyHelper from 'pedigree/DefaultFhirTerminologyHelper';
+import simpleGG from '../fixtures/simple-pedigree-gg.json';
+import legacyPedigree from '../fixtures/legacy-fhir-v1-pedigree.json';
+
+const mockEditor = {
+  getFhirTerminologyHelper: () => ({
+    getCodeableConceptFromDisorder: () => ({}),
+    getCodeableConceptFromPhenotype: () => ({}),
+    getCodeableConceptFromGene: () => ({}),
+  }),
+  getDisorderLegend: () => ({ getTerm: (id) => ({ getName: () => id }) }),
+  getGeneLegend: () => ({ getTerm: (id) => ({ getName: () => id }) }),
+  getPhenotypeLegend: () => ({ getTerm: (id) => ({ getName: () => id }) }),
+};
 
 // What an import throws, caught (undefined if it doesn't).
 const failure = (importIt) => {
@@ -143,5 +159,69 @@ describe('GEDCOM import problems', () => {
   it('imports a sound file as before, without notes', () => {
     const graph = gedcom([...people, '0 @F1@ FAM', '1 HUSB @I1@', '1 WIFE @I2@', '1 CHIL @I3@'])();
     expect(graph.importNotes).toBeUndefined();
+  });
+});
+
+describe('GA4GH FHIR import problems', () => {
+  // A GA4GH export of simpleGG (John and Jane, with a child), as JSON to change.
+  const exported = () => {
+    vi.stubGlobal('editor', mockEditor);
+    return JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
+  };
+  const patients = (bundle) => bundle.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+  const given = (p) => p.name && p.name[0].given && p.name[0].given[0];
+  // John, coded as the child's father, made female; Jane, coded as mother, made male
+  const swapSexes = (bundle) => {
+    patients(bundle).find((p) => given(p) === 'John').gender = 'female';
+    patients(bundle).find((p) => given(p) === 'Jane').gender = 'male';
+    return bundle;
+  };
+  const importBundle = (bundle) => () => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+
+  it('reports every parent whose sex contradicts their code', () => {
+    const err = failure(importBundle(swapSexes(exported())));
+    expect(problemsOf(err)).toEqual([
+      expect.stringMatching(/declared as female is also declared as being a father/),
+      expect.stringMatching(/declared as male is also declared as being a mother/),
+    ]);
+  });
+
+  it('reports a duplicate Patient id first, and the parents\' sexes once it is fixed', () => {
+    const bundle = swapSexes(exported());
+    const copy = structuredClone(bundle.entry.find((e) => e.resource.resourceType === 'Patient'));
+    copy.fullUrl = 'urn:uuid:00000000-0000-4000-8000-000000000000';
+    bundle.entry.push(copy);
+    expect(problemsOf(failure(importBundle(bundle)))).toEqual([expect.stringMatching(/multiple persons with the same ID/)]);
+    bundle.entry.pop();
+    expect(problemsOf(failure(importBundle(bundle)))).toHaveLength(2);
+  });
+
+  it('stops at once, with that alone, at input that is not JSON', () => {
+    expect(failure(() => GA4GHFHIRConverter.initFromFHIR('{not json'))).toMatch(/^Unable to import pedigree: input is not a valid JSON string/);
+  });
+});
+
+describe('legacy FHIR import problems', () => {
+  // The legacy fixture with each child's first parent reference pointing at no one.
+  const brokenRefs = (children) => {
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => new DefaultFhirTerminologyHelper() });
+    const pedigree = structuredClone(legacyPedigree);
+    for (const [id, ref] of Object.entries(children)) {
+      const fmh = pedigree.contained.find((c) => c.id === id);
+      const parentExt = fmh.extension.find((e) => e.url.endsWith('family-member-history-genetics-parent'));
+      parentExt.extension.find((e) => e.url === 'reference').valueReference.reference = ref;
+    }
+    return () => LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree));
+  };
+
+  it('reports every parent reference that can\'t be resolved', () => {
+    const problems = problemsOf(failure(brokenRefs({ FMH_7: '#nobody1', FMH_8: '#nobody2' })));
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toMatch(/nobody1/);
+    expect(problems[1]).toMatch(/nobody2/);
+  });
+
+  it('imports the fixture as before', () => {
+    expect(failure(brokenRefs({}))).toBeUndefined();
   });
 });

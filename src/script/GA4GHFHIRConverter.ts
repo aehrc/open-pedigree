@@ -6,6 +6,7 @@ import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { geneResultComponents, geneResultFromComponents } from 'pedigree/model/geneResults';
+import { ProblemList } from 'pedigree/model/importProblems';
 import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 import {
@@ -167,8 +168,20 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   }
 
 
+  // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
+  const found = new ProblemList();
+
   // first pass: add all vertices and assign vertex IDs
   for (const nextPerson of nodeData){
+    if (nextPerson.properties.id) {
+      if (seenIds.has(nextPerson.properties.id)) {
+        found.add('Unable to import pedigree: multiple persons with the same ID ['
+        + nextPerson.properties.id + ']');
+        continue;
+      }
+      seenIds.add(nextPerson.properties.id);
+    }
+
     // add twin groups
     if (nextPerson.nodeId in twinTracker.lookup){
       nextPerson.properties.twinGroup = twinTracker.lookup[nextPerson.nodeId];
@@ -177,15 +190,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     let pedigreeID = newG._addVertex(null, BaseGraph.TYPE.PERSON, nextPerson.properties,
       newG.defaultPersonNodeWidth);
     nextPerson.pedigreeID = pedigreeID;
-
-    if (nextPerson.properties.id) {
-      if (seenIds.has(nextPerson.properties.id)) {
-        throw 'Unable to import pedigree: multiple persons with the same ID ['
-        + nextPerson.properties.id + ']';
-      }
-      seenIds.add(nextPerson.properties.id);
-    }
   }
+  // (no linking people when one was set aside: every link to them would be reported again)
+  found.throwIfAny();
 
   let defaultEdgeWeight = 1;
 
@@ -204,11 +211,17 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
     // parent left out can't fail the import)
+    // (a child whose parents can't be placed is left without them, and the rest still checked)
+    let parentsOK = true;
     for (const claim of placed.checked) {
       const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
       if (conflict) {
-        throw conflict;
+        found.add(conflict);
+        parentsOK = false;
       }
+    }
+    if (!parentsOK) {
+      continue;
     }
     // (never for a fetus: chooseParentClaims places its biological parents)
     if (chosen.adopted && newG.properties[personID]) {
@@ -246,7 +259,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     }
 
     if (fatherID === personID || motherID === personID) {
-      throw 'Unable to import pedigree: a person is declared to be his or hew own parent';
+      found.add('Unable to import pedigree: a person is declared to be his or hew own parent');
+      continue;
     }
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
@@ -310,11 +324,13 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }
     }
   } catch (err) {
-    throw importError(err);
+    // (after any problems already found)
+    found.add(importError(err));
   }
+  found.throwIfAny();
   // (after the partners: a couple with no shared child only connects once given its placeholder)
-  validateImportedGraph(newG);
-  return newG;
+  validateImportedGraph(newG, found);
+  return found.attachNotes(newG);
 
 };
 
