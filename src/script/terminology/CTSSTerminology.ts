@@ -32,13 +32,16 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
   processLookupResponse(id: any, response: any): any {
     const parsed = JSON.parse(response.responseText);
     // the row for this very code (the service's search can also match codes that only contain it),
-    // compared as IDs are kept - sanitized, which can't be undone exactly - and in the same case first
-    const rows = (parsed.length > 3 && parsed[3]) ? parsed[3].filter((r: any) => r) : [];
-    const kept = (r: any) => this.sanitizeID(String(r[0]));
-    const row = rows.find((r: any) => kept(r) === id)
-      || rows.find((r: any) => kept(r).toLowerCase() === String(id).toLowerCase());
+    // each row's code put through sanitizing as IDs are (which can't be undone exactly), in the same
+    // case first; compared desanitized, so a case-blind match can't take an escape for a character
+    const wanted = this.desanitizeID(id);
+    const rows = ((parsed.length > 3 && parsed[3]) ? parsed[3] : [])
+      .filter((r: any) => r)
+      .map((r: any) => ({ code: this.desanitizeID(this.sanitizeID(String(r[0]))), text: r[1] }));
+    const row = rows.find((r: any) => r.code === wanted)
+      || rows.find((r: any) => r.code.toLowerCase() === wanted.toLowerCase());
     if (row) {
-      return row[1];
+      return row.text;
     }
     throw 'Failed to find result in response';
   }

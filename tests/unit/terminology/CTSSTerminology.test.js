@@ -70,6 +70,12 @@ describe('CTSSTerminology lookup response', () => {
     expect(terminology.processLookupResponse('AB1', response([['ab1', 'Other'], ['AB1', 'Wanted']]))).toBe('Wanted');
   });
 
+  it('never takes an escape in the kept ID for the character it stands for, whatever the case', () => {
+    // a real code containing "_c_" is not the code with a colon there
+    expect(() => terminology.processLookupResponse('X_c_1', response([['X:1', 'Colon']]))).toThrow();
+    expect(terminology.processLookupResponse('X_c_1', response([['X:1', 'Colon'], ['X_c_1', 'Real']]))).toBe('Real');
+  });
+
   it('takes the code whatever its case', () => {
     expect(terminology.processLookupResponse('hp_C_0001250', response([['HP:0001250', 'Seizure']]))).toBe('Seizure');
   });
