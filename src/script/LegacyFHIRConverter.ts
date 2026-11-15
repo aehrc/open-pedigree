@@ -1,8 +1,8 @@
 import BaseGraph, { addPlaceholderChild } from 'pedigree/model/baseGraph';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
-import { ProblemList } from 'pedigree/model/importProblems';
+import { ProblemList, personLabel } from 'pedigree/model/importProblems';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -292,6 +292,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
         if (leftOut) {
           console.warn(leftOut + (unresolved > 0 ? ' (' + unresolved + ' of them a reference that couldn\'t be resolved)' : ''));
+          problems.note(leftOutNote(personLabel(nextPerson.properties), chosen, placed.dropped + unresolved));
         }
         let motherLink = parents.mother ? parents.mother.node : null;
         let fatherLink = parents.father ? parents.father.node : null;

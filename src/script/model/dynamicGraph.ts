@@ -1387,7 +1387,13 @@ DynamicPositionedGraph.prototype = {
 
     var newNodes = this._getAllNodes();
 
-    return {'new': newNodes, 'removed': removedNodes};
+    // what the import left out (see importProblems), taken off the graph so it isn't kept with it
+    var notes = (baseGraph && baseGraph.importNotes) ? baseGraph.importNotes : [];
+    if (baseGraph) {
+      delete baseGraph.importNotes;
+    }
+
+    return {'new': newNodes, 'removed': removedNodes, 'notes': notes};
   },
 
   getPathToParents: function(v) {

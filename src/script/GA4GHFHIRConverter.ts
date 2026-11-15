@@ -6,8 +6,8 @@ import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { geneResultComponents, geneResultFromComponents } from 'pedigree/model/geneResults';
-import { ProblemList } from 'pedigree/model/importProblems';
-import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
+import { ProblemList, personLabel } from 'pedigree/model/importProblems';
+import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 import {
   LINKED_RECORD_REF_EXTENSION_URL, LINKED_RECORD_SNAPSHOT_EXTENSION_URL, FETUS_DATE_OF_DEATH_EXTENSION_URL,
@@ -39,6 +39,13 @@ function generateUUID() {
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 // Retired extension URLs already warned about in this import (see extractDataFromPatient).
 const warnedRetired = new Set<string>();
+// The import under way (its problems and notes): what initFromFHIR's helpers say to the user goes here.
+let currentImport: ProblemList = new ProblemList();
+// What a user can be told an extension under a retired URL held (the rest are only logged).
+const RETIRED_NOTE_SUBJECTS = {
+  [ADOPTED_EXTENSION_URL]: 'An adoption',
+  [FETUS_DATE_OF_DEATH_EXTENSION_URL]: 'A fetus\'s date of death',
+};
 // An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
 // are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
 // to carry it (redcap_pedigree_editor#7).
@@ -63,6 +70,9 @@ GA4GHFHIRConverter.prototype = {};
 GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   // (each import says once which retired URLs it ignored)
   warnedRetired.clear();
+  // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
+  const found = new ProblemList();
+  currentImport = found;
   let inputResource = null;
   try {
     inputResource = JSON.parse(inputText);
@@ -168,9 +178,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   }
 
 
-  // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
-  const found = new ProblemList();
-
   // first pass: add all vertices and assign vertex IDs
   for (const nextPerson of nodeData){
     if (nextPerson.properties.id) {
@@ -230,6 +237,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     const leftOut = leftOutWarning(chosen, placed.dropped);
     if (leftOut) {
       console.warn(leftOut);
+      found.note(leftOutNote(personLabel(nextPerson.properties), chosen, placed.dropped));
     }
     let motherID = (parents.mother != null) ? nodeData[parents.mother.node].pedigreeID : null;
     let fatherID = (parents.father != null) ? nodeData[parents.father.node].pedigreeID : null;
@@ -710,6 +718,7 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   if (!result) {
     if (observationResource.component.length > 0) {
       console.warn('Ignoring an unreadable gene result on ' + (observationResource.id || 'an Observation'));
+      currentImport.note(personLabel(nodeData.properties) + ': a gene result could not be read and was left out');
     }
     return;
   }
@@ -733,6 +742,8 @@ function readGeneResult(observationResource: any, nodeData: any): void {
     if (unreadState) {
       console.warn('Read the result for gene ' + gene + ' (' + (observationResource.id || 'an Observation')
         + ') as positive: its allelic state (' + unreadState + ') is not one the editor can read');
+      currentImport.note(personLabel(nodeData.properties) + ': the result for gene ' + gene
+        + ' was read as positive (its allelic state ' + unreadState + ' is not one the editor can read)');
     }
   }
 }
@@ -920,6 +931,9 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
       warnedRetired.add(ext.url);
       console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacement
         + (replacement === ADOPTED_EXTENSION_URL ? ', with valueCode "in" instead of valueBoolean true' : '') + ')');
+      if (RETIRED_NOTE_SUBJECTS[replacement]) {
+        currentImport.note(RETIRED_NOTE_SUBJECTS[replacement] + ' saved by open-pedigree before 2.0.0 was not read');
+      }
     }
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;

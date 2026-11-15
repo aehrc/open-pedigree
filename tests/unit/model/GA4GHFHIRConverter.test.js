@@ -422,6 +422,25 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     }
   });
 
+  it('notes, for the user, an adoption saved under the URL used before 2.0.0; a linked-record one only in the console', () => {
+    const gg = structuredClone(simpleGG);
+    gg[0].prop.isAdopted = true;
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    const retired = exported
+      .replace('https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', 'https://github.com/aehrc/open-pedigree/StructureDefinition/adopted')
+      .replace('"valueCode":"in"', '"valueBoolean":true');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(GA4GHFHIRConverter.initFromFHIR(retired).importNotes).toEqual(['An adoption saved by open-pedigree before 2.0.0 was not read']);
+      const bundle = JSON.parse(exported);
+      bundle.entry.find((e) => e.resource.resourceType === 'Patient').resource.extension = [
+        { url: 'https://github.com/aehrc/open-pedigree/StructureDefinition/linked-record-snapshot', valueString: '{}' }];
+      expect(GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).importNotes).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('warns about a retired extension once per import, however many people carry it', () => {
     const gg = structuredClone(simpleGG);
     const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
@@ -572,6 +591,45 @@ describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
     expect(graph.properties[child].isAdopted).toBe(true);
     // under the adoptive parents, John as father: the KIN:027 claim on him was left out
     expect(graph.getParents(child).map((v) => `${graph.properties[v].fName}:${graph.properties[v].gender}`).sort()).toEqual(['Jane:F', 'John:M']);
+  });
+
+  it('notes, for the user, the parent left out, naming the child - and a failure carries the note', () => {
+    // Maya, adopted by John and Jane, also claims Edith (not otherwise in the family) as birth mother:
+    // Edith is left out, and so cut off from the rest
+    const gg = structuredClone(simpleGG);
+    gg[4].prop.isAdopted = true;
+    gg[4].prop.fName = 'Maya';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const adoptive = exported.entry.map((e) => e.resource).find((r) => r.resourceType === 'FamilyMemberHistory' && r.relationship
+      && r.relationship.coding[0].code === 'KIN:022');
+    // (the FMH's patient is the child; its patient-record extension the parent)
+    const parentRef = adoptive.extension.find((e) => e.url.endsWith('familymemberhistory-patient-record')).valueReference.reference;
+    const asEdith = (text) => text.slice(0, -2) + 'ed';
+    const parentEntry = exported.entry.find((e) => e.resource.resourceType === 'Patient'
+      && (parentRef === e.fullUrl || parentRef.endsWith(e.resource.id)));
+    const edith = structuredClone(parentEntry);
+    edith.fullUrl = asEdith(edith.fullUrl);
+    edith.resource.id = asEdith(edith.resource.id);
+    edith.resource.gender = 'female';
+    edith.resource.name = [{ given: ['Edith'] }];
+    exported.entry.push(edith);
+    const birth = structuredClone(adoptive);
+    birth.id = adoptive.id + '-bio';
+    birth.relationship.coding[0] = { system: 'http://purl.org/ga4gh/kin.fhir', code: 'KIN:027', display: 'isBiologicalMother' };
+    birth.extension.find((e) => e.url.endsWith('familymemberhistory-patient-record')).valueReference.reference = asEdith(parentRef);
+    exported.entry.push({ fullUrl: 'FamilyMemberHistory/' + birth.id, resource: birth });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let err;
+    try {
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    } catch (e) {
+      err = e;
+    } finally {
+      warn.mockRestore();
+    }
+    expect(String(err)).toMatch(/disconnected/);
+    expect(err.notes).toEqual([expect.stringMatching(/^Maya: 1 other parent\(s\) were left out \(the editor shows two parents/)]);
+    expect(err.messageWithNotes()).toMatch(/\n\nAlso noted:\n1\. Maya: 1 other parent/);
   });
 });
 
@@ -802,6 +860,21 @@ describe('GA4GHFHIRConverter gene results', () => {
     try {
       expect(readBack(bundle).geneResults).toEqual({ BRCA1: 'positive' });
       expect(warn.mock.calls.some((c) => String(c[0]).includes('gene BRCA1') && String(c[0]).includes('"compound heterozygous"'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('notes, for the user, a gene result read as positive, and one it could not read at all', () => {
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: withGenes({ BRCA1: 'heterozygous', TP53: 'heterozygous' }) }, 'all', null, null));
+    const byGene = Object.fromEntries(geneObservations(bundle).map((o) => [o.valueString.slice('gene: '.length), o]));
+    byGene.BRCA1.component[1].valueCodeableConcept = { text: 'compound heterozygous' };
+    byGene.TP53.component = [{ code: { coding: [{ system: 'http://loinc.org', code: 'nonsense' }] }, valueString: '?' }];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const notes = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle)).importNotes;
+      expect(notes).toContainEqual(expect.stringMatching(/: the result for gene BRCA1 was read as positive \(its allelic state "compound heterozygous" is not one the editor can read\)$/));
+      expect(notes).toContainEqual(expect.stringMatching(/: a gene result could not be read and was left out$/));
     } finally {
       warn.mockRestore();
     }

@@ -14,6 +14,13 @@
  * failure on the ImportProblems; a caller decides whether to show them (only the import dialog does).
  */
 
+/** Who a note is about, as the user knows them: their name, else their ID in the file. */
+export function personLabel(properties: any): string {
+  const props = properties || {};
+  const name = [props.fName, props.lName].filter((part) => part && String(part).trim()).join(' ');
+  return name || props.externalID || props.externalId || props.id || 'A person';
+}
+
 /** At most this many problems (or notes) are listed in a message; all are kept. */
 export const MAX_LISTED = 20;
 

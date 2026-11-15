@@ -260,7 +260,8 @@ export default class ImportSelector {
     var optionSelected = (document.querySelector('input:checked[type=radio][name="select-options"]') as any).value;
     var acceptUnknownPhenotypes = (optionSelected == 'accept');
 
-    var importOptions = { 'markEvaluated': importMark, 'externalIdMark': externalIdMark, 'acceptUnknownPhenotypes': acceptUnknownPhenotypes };
+    // (showNotes: what the import left out is told to the user, as they imported it)
+    var importOptions = { 'markEvaluated': importMark, 'externalIdMark': externalIdMark, 'acceptUnknownPhenotypes': acceptUnknownPhenotypes, 'showNotes': true };
 
     editor.getSaveLoadEngine().createGraphFromImportData(importValue, importType, importOptions,
       false /* add to undo stack */, true /*center around 0*/);

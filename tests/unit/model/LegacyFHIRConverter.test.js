@@ -335,6 +335,18 @@ describe('LegacyFHIRConverter parents', () => {
     expect(maya(LegacyFHIRConverter.initFromFHIR(text))).toEqual({ parents: ['Grace', 'Tom'], adopted: false });
   });
 
+  it('notes, for the user, the parents left out, naming the child', () => {
+    const text = legacyWith((byId) => {
+      byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2')); // Edith
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(LegacyFHIRConverter.initFromFHIR(text).importNotes).toEqual([expect.stringMatching(/^Maya Example: 2 other parent\(s\) were left out/)]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('reads a natural and an adoptive mother: the child is adopted, under the adoptive one', () => {
     const text = legacyWith((byId) => {
       byId.FMH_0.extension.push(parentExtension('ADOPTM', '#FMH_2')); // Edith
