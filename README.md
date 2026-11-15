@@ -180,9 +180,20 @@ Results are saved as the property `geneResults` (`{ "BRCA1": "heterozygous" }`, 
 - `69548-6` *Genetic variant assessment*: `LA9633-4` *Present* or `LA9634-2` *Absent* (negative);
 - `53034-5` *Allelic state*, when present and known: `LA6706-1` *Heterozygous*, `LA6705-3` *Homozygous*, `LA6707-9` *Hemizygous*, `LA6703-8` *Heteroplasmic* or `LA6704-6` *Homoplasmic* - every state LOINC lists.
 
-On import, a variant marked *Present* with no allelic state reads as *Positive*. So does one whose allelic state can't be read (coded outside LOINC, or given only as text): a found variant is never dropped, and the console says what the state was.
+On import, a variant marked *Present* with no allelic state reads as *Positive*. So does one whose allelic state can't be read (coded outside LOINC, or given only as text): a found variant is never dropped, and the console says what the state was (as does a note, for a file imported from the import dialog: see [Import problems and notes](#import-problems-and-notes)).
 
 The Observation's value is still the gene, so a reader that ignores components reads the genes as before. PED, PEDX, DADA2 and BOADICEA have nowhere to put a result.
+
+## Import problems and notes
+
+An import that finds a problem with the file imports nothing. It doesn't stop at the first problem: it reports every one it can find, so a file can be fixed in one go. A single problem is reported as it always was. Several are listed in one message, `Unable to import pedigree: N problems found:`, numbered in the order they were found, which follows the file within each check (at most 20, then how many more).
+
+- **Rows, people and links:** a row with too few columns, a duplicate ID, a parent ID that matches no one, a parent whose sex contradicts their role, a reference that can't be resolved, and a person who is their own parent are all reported. Each import pass is finished before the import stops, and people aren't linked once a row has been set aside, so a skipped row isn't reported again as a missing parent. If the people are sound, the pedigree itself is checked next, and every part cut off from the rest is reported once, named by up to three of its people.
+- **Stops at once:** input that can't be read any further is reported on its own. That covers no data, text that isn't valid JSON or XML, an unsupported BOADICEA version or FHIR resource type, a GEDCOM level jump, more than one family in a PED, BOADICEA or DADA2 file, and a GEDCOM file with no individuals.
+
+A failed import throws its problems as before. One problem is thrown as its text, and several as an `ImportProblems` whose string form is the message above and whose `problems` lists them all.
+
+**Notes** say what an import left out or read loosely, without failing it. They cover a child's parents beyond the two the editor shows, a gene result that couldn't be read or was read as *Positive*, an adoption or a fetus's date of death saved under a URL used before 2.0.0, and an unsupported GEDCOM version. Each is logged to the console. A file imported from the **import dialog** also shows them, in one `Imported, with N notes:` message after importing, or under `Also noted:` after the problems of a failed import. Loading a stored pedigree (a host's backend, undo) never shows them, so a record doesn't repeat its notes every time it's opened. A host calling `createGraphFromImportData` itself can pass `showNotes: true` in its import options to show them.
 
 ## Testing
 

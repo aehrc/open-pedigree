@@ -94,11 +94,27 @@ export function parentGenderConflict(claim, gender, reference) {
  * left out isn't left out), or null if none were.
  */
 export function leftOutWarning(chosen, dropped = 0) {
-  const chosenNodes = new Set(chosen.claims.map((c) => c.node));
-  const count = new Set(chosen.left.filter((c) => !chosenNodes.has(c.node)).map((c) => c.node)).size + dropped;
+  const count = leftOutCount(chosen, dropped);
   if (count === 0) {
     return null;
   }
   return 'A child\'s ' + count + ' other parent(s) were left out: the editor shows two parents - adoptive ones'
     + ' first (but a fetus\'s biological ones), and step-parents only when there are no others';
+}
+
+/** How many claimed parents were left out (see leftOutWarning). */
+export function leftOutCount(chosen, dropped = 0) {
+  const chosenNodes = new Set(chosen.claims.map((c) => c.node));
+  return new Set(chosen.left.filter((c) => !chosenNodes.has(c.node)).map((c) => c.node)).size + dropped;
+}
+
+/** The same, as a note for the user who imported the file, naming the child; null if none were. */
+export function leftOutNote(child: string, chosen, dropped = 0) {
+  const count = leftOutCount(chosen, dropped);
+  if (count === 0) {
+    return null;
+  }
+  return child + ': ' + count + ' other parent(s) were left out. The editor shows two parents: adoptive parents'
+    + ' before birth parents (except for a fetus, which keeps its birth parents), and step-parents only when'
+    + ' there are no others.';
 }

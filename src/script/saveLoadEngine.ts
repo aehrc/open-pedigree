@@ -1,4 +1,5 @@
 import TemplateSelector from 'pedigree/view/templateSelector';
+import { ImportProblems, notesMessage } from 'pedigree/model/importProblems';
 
 function unescapeRestData(data: any): any {
   var tempNode = document.createElement('div');
@@ -204,7 +205,13 @@ export default class SaveLoadEngine {
     } catch(err) {
       console.log('Error importing pedigree:');
       console.log(err);
-      alert('Error importing pedigree: ' + err);
+      if (err instanceof ImportProblems) {
+        // (several problems already say the import failed; one, carried with notes, reads as itself)
+        const message = (importOptions && importOptions.showNotes) ? err.messageWithNotes() : err.message;
+        alert((err.problems.length === 1 ? 'Error importing pedigree: ' : '') + message);
+      } else {
+        alert('Error importing pedigree: ' + err);
+      }
       document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
       return false;
     }
@@ -227,6 +234,12 @@ export default class SaveLoadEngine {
     }
 
     document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
+
+    // what the import left out, told to whoever imported it (the import dialog asks; loading a stored
+    // pedigree doesn't, so a record never shows the same notes each time it's opened)
+    if (importOptions && importOptions.showNotes && changeSet.notes && changeSet.notes.length > 0) {
+      alert(notesMessage(changeSet.notes));
+    }
     return true;
   }
 

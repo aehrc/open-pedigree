@@ -415,82 +415,124 @@ BaseGraph.prototype = {
     }
   },
 
-  validate: function() {
+  /** The first problem with a vertex's own edges, or null (see findProblems). */
+  _vertexProblem: function(v) {
+    var outEdges = this.getOutEdges(v);
+    var inEdges  = this.getInEdges(v);
+
+    if (this.isPerson(v)) {
+      if (inEdges.length > 1) {
+        return 'Assertion failed: person nodes can\'t have two in-edges as people are produced by a single pregnancy (failed for ' + this.getVertexDescription(v) + ')';
+      }
+      for (var i = 0; i < outEdges.length; i++) {
+        if (!this.isRelationship(outEdges[i]) && !this.isVirtual(outEdges[i]) ) {
+          return 'Assertion failed: person nodes have only out edges to relationships (failed for ' + this.getVertexDescription(v) + ')';
+        }
+      }
+    } else if (this.isRelationship(v)) {
+      // TODO: for childless relations this is not true!
+      if (outEdges.length == 0) {
+        return 'Assertion failed: all relationships should have a childhub associated with them (failed for ' + this.getVertexDescription(v) + ')';
+      }
+      if (outEdges.length > 1) {
+        return 'Assertion failed: all relationships should have only one outedge (to a childhub) (failed for ' + this.getVertexDescription(v) + ')';
+      }
+      if (!this.isChildhub(outEdges[0])) {
+        return 'Assertion failed: relationships should only have out edges to childhubs (failed for ' + this.getVertexDescription(v) + ')';
+      }
+      if (inEdges.length != 2) {
+        return 'Assertion failed: relationships should always have exactly two associated persons (failed for ' + this.getVertexDescription(v) + ')';
+      }
+    } else if (this.isVirtual(v)) {
+      if (outEdges.length != 1) {
+        return 'Assertion failed: all virtual nodes have exactly one out edge (to a virtual node or a relationship)';
+      }
+      if (inEdges.length != 1) {
+        return 'Assertion failed: all virtual nodes have exactly one in edge (from a person or a virtual node)';
+      }
+      if (!this.isRelationship(outEdges[0]) && !this.isVirtual(outEdges[0]) ) {
+        return 'Assertion failed: all virtual nodes may only have an outedge to a virtual node or a relationship';
+      }
+    } else if (this.isChildhub(v)) {
+      if (outEdges.length < 1) {
+        return 'Assertion failed: all childhubs should have at least one child associated with them';
+      }  // if not, re-ranking relationship nodes breaks
+      for (var i = 0; i < outEdges.length; i++) {
+        if (!this.isPerson(outEdges[i])) {
+          return 'Assertion failed: childhubs are only connected to people (failed for ' + this.getVertexDescription(v) + ')';
+        }
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Every problem with the graph's structure, worded as validate's (which throws the first). The
+   * cycle and disconnected-part checks assume a well-formed graph, so they only run when every
+   * vertex passes; each part cut off from the rest is reported once, by up to 3 of its vertices.
+   */
+  findProblems: function() {
+    var problems = [];
 
     if( this.v.length == 0 ) {
-      return;
+      return problems;
     }
 
     for (var v = 0; v < this.v.length; v++) {
-      var outEdges = this.getOutEdges(v);
-      var inEdges  = this.getInEdges(v);
-
-      if (this.isPerson(v)) {
-        if (inEdges.length > 1) {
-          throw 'Assertion failed: person nodes can\'t have two in-edges as people are produced by a single pregnancy (failed for ' + this.getVertexDescription(v) + ')';
-        }
-        for (var i = 0; i < outEdges.length; i++) {
-          if (!this.isRelationship(outEdges[i]) && !this.isVirtual(outEdges[i]) ) {
-            throw 'Assertion failed: person nodes have only out edges to relationships (failed for ' + this.getVertexDescription(v) + ')';
-          }
-        }
-      } else if (this.isRelationship(v)) {
-        // TODO: for childless relations this is not true!
-        if (outEdges.length == 0) {
-          throw 'Assertion failed: all relationships should have a childhub associated with them (failed for ' + this.getVertexDescription(v) + ')';
-        }
-        if (outEdges.length > 1) {
-          throw 'Assertion failed: all relationships should have only one outedge (to a childhub) (failed for ' + this.getVertexDescription(v) + ')';
-        }
-        if (!this.isChildhub(outEdges[0])) {
-          throw 'Assertion failed: relationships should only have out edges to childhubs (failed for ' + this.getVertexDescription(v) + ')';
-        }
-        if (inEdges.length != 2) {
-          throw 'Assertion failed: relationships should always have exactly two associated persons (failed for ' + this.getVertexDescription(v) + ')';
-        }
-      } else if (this.isVirtual(v)) {
-        if (outEdges.length != 1) {
-          throw 'Assertion failed: all virtual nodes have exactly one out edge (to a virtual node or a relationship)';
-        }
-        if (inEdges.length != 1) {
-          throw 'Assertion failed: all virtual nodes have exactly one in edge (from a person or a virtual node)';
-        }
-        if (!this.isRelationship(outEdges[0]) && !this.isVirtual(outEdges[0]) ) {
-          throw 'Assertion failed: all virtual nodes may only have an outedge to a virtual node or a relationship';
-        }
-      } else if (this.isChildhub(v)) {
-        if (outEdges.length < 1) {
-          throw 'Assertion failed: all childhubs should have at least one child associated with them';
-        }  // if not, re-ranking relationship nodes breaks
-        for (var i = 0; i < outEdges.length; i++) {
-          if (!this.isPerson(outEdges[i])) {
-            throw 'Assertion failed: childhubs are only connected to people (failed for ' + this.getVertexDescription(v) + ')';
-          }
-        }
+      var problem = this._vertexProblem(v);
+      if (problem) {
+        problems.push(problem);
       }
+    }
+
+    if (problems.length > 0) {
+      return problems;
     }
 
     var leafAndRootlessInfo = this.getLeafAndParentlessNodes();
 
     // check for cycles - supposedly pedigrees can't have any
     if (leafAndRootlessInfo.parentlessNodes.length == 0) {
-      throw 'Assertion failed: pedigrees should have no cycles (no parentless nodes found)';
+      problems.push('Assertion failed: pedigrees should have no cycles (no parentless nodes found)');
+      return problems;
     }
     for (var j = 0; j < leafAndRootlessInfo.parentlessNodes.length; j++) {
       if ( this._DFSFindCycles( leafAndRootlessInfo.parentlessNodes[j], {} ) ) {
-        throw 'Assertion failed: pedigrees should have no cycles';
+        problems.push('Assertion failed: pedigrees should have no cycles');
+        return problems;
       }
     }
 
-    // check for disconnected components
+    // check for disconnected components: each part not reachable from the first is reported once
     var reachable = {};
     this._markAllReachableComponents( leafAndRootlessInfo.parentlessNodes[0], reachable );
     for (var v = 0; v < this.v.length; v++) {
       if (!reachable.hasOwnProperty(v)) {
-        throw 'Assertion failed: disconnected component detected (' + this.getVertexDescription(v) + ')';
+        var part = {};
+        this._markAllReachableComponents( v, part );
+        var members = Object.keys(part).map(Number).sort(function(a, b) { return a - b; });
+        for (var k = 0; k < members.length; k++) {
+          reachable[members[k]] = true;
+        }
+        // (named by its people, if it has any)
+        var people = members.filter((u) => this.isPerson(u));
+        var named = people.length > 0 ? people : members;
+        var description = named.slice(0, 3).map((u) => this.getVertexDescription(u)).join(', ');
+        if (named.length > 3) {
+          description += ' and ' + (named.length - 3) + ' more';
+        }
+        problems.push('Assertion failed: disconnected component detected (' + description + ')');
       }
     }
 
+    return problems;
+  },
+
+  validate: function() {
+    var problems = this.findProblems();
+    if (problems.length > 0) {
+      throw problems[0];
+    }
   },
 
   _DFSFindCycles: function( vertex, visited ) {

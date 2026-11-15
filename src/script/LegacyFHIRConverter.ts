@@ -1,7 +1,8 @@
 import BaseGraph, { addPlaceholderChild } from 'pedigree/model/baseGraph';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
+import { ProblemList, personLabel, personReference } from 'pedigree/model/importProblems';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
-import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
+import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 /* ===============================================================================================
  *
@@ -129,6 +130,9 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     // (every id seen, including one made ambiguous by a name, so a second person with it is refused)
     const seenIds = new Set();
 
+    // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
+    const problems = new ProblemList();
+
     let nodeData = [];
     // first pass: add all vertices and assign vertex IDs
     for (let i = 0; i < familyHistoryResources.length; i++) {
@@ -136,10 +140,13 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         subjectResource, containedResourcesLookup, twinTracker);
       nodeData.push(nextPerson);
 
-      if (!nextPerson.properties.hasOwnProperty('id')
-          && !nextPerson.properties.hasOwnProperty('fName')
-          && !nextPerson.properties.hasOwnProperty('externalId')) {
-        throw 'Unable to import pedigree: a node with no ID or name is found';
+      // (A person with no ID or name is read as any other: a stored legacy pedigree must still open.
+      // The check this had, by hasOwnProperty, never refused anyone, as extractDataFromFMH always sets
+      // id, if only to undefined.)
+      if (nextPerson.properties.id && seenIds.has(nextPerson.properties.id)) {
+        problems.add('Unable to import pedigree: multiple persons with the same ID ['
+          + nextPerson.properties.id + ']');
+        continue;
       }
 
       let pedigreeID = newG._addVertex(null, Graph.TYPE.PERSON, nextPerson.properties,
@@ -147,10 +154,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       nextPerson.pedigreeID = pedigreeID;
 
       if (nextPerson.properties.id) {
-        if (seenIds.has(nextPerson.properties.id)) {
-          throw 'Unable to import pedigree: multiple persons with the same ID ['
-            + nextPerson.properties.id + ']';
-        }
         seenIds.add(nextPerson.properties.id);
         if (nameToID.hasOwnProperty(nextPerson.properties.id)
             && nameToID[nextPerson.properties.id] !== pedigreeID) {
@@ -206,6 +209,9 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         + ' reference (does not correspond to a name or an ID of another person)';
     };
 
+    // (no linking people when one was set aside: every link to them would be reported again)
+    problems.throwIfAny();
+
     let defaultEdgeWeight = 1;
 
     let relationshipTracker = new RelationshipTracker(newG,
@@ -213,111 +219,120 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
 
     // second pass (once all vertex IDs are known): process parents/children & add edges
     for (let i = 0; i < nodeData.length; i++) {
-      let nextPerson = nodeData[i];
+      // (a child whose parents can't be placed - a reference that can't be resolved, a gender that
+      // contradicts a parent's code, their own parent - is recorded, left without parents, and the
+      // rest still checked)
+      try {
+        let nextPerson = nodeData[i];
 
-      // (each person's own vertex, recorded when it was added: looking it up again by id or name
-      // fails when that id or name is ambiguous)
-      let personID = nextPerson.pedigreeID;
+        // (each person's own vertex, recorded when it was added: looking it up again by id or name
+        // fails when that id or name is ambiguous)
+        let personID = nextPerson.pedigreeID;
 
-      // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
-      // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
-      // for the parents placed only - one left out can't fail the import)
-      // A parent whose reference can't be resolved (matching nobody, or more than one person) is set
-      // aside before placing, so it can't take a real parent's slot - unless they're needed: then
-      // the import fails as before, with the reference's own error.
-      let ambiguous = new Set();
-      let resolves = (node) => {
-        try {
-          findReferencedPerson(node, 'parent');
-          return true;
-        } catch (err) {
-          if (String(err).indexOf('ambiguous reference') !== -1) {
-            ambiguous.add(node);
+        // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
+        // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
+        // for the parents placed only - one left out can't fail the import)
+        // A parent whose reference can't be resolved (matching nobody, or more than one person) is set
+        // aside before placing, so it can't take a real parent's slot - unless they're needed: then
+        // the import fails as before, with the reference's own error.
+        let ambiguous = new Set();
+        let resolves = (node) => {
+          try {
+            findReferencedPerson(node, 'parent');
+            return true;
+          } catch (err) {
+            if (String(err).indexOf('ambiguous reference') !== -1) {
+              ambiguous.add(node);
+            }
+            return false;
           }
-          return false;
+        };
+        let fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
+        let claims = nextPerson.parentClaims || [];
+        let found = claims.filter((c) => resolves(c.node));
+        let missing = claims.filter((c) => found.indexOf(c) === -1);
+        let unresolved = new Set(missing.map((c) => c.node)).size;
+        let chosen = chooseParentClaims(found, fetus);
+        let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
+        let placed = placedClaims(chosen, parents);
+        if (missing.length > 0) {
+          // needed: one without whom fewer parents are placed than the child has (up to two), or whose
+          // absence has another kind of parent (biological, adoptive, step) stand in for the kind the
+          // child would have
+          let chosenAll = chooseParentClaims(claims, fetus);
+          let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
+          let placedCount = [parents.mother, parents.father].filter(Boolean).length;
+          let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
+          let kind = (c) => (c.adoptive ? 'adoptive' : c.step ? 'step' : 'biological');
+          let kindsWanted = new Set(chosenAll.claims.map(kind));
+          let standsIn = chosen.claims.some((c) => !kindsWanted.has(kind(c)));
+          // An ambiguous reference names someone who exists: if they'd be chosen, they're needed (no
+          // one else quietly takes their slot).
+          let ambiguousChosen = missing.find((c) => ambiguous.has(c.node) && chosenAll.claims.indexOf(c) !== -1);
+          if (ambiguousChosen) {
+            findReferencedPerson(ambiguousChosen.node, 'parent'); // throws: ambiguous reference
+          }
+          if (neededMissing && (placedCount < wanted || standsIn)) {
+            findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
+          }
         }
-      };
-      let fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
-      let claims = nextPerson.parentClaims || [];
-      let found = claims.filter((c) => resolves(c.node));
-      let missing = claims.filter((c) => found.indexOf(c) === -1);
-      let unresolved = new Set(missing.map((c) => c.node)).size;
-      let chosen = chooseParentClaims(found, fetus);
-      let parents = placeParents(chosen.claims, (node) => newG.properties[findReferencedPerson(node, 'parent')].gender);
-      let placed = placedClaims(chosen, parents);
-      if (missing.length > 0) {
-        // needed: one without whom fewer parents are placed than the child has (up to two), or whose
-        // absence has another kind of parent (biological, adoptive, step) stand in for the kind the
-        // child would have
-        let chosenAll = chooseParentClaims(claims, fetus);
-        let wanted = Math.min(2, new Set(chosenAll.claims.map((c) => c.node)).size);
-        let placedCount = [parents.mother, parents.father].filter(Boolean).length;
-        let neededMissing = missing.find((c) => chosenAll.claims.indexOf(c) !== -1);
-        let kind = (c) => (c.adoptive ? 'adoptive' : c.step ? 'step' : 'biological');
-        let kindsWanted = new Set(chosenAll.claims.map(kind));
-        let standsIn = chosen.claims.some((c) => !kindsWanted.has(kind(c)));
-        // An ambiguous reference names someone who exists: if they'd be chosen, they're needed (no
-        // one else quietly takes their slot).
-        let ambiguousChosen = missing.find((c) => ambiguous.has(c.node) && chosenAll.claims.indexOf(c) !== -1);
-        if (ambiguousChosen) {
-          findReferencedPerson(ambiguousChosen.node, 'parent'); // throws: ambiguous reference
+        for (const claim of placed.checked) {
+          const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
+          if (conflict) {
+            throw conflict; // (recorded below, with the child left without parents)
+          }
         }
-        if (neededMissing && (placedCount < wanted || standsIn)) {
-          findReferencedPerson(neededMissing.node, 'parent'); // throws: not a valid reference
+        // (never for a fetus: chooseParentClaims places its biological parents)
+        if (chosen.adopted && newG.properties[personID]) {
+          newG.properties[personID].isAdopted = true;
         }
-      }
-      for (const claim of placed.checked) {
-        const conflict = parentGenderConflict(claim, newG.properties[findReferencedPerson(claim.node, 'parent')].gender, claim.node);
-        if (conflict) {
-          throw conflict;
+        let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
+        if (leftOut) {
+          console.warn(leftOut + (unresolved > 0 ? ' (' + unresolved + ' of them a reference that couldn\'t be resolved)' : ''));
+          problems.note(leftOutNote(personLabel(nextPerson.properties), chosen, placed.dropped + unresolved));
         }
-      }
-      // (never for a fetus: chooseParentClaims places its biological parents)
-      if (chosen.adopted && newG.properties[personID]) {
-        newG.properties[personID].isAdopted = true;
-      }
-      let leftOut = leftOutWarning(chosen, placed.dropped + unresolved);
-      if (leftOut) {
-        console.warn(leftOut + (unresolved > 0 ? ' (' + unresolved + ' of them a reference that couldn\'t be resolved)' : ''));
-      }
-      let motherLink = parents.mother ? parents.mother.node : null;
-      let fatherLink = parents.father ? parents.father.node : null;
+        let motherLink = parents.mother ? parents.mother.node : null;
+        let fatherLink = parents.father ? parents.father.node : null;
 
-      if (motherLink == null && fatherLink == null) {
-        continue;
-      }
+        if (motherLink == null && fatherLink == null) {
+          continue;
+        }
 
-      // create a virtual parent in case one of the parents is missing
-      let fatherID = null;
-      let motherID = null;
-      if (fatherLink == null) {
-        fatherID = newG._addVertex(null, Graph.TYPE.PERSON, {
-          'gender' : 'M',
-          'comments' : 'unknown'
-        }, newG.defaultPersonNodeWidth);
-      } else {
-        fatherID = findReferencedPerson(fatherLink, 'father');
-      }
-      if (motherLink == null) {
-        motherID = newG._addVertex(null, Graph.TYPE.PERSON, {
-          'gender' : 'F',
-          'comments' : 'unknown'
-        }, newG.defaultPersonNodeWidth);
-      } else {
-        motherID = findReferencedPerson(motherLink, 'mother');
-      }
-      if (fatherID === personID || motherID === personID) {
-        throw 'Unable to import pedigree: a person is declared to be his or hew own parent';
-      }
+        // create a virtual parent in case one of the parents is missing
+        let fatherID = null;
+        let motherID = null;
+        if (fatherLink == null) {
+          fatherID = newG._addVertex(null, Graph.TYPE.PERSON, {
+            'gender' : 'M',
+            'comments' : 'unknown'
+          }, newG.defaultPersonNodeWidth);
+        } else {
+          fatherID = findReferencedPerson(fatherLink, 'father');
+        }
+        if (motherLink == null) {
+          motherID = newG._addVertex(null, Graph.TYPE.PERSON, {
+            'gender' : 'F',
+            'comments' : 'unknown'
+          }, newG.defaultPersonNodeWidth);
+        } else {
+          motherID = findReferencedPerson(motherLink, 'mother');
+        }
+        if (fatherID === personID || motherID === personID) {
+          throw 'Unable to import pedigree: a person is declared to be his or her own parent ('
+            + personReference(nextPerson.properties) + ')'; // (recorded below)
+        }
 
-      // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
+        // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
 
-      // if there is a relationship between motherID and fatherID the corresponding childhub is returned
-      // if there is no relationship, a new one is created together with the chldhub
-      let chhubID = relationshipTracker.createOrGetChildhub(motherID,
-        fatherID);
+        // if there is a relationship between motherID and fatherID the corresponding childhub is returned
+        // if there is no relationship, a new one is created together with the chldhub
+        let chhubID = relationshipTracker.createOrGetChildhub(motherID,
+          fatherID);
 
-      newG.addEdge(chhubID, personID, defaultEdgeWeight);
+        newG.addEdge(chhubID, personID, defaultEdgeWeight);
+      } catch (err) {
+        problems.add(importError(err));
+      }
     }
 
 
@@ -328,7 +343,14 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           let nextPersonId = nextPerson.pedigreeID;
           for (let i=0; i < nextPerson.partners.length; i++){
             // (Both partners usually carry the extension; setting the same flags twice is harmless.)
-            const partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');
+            let partnerId;
+            try {
+              partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');
+            } catch (err) {
+              // (that partnership is left out, and the rest still checked)
+              problems.add(importError(err));
+              continue;
+            }
             const partnerType = nextPerson.partners[i].type;
             let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
             if (!relNode && nextPersonId !== partnerId) {
@@ -367,12 +389,14 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         }
       }
     } catch (err) {
-      throw importError(err);
+      // (after any problems already found)
+      problems.add(importError(err));
     }
+    problems.throwIfAny();
 
-    validateImportedGraph(newG);
+    validateImportedGraph(newG, problems);
 
-    return newG;
+    return problems.attachNotes(newG);
   } else {
 
     throw 'Unable to import pedigree: input is not a resource type we understand';

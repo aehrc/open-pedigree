@@ -6,7 +6,8 @@ import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { geneResultComponents, geneResultFromComponents } from 'pedigree/model/geneResults';
-import { placeParents, chooseParentClaims, leftOutWarning, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
+import { ProblemList, personLabel, personReference } from 'pedigree/model/importProblems';
+import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 import {
   LINKED_RECORD_REF_EXTENSION_URL, LINKED_RECORD_SNAPSHOT_EXTENSION_URL, FETUS_DATE_OF_DEATH_EXTENSION_URL,
@@ -38,6 +39,13 @@ function generateUUID() {
 // open-pedigree's own extension for a fetus's date of death (Patient.deceased[x] holds its fetal status).
 // Retired extension URLs already warned about in this import (see extractDataFromPatient).
 const warnedRetired = new Set<string>();
+// The import under way (its problems and notes): what initFromFHIR's helpers say to the user goes here.
+let currentImport: ProblemList = new ProblemList();
+// What a user can be told an extension under a retired URL held (the rest are only logged).
+const RETIRED_NOTE_SUBJECTS = {
+  [ADOPTED_EXTENSION_URL]: 'An adoption',
+  [FETUS_DATE_OF_DEATH_EXTENSION_URL]: 'A fetus\'s date of death',
+};
 // An adopted person with no parents in the pedigree, on their Patient: an adopted child's parents
 // are written as adoptive (KIN:022), which says it, but someone with no parents has no relationship
 // to carry it (redcap_pedigree_editor#7).
@@ -60,8 +68,21 @@ GA4GHFHIRConverter.prototype = {};
 
 
 GA4GHFHIRConverter.initFromFHIR = function (inputText) {
+  try {
+    return readFHIR.call(this, inputText);
+  } finally {
+    // (helpers called outside an import note nowhere, and the import's list isn't kept)
+    currentImport = new ProblemList();
+  }
+};
+
+// The import itself (initFromFHIR, which resets currentImport however it ends).
+function readFHIR(this: any, inputText) {
   // (each import says once which retired URLs it ignored)
   warnedRetired.clear();
+  // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
+  const found = new ProblemList();
+  currentImport = found;
   let inputResource = null;
   try {
     inputResource = JSON.parse(inputText);
@@ -169,6 +190,15 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
   // first pass: add all vertices and assign vertex IDs
   for (const nextPerson of nodeData){
+    if (nextPerson.properties.id) {
+      if (seenIds.has(nextPerson.properties.id)) {
+        found.add('Unable to import pedigree: multiple persons with the same ID ['
+        + nextPerson.properties.id + ']');
+        continue;
+      }
+      seenIds.add(nextPerson.properties.id);
+    }
+
     // add twin groups
     if (nextPerson.nodeId in twinTracker.lookup){
       nextPerson.properties.twinGroup = twinTracker.lookup[nextPerson.nodeId];
@@ -177,15 +207,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     let pedigreeID = newG._addVertex(null, BaseGraph.TYPE.PERSON, nextPerson.properties,
       newG.defaultPersonNodeWidth);
     nextPerson.pedigreeID = pedigreeID;
-
-    if (nextPerson.properties.id) {
-      if (seenIds.has(nextPerson.properties.id)) {
-        throw 'Unable to import pedigree: multiple persons with the same ID ['
-        + nextPerson.properties.id + ']';
-      }
-      seenIds.add(nextPerson.properties.id);
-    }
   }
+  // (no linking people when one was set aside: every link to them would be reported again)
+  found.throwIfAny();
 
   let defaultEdgeWeight = 1;
 
@@ -204,11 +228,17 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     const placed = placedClaims(chosen, parents);
     // every code for a parent placed must fit their gender, not just the one that placed them (a
     // parent left out can't fail the import)
+    // (a child whose parents can't be placed is left without them, and the rest still checked)
+    let parentsOK = true;
     for (const claim of placed.checked) {
       const conflict = parentGenderConflict(claim, nodeData[claim.node].properties.gender, nodeData[claim.node].properties.id);
       if (conflict) {
-        throw conflict;
+        found.add(conflict);
+        parentsOK = false;
       }
+    }
+    if (!parentsOK) {
+      continue;
     }
     // (never for a fetus: chooseParentClaims places its biological parents)
     if (chosen.adopted && newG.properties[personID]) {
@@ -217,6 +247,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     const leftOut = leftOutWarning(chosen, placed.dropped);
     if (leftOut) {
       console.warn(leftOut);
+      found.note(leftOutNote(personLabel(nextPerson.properties), chosen, placed.dropped));
     }
     let motherID = (parents.mother != null) ? nodeData[parents.mother.node].pedigreeID : null;
     let fatherID = (parents.father != null) ? nodeData[parents.father.node].pedigreeID : null;
@@ -246,7 +277,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     }
 
     if (fatherID === personID || motherID === personID) {
-      throw 'Unable to import pedigree: a person is declared to be his or hew own parent';
+      found.add('Unable to import pedigree: a person is declared to be his or her own parent ('
+        + personReference(nextPerson.properties) + ')');
+      continue;
     }
 
     // both motherID and fatherID are now given and represent valid existing nodes in the pedigree
@@ -310,13 +343,14 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       }
     }
   } catch (err) {
-    throw importError(err);
+    // (after any problems already found)
+    found.add(importError(err));
   }
+  found.throwIfAny();
   // (after the partners: a couple with no shared child only connects once given its placeholder)
-  validateImportedGraph(newG);
-  return newG;
-
-};
+  validateImportedGraph(newG, found);
+  return found.attachNotes(newG);
+}
 
 GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
   nodeDataLookup, containedResourcesLookup, twinTracker) {
@@ -694,6 +728,7 @@ function readGeneResult(observationResource: any, nodeData: any): void {
   if (!result) {
     if (observationResource.component.length > 0) {
       console.warn('Ignoring an unreadable gene result on ' + (observationResource.id || 'an Observation'));
+      currentImport.note(personLabel(nodeData.properties) + ': a gene result could not be read and was left out');
     }
     return;
   }
@@ -717,6 +752,8 @@ function readGeneResult(observationResource: any, nodeData: any): void {
     if (unreadState) {
       console.warn('Read the result for gene ' + gene + ' (' + (observationResource.id || 'an Observation')
         + ') as positive: its allelic state (' + unreadState + ') is not one the editor can read');
+      currentImport.note(personLabel(nodeData.properties) + ': the result for gene ' + gene
+        + ' was read as positive (its allelic state ' + unreadState + ' is not one the editor can read)');
     }
   }
 }
@@ -904,6 +941,9 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
       warnedRetired.add(ext.url);
       console.warn('Ignoring ' + ext.url + ': open-pedigree no longer reads it (now ' + replacement
         + (replacement === ADOPTED_EXTENSION_URL ? ', with valueCode "in" instead of valueBoolean true' : '') + ')');
+      if (RETIRED_NOTE_SUBJECTS[replacement]) {
+        currentImport.note(RETIRED_NOTE_SUBJECTS[replacement] + ' saved by open-pedigree before 2.0.0 was not read');
+      }
     }
     if (ext.url === LINKED_RECORD_REF_EXTENSION_URL && ext.valueString) {
       (properties as any).linkedRecordRef = ext.valueString;
