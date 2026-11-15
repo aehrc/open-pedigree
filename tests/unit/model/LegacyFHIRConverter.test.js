@@ -306,6 +306,25 @@ describe('LegacyFHIRConverter parents', () => {
     adopted: !!graph.properties[0].isAdopted,
   });
 
+  it('keeps a child\'s parents when the child\'s id is also someone else\'s first name', () => {
+    // Maya (read first) is named after Leo's id
+    const text = legacyWith((byId) => {
+      byId.FMH_0.name = 'FMH_8';
+    });
+    const graph = LegacyFHIRConverter.initFromFHIR(text);
+    const leo = Object.keys(graph.properties).map(Number).find((v) => graph.isPerson(v) && graph.properties[v].id === 'FMH_8');
+    expect(graph.getParents(leo).map((v) => graph.properties[v].fName).sort()).toEqual(['Grace', 'Tom']);
+  });
+
+  it('refuses two people with the same id, even when that id is also someone else\'s first name', () => {
+    // Maya (read first) is named after Leo's id, which Ruby has too
+    const text = legacyWith((byId) => {
+      byId.FMH_0.name = 'FMH_8';
+      byId.FMH_7.id = 'FMH_8';
+    });
+    expect(() => LegacyFHIRConverter.initFromFHIR(text)).toThrow(/multiple persons with the same ID \[FMH_8\]/);
+  });
+
   it('keeps two mothers', () => {
     const text = legacyWith((byId) => {
       byId.FMH_5.sex.coding[0].code = 'female'; // Tom, now a second mother - of all three children

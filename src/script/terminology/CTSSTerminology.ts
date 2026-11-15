@@ -13,19 +13,35 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
   }
 
   getLookupURL(id: any): any {
+    // the ID as a quoted phrase, so the service's query syntax reads none of its characters (every
+    // colon, not just the first); an empty terms parameter, as the service refuses a request without
+    // one; the columns asked for, as processLookupResponse reads the text from the second; and the
+    // service's largest page, as a short code can be part of many others
+    const phrase = '"' + this.desanitizeID(id).replace(/[\\"]/g, '\\$&') + '"';
     return (
       this._ctssBaseUrl +
-      '?q=' +
-      encodeURI(this._valueColumn) +
-      '%3A' +
-      encodeURI(this.desanitizeID(id).replace(':', '\\:'))
+      '?df=' +
+      encodeURIComponent(this._valueColumn) +
+      ',' +
+      encodeURIComponent(this._textColumn) +
+      '&maxList=500&terms=&q=' +
+      encodeURIComponent(this._valueColumn + ':' + phrase)
     );
   }
 
   processLookupResponse(id: any, response: any): any {
     const parsed = JSON.parse(response.responseText);
-    if (parsed.length > 3 && parsed[3] && parsed[3][0]) {
-      return parsed[3][0][1];
+    // the row for this very code (the service's search can also match codes that only contain it),
+    // each row's code put through sanitizing as IDs are (which can't be undone exactly), in the same
+    // case first; compared desanitized, so a case-blind match can't take an escape for a character
+    const wanted = this.desanitizeID(id);
+    const rows = ((parsed.length > 3 && parsed[3]) ? parsed[3] : [])
+      .filter((r: any) => r)
+      .map((r: any) => ({ code: this.desanitizeID(this.sanitizeID(String(r[0]))), text: r[1] }));
+    const row = rows.find((r: any) => r.code === wanted)
+      || rows.find((r: any) => r.code.toLowerCase() === wanted.toLowerCase());
+    if (row) {
+      return row.text;
     }
     throw 'Failed to find result in response';
   }
@@ -34,13 +50,13 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
     return (
       this._ctssBaseUrl +
       '?df=' +
-      encodeURI(this._valueColumn) +
+      encodeURIComponent(this._valueColumn) +
       ',' +
-      encodeURI(this._textColumn) +
+      encodeURIComponent(this._textColumn) +
       '&maxList=' +
       this.getSearchCount() +
-      '&term=' +
-      encodeURI(searchTerm)
+      '&terms=' +
+      encodeURIComponent(searchTerm)
     );
   }
 
