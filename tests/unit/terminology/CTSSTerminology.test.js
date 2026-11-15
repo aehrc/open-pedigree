@@ -44,3 +44,33 @@ describe('CTSSTerminology search URL', () => {
     expect(new URL(terminology.getSearchURL('A&B #1+2')).searchParams.get('terms')).toBe('A&B #1+2');
   });
 });
+
+describe('CTSSTerminology lookup response', () => {
+  const response = (rows) => ({ responseText: JSON.stringify([rows.length, rows.map((r) => r[0]), null, rows]) });
+
+  it('gives the text of the row for the code asked for', () => {
+    expect(terminology.processLookupResponse('HP_C_0001250', response([['HP:0001250', 'Seizure']]))).toBe('Seizure');
+  });
+
+  it('skips a row for another code the search also matched', () => {
+    expect(terminology.processLookupResponse('HP_C_0001250', response([['HP:0001250X', 'Other'], ['HP:0001250', 'Seizure']])))
+      .toBe('Seizure');
+    expect(() => terminology.processLookupResponse('HP_C_0001250', response([['HP:0001250X', 'Other']]))).toThrow();
+  });
+
+  it('takes the code whatever its case', () => {
+    expect(terminology.processLookupResponse('hp_C_0001250', response([['HP:0001250', 'Seizure']]))).toBe('Seizure');
+  });
+
+  it('fails when nothing is found', () => {
+    expect(() => terminology.processLookupResponse('HP_C_0001250', response([]))).toThrow('Failed to find result in response');
+  });
+});
+
+describe('CTSSTerminology column names', () => {
+  it('are encoded whole', () => {
+    const odd = new CTSSTerminology('phenotype', /.*/, 20, BASE, 'code&x', 'name');
+    expect(new URL(odd.getLookupURL('A')).searchParams.get('df')).toBe('code&x,name');
+    expect(new URL(odd.getSearchURL('A')).searchParams.get('df')).toBe('code&x,name');
+  });
+});

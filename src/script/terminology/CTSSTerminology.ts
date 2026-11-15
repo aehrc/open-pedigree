@@ -20,9 +20,9 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
     return (
       this._ctssBaseUrl +
       '?df=' +
-      encodeURI(this._valueColumn) +
+      encodeURIComponent(this._valueColumn) +
       ',' +
-      encodeURI(this._textColumn) +
+      encodeURIComponent(this._textColumn) +
       '&terms=&q=' +
       encodeURIComponent(this._valueColumn + ':' + phrase)
     );
@@ -30,8 +30,12 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
 
   processLookupResponse(id: any, response: any): any {
     const parsed = JSON.parse(response.responseText);
-    if (parsed.length > 3 && parsed[3] && parsed[3][0]) {
-      return parsed[3][0][1];
+    // the row for this very code (the service's search can also match codes that only contain it)
+    const wanted = String(this.desanitizeID(id)).toLowerCase();
+    const rows = (parsed.length > 3 && parsed[3]) ? parsed[3] : [];
+    const row = rows.find((r: any) => r && String(r[0]).toLowerCase() === wanted);
+    if (row) {
+      return row[1];
     }
     throw 'Failed to find result in response';
   }
@@ -40,9 +44,9 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
     return (
       this._ctssBaseUrl +
       '?df=' +
-      encodeURI(this._valueColumn) +
+      encodeURIComponent(this._valueColumn) +
       ',' +
-      encodeURI(this._textColumn) +
+      encodeURIComponent(this._textColumn) +
       '&maxList=' +
       this.getSearchCount() +
       '&terms=' +
