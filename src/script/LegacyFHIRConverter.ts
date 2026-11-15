@@ -140,9 +140,9 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         subjectResource, containedResourcesLookup, twinTracker);
       nodeData.push(nextPerson);
 
-      // (A person with no ID or name is read as any other: nothing can refer to them, and a stored
-      // legacy pedigree must still open. extractDataFromFMH always sets id, if only to undefined, so
-      // the check this once had never refused anyone.)
+      // (A person with no ID or name is read as any other: a stored legacy pedigree must still open.
+      // The check this had, by hasOwnProperty, never refused anyone, as extractDataFromFMH always sets
+      // id, if only to undefined.)
       if (nextPerson.properties.id && seenIds.has(nextPerson.properties.id)) {
         problems.add('Unable to import pedigree: multiple persons with the same ID ['
           + nextPerson.properties.id + ']');
@@ -318,7 +318,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           motherID = findReferencedPerson(motherLink, 'mother');
         }
         if (fatherID === personID || motherID === personID) {
-          throw 'Unable to import pedigree: a person is declared to be his or hew own parent ('
+          throw 'Unable to import pedigree: a person is declared to be his or her own parent ('
             + personReference(nextPerson.properties) + ')'; // (recorded below)
         }
 

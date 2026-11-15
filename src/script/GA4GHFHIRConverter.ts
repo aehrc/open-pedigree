@@ -277,7 +277,7 @@ function readFHIR(this: any, inputText) {
     }
 
     if (fatherID === personID || motherID === personID) {
-      found.add('Unable to import pedigree: a person is declared to be his or hew own parent ('
+      found.add('Unable to import pedigree: a person is declared to be his or her own parent ('
         + personReference(nextPerson.properties) + ')');
       continue;
     }

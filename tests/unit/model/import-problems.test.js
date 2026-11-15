@@ -230,12 +230,19 @@ describe('legacy FHIR import problems', () => {
     expect(failure(brokenRefs({}))).toBeUndefined();
   });
 
-  it('still opens a stored pedigree with a relative no one refers to who has no ID or name', () => {
+  it('still opens a stored pedigree with a person who has no ID or name', () => {
     vi.stubGlobal('editor', { getFhirTerminologyHelper: () => new DefaultFhirTerminologyHelper() });
     const pedigree = structuredClone(legacyPedigree);
-    pedigree.contained.push({ resourceType: 'FamilyMemberHistory', status: 'completed', relationship: { coding: [{ code: 'NMTH' }] } });
-    // (open, or failing only as any unconnected person would: never for the missing ID or name)
-    const err = failure(() => LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree)));
-    expect(String(err || '')).not.toMatch(/no ID or name/);
+    // a child of Tom's with no ID or name
+    const leo = pedigree.contained.find((c) => c.id === 'FMH_8');
+    const nameless = structuredClone(leo);
+    delete nameless.id;
+    delete nameless.name;
+    delete nameless.identifier;
+    pedigree.contained.push(nameless);
+    const before = LegacyFHIRConverter.initFromFHIR(JSON.stringify(legacyPedigree));
+    const graph = LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree));
+    const people = (g) => g.properties.filter((p, v) => g.isPerson(v)).length;
+    expect(people(graph)).toBe(people(before) + 1);
   });
 });

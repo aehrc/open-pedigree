@@ -14,11 +14,15 @@
  * failure on the ImportProblems; a caller decides whether to show them (only the import dialog does).
  */
 
-/** Who a note is about, as the user knows them: their name, else their ID in the file. */
+// A person's name, as entered ('' if none).
+function personName(props: any): string {
+  return [props.fName, props.lName].filter((part) => part && String(part).trim()).join(' ');
+}
+
+/** Who a note is about, as the user knows them: their name, else an ID. */
 export function personLabel(properties: any): string {
   const props = properties || {};
-  const name = [props.fName, props.lName].filter((part) => part && String(part).trim()).join(' ');
-  return name || props.externalID || props.externalId || props.id || 'A person';
+  return personName(props) || props.externalID || props.externalId || props.id || 'A person';
 }
 
 /**
@@ -27,8 +31,9 @@ export function personLabel(properties: any): string {
  */
 export function personReference(properties: any): string {
   const props = properties || {};
-  const name = [props.fName, props.lName].filter((part) => part && String(part).trim()).join(' ');
-  const id = props.externalID || props.externalId || props.id;
+  const name = personName(props);
+  // (the ID in the file first: it's the one an import requires to be unique)
+  const id = props.id || props.externalID || props.externalId;
   if (name && id) {
     return name + ' [' + id + ']';
   }
