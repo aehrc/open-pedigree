@@ -6,7 +6,7 @@ import { isBlankValue } from 'pedigree/model/helpers';
 import LegacyFHIRConverter, { hasGA4GHPedigreeProfile, LEGACY_GENE_SYSTEMS, HGNC_SYSTEM } from 'pedigree/LegacyFHIRConverter';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
 import { geneResultComponents, geneResultFromComponents } from 'pedigree/model/geneResults';
-import { ProblemList, personLabel } from 'pedigree/model/importProblems';
+import { ProblemList, personLabel, personReference } from 'pedigree/model/importProblems';
 import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
 import {
@@ -69,14 +69,15 @@ GA4GHFHIRConverter.prototype = {};
 
 GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   try {
-    return (GA4GHFHIRConverter as any)._readFHIR(inputText);
+    return readFHIR.call(this, inputText);
   } finally {
     // (helpers called outside an import note nowhere, and the import's list isn't kept)
     currentImport = new ProblemList();
   }
 };
 
-(GA4GHFHIRConverter as any)._readFHIR = function (inputText) {
+// The import itself (initFromFHIR, which resets currentImport however it ends).
+function readFHIR(this: any, inputText) {
   // (each import says once which retired URLs it ignored)
   warnedRetired.clear();
   // (every problem with a person or link is recorded, and the rest still checked: see importProblems)
@@ -277,7 +278,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     if (fatherID === personID || motherID === personID) {
       found.add('Unable to import pedigree: a person is declared to be his or hew own parent ('
-        + personLabel(nextPerson.properties) + ')');
+        + personReference(nextPerson.properties) + ')');
       continue;
     }
 
@@ -293,12 +294,11 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
   // set any partner relationships (before validation: a couple with no shared child only connects
   // once given its placeholder; anything this trips over is reported as validation would)
-  for (const nextPerson of nodeData){
-    if (nextPerson.partners){
-      const nextPersonId = nextPerson.pedigreeID;
-      for (let i=0; i < nextPerson.partners.length; i++){
-        // (a partnership it trips over is recorded, and the rest still checked)
-        try {
+  try {
+    for (const nextPerson of nodeData){
+      if (nextPerson.partners){
+        const nextPersonId = nextPerson.pedigreeID;
+        for (let i=0; i < nextPerson.partners.length; i++){
           const partner = nextPerson.partners[i];
           if (partner < nextPerson.nodeId){
             continue; // should have already been processed.
@@ -339,19 +339,18 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
               relProperties['broken'] = true;
             }
           }
-        } catch (err) {
-          found.add(importError(err));
         }
       }
     }
+  } catch (err) {
+    // (after any problems already found)
+    found.add(importError(err));
   }
-
   found.throwIfAny();
   // (after the partners: a couple with no shared child only connects once given its placeholder)
   validateImportedGraph(newG, found);
   return found.attachNotes(newG);
-
-};
+}
 
 GA4GHFHIRConverter.extractDataFromFMH = function (familyHistoryResource,
   nodeDataLookup, containedResourcesLookup, twinTracker) {

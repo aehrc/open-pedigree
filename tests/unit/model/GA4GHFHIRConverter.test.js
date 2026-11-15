@@ -628,7 +628,8 @@ describe('GA4GHFHIRConverter fetus and adoption edge cases', () => {
       warn.mockRestore();
     }
     expect(String(err)).toMatch(/disconnected/);
-    expect(err.notes).toEqual([expect.stringMatching(/^Maya: 1 other parent\(s\) were left out \(the editor shows two parents/)]);
+    expect(err.notes).toEqual(['Maya: 1 other parent(s) were left out. The editor shows two parents: adoptive parents before'
+      + ' birth parents (except for a fetus, which keeps its birth parents), and step-parents only when there are no others.']);
     expect(err.messageWithNotes()).toMatch(/\n\nAlso noted:\n1\. Maya: 1 other parent/);
   });
 });

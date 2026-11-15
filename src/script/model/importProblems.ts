@@ -21,6 +21,20 @@ export function personLabel(properties: any): string {
   return name || props.externalID || props.externalId || props.id || 'A person';
 }
 
+/**
+ * A person as a problem names them: their name and their ID in the file, so two people who share a
+ * name (or have none) stay two problems.
+ */
+export function personReference(properties: any): string {
+  const props = properties || {};
+  const name = [props.fName, props.lName].filter((part) => part && String(part).trim()).join(' ');
+  const id = props.externalID || props.externalId || props.id;
+  if (name && id) {
+    return name + ' [' + id + ']';
+  }
+  return name || (id ? '[' + id + ']' : 'a person with no name or ID');
+}
+
 /** At most this many problems (or notes) are listed in a message; all are kept. */
 export const MAX_LISTED = 20;
 

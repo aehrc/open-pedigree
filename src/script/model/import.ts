@@ -841,9 +841,9 @@ PedigreeImport.initFromGEDCOM = function(inputText, markEvaluated, saveIDAsExter
 
   // (as parsed: GEDC holds a list of objects, each with a list of VERS values)
   const gedc = (gedcom.header as any).GEDC;
-  const gedcomVersion = (gedc && gedc[0] && gedc[0].VERS && gedc[0].VERS[0] && gedc[0].VERS[0].value !== undefined)
-    ? String(gedc[0].VERS[0].value).trim() : undefined;
-  if (gedcomVersion !== undefined && gedcomVersion != '5.5' && gedcomVersion != '5.5.1') {
+  const versionValue = (gedc && gedc[0] && gedc[0].VERS && gedc[0].VERS[0]) ? gedc[0].VERS[0].value : undefined;
+  const gedcomVersion = (typeof versionValue === 'string') ? versionValue.trim() : '';
+  if (gedcomVersion !== '' && gedcomVersion != '5.5' && gedcomVersion != '5.5.1') {
     const versionWarning = 'Unsupported GEDCOM version detected: [' + gedcomVersion + ']. '
       + 'Import will continue but the correctness is not guaranteed. Supported versions are 5.5 and 5.5.1';
     console.warn(versionWarning);

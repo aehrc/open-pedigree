@@ -1,6 +1,6 @@
 import BaseGraph, { addPlaceholderChild } from 'pedigree/model/baseGraph';
 import validateImportedGraph, { importError } from 'pedigree/model/validateImportedGraph';
-import { ProblemList, personLabel } from 'pedigree/model/importProblems';
+import { ProblemList, personLabel, personReference } from 'pedigree/model/importProblems';
 import RelationshipTracker from 'pedigree/model/relationshipTracker';
 import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedClaims, parentGenderConflict, FETAL_STATUSES } from 'pedigree/model/parentClaims';
 
@@ -140,13 +140,9 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         subjectResource, containedResourcesLookup, twinTracker);
       nodeData.push(nextPerson);
 
-      // (by value: extractDataFromFMH always sets id, if only to undefined)
-      if (!nextPerson.properties.id && !nextPerson.properties.fName && !nextPerson.properties.externalId) {
-        // (named by its place in the file, as it has nothing else to go by)
-        problems.add('Unable to import pedigree: a node with no ID or name is found (FamilyMemberHistory '
-          + (i + 1) + ' of ' + familyHistoryResources.length + ')');
-        continue;
-      }
+      // (A person with no ID or name is read as any other: nothing can refer to them, and a stored
+      // legacy pedigree must still open. extractDataFromFMH always sets id, if only to undefined, so
+      // the check this once had never refused anyone.)
       if (nextPerson.properties.id && seenIds.has(nextPerson.properties.id)) {
         problems.add('Unable to import pedigree: multiple persons with the same ID ['
           + nextPerson.properties.id + ']');
@@ -323,7 +319,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         }
         if (fatherID === personID || motherID === personID) {
           throw 'Unable to import pedigree: a person is declared to be his or hew own parent ('
-            + personLabel(nextPerson.properties) + ')'; // (recorded below)
+            + personReference(nextPerson.properties) + ')'; // (recorded below)
         }
 
         // both motherID and fatherID are now given and represent valid existing nodes in the pedigree

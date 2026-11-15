@@ -230,19 +230,12 @@ describe('legacy FHIR import problems', () => {
     expect(failure(brokenRefs({}))).toBeUndefined();
   });
 
-  it('reports each person with no ID or name, by their place in the file', () => {
+  it('still opens a stored pedigree with a relative no one refers to who has no ID or name', () => {
     vi.stubGlobal('editor', { getFhirTerminologyHelper: () => new DefaultFhirTerminologyHelper() });
     const pedigree = structuredClone(legacyPedigree);
-    for (const id of ['FMH_3', 'FMH_4']) {
-      const fmh = pedigree.contained.find((c) => c.id === id);
-      delete fmh.id;
-      delete fmh.name;
-    }
-    const problems = problemsOf(failure(() => LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree))));
-    expect(problems).toEqual([
-      expect.stringMatching(/^Unable to import pedigree: a node with no ID or name is found \(FamilyMemberHistory \d+ of 9\)$/),
-      expect.stringMatching(/^Unable to import pedigree: a node with no ID or name is found \(FamilyMemberHistory \d+ of 9\)$/),
-    ]);
-    expect(problems[0]).not.toBe(problems[1]);
+    pedigree.contained.push({ resourceType: 'FamilyMemberHistory', status: 'completed', relationship: { coding: [{ code: 'NMTH' }] } });
+    // (open, or failing only as any unconnected person would: never for the missing ID or name)
+    const err = failure(() => LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree)));
+    expect(String(err || '')).not.toMatch(/no ID or name/);
   });
 });

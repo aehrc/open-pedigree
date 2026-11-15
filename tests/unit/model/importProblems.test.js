@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ImportProblems, ProblemList, MAX_LISTED, notesMessage } from 'pedigree/model/importProblems';
+import { ImportProblems, ProblemList, MAX_LISTED, notesMessage, personReference } from 'pedigree/model/importProblems';
 import { importError } from 'pedigree/model/validateImportedGraph';
 
 // What throwIfAny throws, caught.
@@ -66,6 +66,13 @@ describe('ProblemList', () => {
     expect(String(err)).toBe('Multiple persons with the same ID [3]');
     expect(err.notes).toEqual(['Maya: 1 other parent(s) were left out']);
     expect(err.messageWithNotes()).toBe('Multiple persons with the same ID [3]\n\nAlso noted:\n1. Maya: 1 other parent(s) were left out');
+  });
+
+  it('names a person in a problem by name and ID, so two of the same name stay apart', () => {
+    expect(personReference({ fName: 'John', lName: 'Smith', id: 'p1' })).toBe('John Smith [p1]');
+    expect(personReference({ fName: 'John', lName: 'Smith', id: 'p2' })).not.toBe(personReference({ fName: 'John', lName: 'Smith', id: 'p1' }));
+    expect(personReference({ id: 'p3' })).toBe('[p3]');
+    expect(personReference({})).toBe('a person with no name or ID');
   });
 
   it('puts notes on a graph, and nothing when there are none', () => {
