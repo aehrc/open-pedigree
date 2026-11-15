@@ -1,3 +1,5 @@
+import { ImportProblems } from 'pedigree/model/importProblems';
+
 /**
  * Validates a graph built by an importer, and throws one of:
  *
@@ -12,7 +14,11 @@
  * An importer's failure while building a graph from data it hasn't validated yet, in the same
  * words as a validation failure ("Unable to import pedigree (...)"), unless it already is one.
  */
-export function importError(err: any): string {
+export function importError(err: any): any {
+  if (err instanceof ImportProblems) {
+    // (every problem already found, each already worded)
+    return err;
+  }
   const reason = ((err && err.message) ? err.message : String(err));
   if (reason.startsWith('Unable to import pedigree') || reason.startsWith('Unsupported pedigree')) {
     return reason;
