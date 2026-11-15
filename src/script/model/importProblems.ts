@@ -89,20 +89,6 @@ export class ProblemList {
     }
   }
 
-  /** Takes in another import's problems and notes (one importer handing over to another). */
-  absorb(err: any): void {
-    if (err instanceof ImportProblems) {
-      err.problems.forEach((p) => this.add(p));
-      err.notes.forEach((n) => this.note(n));
-    } else {
-      this.add(err);
-    }
-  }
-
-  get size(): number {
-    return this.problems.length;
-  }
-
   /** Fails the import with everything found so far, if anything was. */
   throwIfAny(): void {
     if (this.problems.length === 0) {

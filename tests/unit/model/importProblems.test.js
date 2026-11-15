@@ -68,20 +68,6 @@ describe('ProblemList', () => {
     expect(err.messageWithNotes()).toBe('Multiple persons with the same ID [3]\n\nAlso noted:\n1. Maya: 1 other parent(s) were left out');
   });
 
-  it('takes in another import\'s problems and notes', () => {
-    const inner = new ProblemList();
-    inner.add('a');
-    inner.add('b');
-    inner.note('n');
-    const found = new ProblemList();
-    found.add('first');
-    found.absorb(thrownBy(inner));
-    found.absorb('c');
-    const err = thrownBy(found);
-    expect(err.problems).toEqual(['first', 'a', 'b', 'c']);
-    expect(err.notes).toEqual(['n']);
-  });
-
   it('puts notes on a graph, and nothing when there are none', () => {
     const found = new ProblemList();
     const graph = {};

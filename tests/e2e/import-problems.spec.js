@@ -75,6 +75,14 @@ test('a dialog import that left something out says so, after importing', async (
   expect(await people(page)).toBe(3);
 });
 
+test('a file with one problem and a note is refused as before, then the note', async ({ page }) => {
+  await openEditor(page);
+  const alerts = collectAlerts(page);
+  await importThroughDialog(page, 'gedcom', GEDCOM_7.replace('1 CHIL @I3@', '1 CHIL @I9@'));
+  await expect.poll(() => alerts.length).toBe(1);
+  expect(alerts[0]).toMatch(/^Error importing pedigree: Unable to import pedigree: child link does not point to an existing individual: \[@I9@\]\n\nAlso noted:\n1\. Unsupported GEDCOM version detected: \[7\.0\]/);
+});
+
 test('loading a pedigree the way a host does shows no notes', async ({ page }) => {
   await openEditor(page);
   const alerts = collectAlerts(page);

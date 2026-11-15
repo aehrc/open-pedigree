@@ -156,6 +156,11 @@ describe('GEDCOM import problems', () => {
     expect(graph.importNotes).toEqual([expect.stringMatching(/^Unsupported GEDCOM version detected: \[7\.0\]/)]);
   });
 
+  it('takes a supported version with spaces after it as supported', () => {
+    const graph = gedcom(['1 GEDC', '2 VERS 5.5.1   ', ...people, '0 @F1@ FAM', '1 HUSB @I1@', '1 WIFE @I2@', '1 CHIL @I3@'])();
+    expect(graph.importNotes).toBeUndefined();
+  });
+
   it('imports a sound file as before, without notes', () => {
     const graph = gedcom([...people, '0 @F1@ FAM', '1 HUSB @I1@', '1 WIFE @I2@', '1 CHIL @I3@'])();
     expect(graph.importNotes).toBeUndefined();
@@ -223,5 +228,21 @@ describe('legacy FHIR import problems', () => {
 
   it('imports the fixture as before', () => {
     expect(failure(brokenRefs({}))).toBeUndefined();
+  });
+
+  it('reports each person with no ID or name, by their place in the file', () => {
+    vi.stubGlobal('editor', { getFhirTerminologyHelper: () => new DefaultFhirTerminologyHelper() });
+    const pedigree = structuredClone(legacyPedigree);
+    for (const id of ['FMH_3', 'FMH_4']) {
+      const fmh = pedigree.contained.find((c) => c.id === id);
+      delete fmh.id;
+      delete fmh.name;
+    }
+    const problems = problemsOf(failure(() => LegacyFHIRConverter.initFromFHIR(JSON.stringify(pedigree))));
+    expect(problems).toEqual([
+      expect.stringMatching(/^Unable to import pedigree: a node with no ID or name is found \(FamilyMemberHistory \d+ of 9\)$/),
+      expect.stringMatching(/^Unable to import pedigree: a node with no ID or name is found \(FamilyMemberHistory \d+ of 9\)$/),
+    ]);
+    expect(problems[0]).not.toBe(problems[1]);
   });
 });

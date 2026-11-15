@@ -140,10 +140,11 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         subjectResource, containedResourcesLookup, twinTracker);
       nodeData.push(nextPerson);
 
-      if (!nextPerson.properties.hasOwnProperty('id')
-          && !nextPerson.properties.hasOwnProperty('fName')
-          && !nextPerson.properties.hasOwnProperty('externalId')) {
-        problems.add('Unable to import pedigree: a node with no ID or name is found');
+      // (by value: extractDataFromFMH always sets id, if only to undefined)
+      if (!nextPerson.properties.id && !nextPerson.properties.fName && !nextPerson.properties.externalId) {
+        // (named by its place in the file, as it has nothing else to go by)
+        problems.add('Unable to import pedigree: a node with no ID or name is found (FamilyMemberHistory '
+          + (i + 1) + ' of ' + familyHistoryResources.length + ')');
         continue;
       }
       if (nextPerson.properties.id && seenIds.has(nextPerson.properties.id)) {
@@ -321,7 +322,8 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           motherID = findReferencedPerson(motherLink, 'mother');
         }
         if (fatherID === personID || motherID === personID) {
-          throw 'Unable to import pedigree: a person is declared to be his or hew own parent'; // (recorded below)
+          throw 'Unable to import pedigree: a person is declared to be his or hew own parent ('
+            + personLabel(nextPerson.properties) + ')'; // (recorded below)
         }
 
         // both motherID and fatherID are now given and represent valid existing nodes in the pedigree

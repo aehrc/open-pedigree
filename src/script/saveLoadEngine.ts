@@ -206,8 +206,9 @@ export default class SaveLoadEngine {
       console.log('Error importing pedigree:');
       console.log(err);
       if (err instanceof ImportProblems) {
-        // (already says it couldn't import, and lists every problem - and, when asked for, the notes)
-        alert((importOptions && importOptions.showNotes) ? err.messageWithNotes() : err.message);
+        // (several problems already say the import failed; one, carried with notes, reads as itself)
+        const message = (importOptions && importOptions.showNotes) ? err.messageWithNotes() : err.message;
+        alert((err.problems.length === 1 ? 'Error importing pedigree: ' : '') + message);
       } else {
         alert('Error importing pedigree: ' + err);
       }

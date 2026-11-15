@@ -115,5 +115,5 @@ export function leftOutNote(child: string, chosen, dropped = 0) {
     return null;
   }
   return child + ': ' + count + ' other parent(s) were left out (the editor shows two parents: adoptive ones'
-    + ' first, a fetus\'s biological ones, and step-parents only when there are no others)';
+    + ' first, but a fetus\'s biological ones, and step-parents only when there are no others)';
 }
