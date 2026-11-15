@@ -633,10 +633,18 @@ describe('GA4GHFHIRConverter import errors', () => {
 
   it('reports a disconnected pedigree in the same words as the other importers', () => {
     const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(structuredClone(simpleGG)) }, 'all', null, null));
-    // no relationships: three unconnected people
+    // no relationships: three unconnected people - the two cut off from the first, each reported
     exported.entry = exported.entry.filter((e) => e.resource.resourceType !== 'FamilyMemberHistory');
-    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported)))
-      .toThrow(/^Unsupported pedigree: some components of the imported pedigree are disconnected from each other \(disconnected component detected/);
+    let err;
+    try {
+      GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    } catch (e) {
+      err = e;
+    }
+    expect(err.problems).toHaveLength(2);
+    for (const problem of err.problems) {
+      expect(problem).toMatch(/^Unsupported pedigree: some components of the imported pedigree are disconnected from each other \(disconnected component detected/);
+    }
   });
 });
 

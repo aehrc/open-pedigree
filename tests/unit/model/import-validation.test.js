@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import PedigreeImport from 'pedigree/model/import';
 import { importError } from 'pedigree/model/validateImportedGraph';
+import BaseGraph from 'pedigree/model/baseGraph';
 
 const DISCONNECTED = 'Unsupported pedigree: some components of the imported pedigree are disconnected from each other';
 
@@ -56,5 +57,69 @@ describe('importError', () => {
     expect(importError('Unable to import pedigree: ambiguous reference to [a]')).toBe('Unable to import pedigree: ambiguous reference to [a]');
     expect(importError('Unsupported pedigree: some components of the imported pedigree are disconnected from each other (x)'))
       .toBe('Unsupported pedigree: some components of the imported pedigree are disconnected from each other (x)');
+  });
+});
+
+describe('every problem with the structure of an imported pedigree', () => {
+  // (thrown by an import, caught)
+  const failure = (pedText) => {
+    try {
+      PedigreeImport.initFromPED(pedText, false, false, true);
+    } catch (err) {
+      return err;
+    }
+    return undefined;
+  };
+  const family = 'fam 1 0 0 1 1\nfam 2 0 0 2 1\nfam 3 1 2 1 1';
+
+  it('reports each part cut off from the rest once, naming its people', () => {
+    const err = failure(family + '\nfam 4 0 0 1 1\nfam 5 0 0 2 1\nfam 6 4 5 1 1\nfam 7 0 0 1 1\nfam 8 0 0 2 1\nfam 9 7 8 1 1');
+    expect(err.problems).toHaveLength(2);
+    expect(err.problems[0]).toMatch(/^Unsupported pedigree: .* disconnected from each other \(disconnected component detected \(\[id: \d+, .*PERSON\], \[id: \d+, .*PERSON\], \[id: \d+, .*PERSON\]\)\)$/);
+    expect(String(err)).toMatch(/^Unable to import pedigree: 2 problems found:\n1\. Unsupported pedigree: .*\n2\. Unsupported pedigree: /);
+  });
+
+  it('finds each cut-off part once, not once per vertex in it', () => {
+    const graph = PedigreeImport.initFromPED(family, false, false, true);
+    for (let i = 0; i < 2; i++) {
+      // a couple with a child, cut off from the family
+      const father = graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'M' }, graph.defaultPersonNodeWidth);
+      const mother = graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'F' }, graph.defaultPersonNodeWidth);
+      const child = graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'U' }, graph.defaultPersonNodeWidth);
+      const rel = graph._addVertex(null, BaseGraph.TYPE.RELATIONSHIP, {}, 1);
+      const hub = graph._addVertex(null, BaseGraph.TYPE.CHILDHUB, {}, 1);
+      graph.addEdge(father, rel, 1);
+      graph.addEdge(mother, rel, 1);
+      graph.addEdge(rel, hub, 1);
+      graph.addEdge(hub, child, 1);
+    }
+    const problems = graph.findProblems();
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).not.toBe(problems[1]);
+  });
+
+  it('names at most three people of a part, then how many more', () => {
+    const err = failure(family + '\nfam 10 0 0 1 1\nfam 11 0 0 2 1\nfam 12 10 11 1 1\nfam 13 10 11 1 1\nfam 14 10 11 2 1');
+    expect(err).toMatch(/ and 2 more\)\)$/);
+    expect(String(err).match(/\[id: /g)).toHaveLength(3);
+  });
+
+  it('checks for cut-off parts only when every vertex is sound', () => {
+    const graph = PedigreeImport.initFromPED(family, false, false, true);
+    // a second person, unconnected, and a relationship with no childhub
+    graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'M' }, graph.defaultPersonNodeWidth);
+    const rel = graph._addVertex(null, BaseGraph.TYPE.RELATIONSHIP, {}, 1);
+    const problems = graph.findProblems();
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/all relationships should have a childhub/);
+    expect(graph.getVertexDescription(rel)).toContain('RELATION');
+  });
+
+  it('validate still throws the first problem, as before', () => {
+    const graph = PedigreeImport.initFromPED(family, false, false, true);
+    graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'M' }, graph.defaultPersonNodeWidth);
+    graph._addVertex(null, BaseGraph.TYPE.PERSON, { gender: 'F' }, graph.defaultPersonNodeWidth);
+    expect(graph.findProblems()).toHaveLength(2);
+    expect(() => graph.validate()).toThrow(graph.findProblems()[0]);
   });
 });
