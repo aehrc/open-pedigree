@@ -34,6 +34,10 @@ describe('CTSSTerminology lookup URL', () => {
     expect(new URL(terminology.getLookupURL('HP_C_0001250')).searchParams.has('terms')).toBe(true);
   });
 
+  it('asks for the service\'s largest page, as a short code can be part of many others', () => {
+    expect(new URL(terminology.getLookupURL('E11')).searchParams.get('maxList')).toBe('500');
+  });
+
   it('asks for the value and text columns, as the text is read from the second', () => {
     expect(new URL(terminology.getLookupURL('HP_C_0001250')).searchParams.get('df')).toBe('id,name');
   });
@@ -56,6 +60,14 @@ describe('CTSSTerminology lookup response', () => {
     expect(terminology.processLookupResponse('HP_C_0001250', response([['HP:0001250X', 'Other'], ['HP:0001250', 'Seizure']])))
       .toBe('Seizure');
     expect(() => terminology.processLookupResponse('HP_C_0001250', response([['HP:0001250X', 'Other']]))).toThrow();
+  });
+
+  it('finds a code with characters IDs are not kept with (sanitized to the same ID)', () => {
+    expect(terminology.processLookupResponse(terminology.sanitizeID('A+B'), response([['A+B', 'Plus']]))).toBe('Plus');
+  });
+
+  it('takes the code in the same case before one differing only in case', () => {
+    expect(terminology.processLookupResponse('AB1', response([['ab1', 'Other'], ['AB1', 'Wanted']]))).toBe('Wanted');
   });
 
   it('takes the code whatever its case', () => {

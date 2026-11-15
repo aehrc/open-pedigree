@@ -127,7 +127,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     let ambiguousReferences = {};
     let hasID = {};
     // (every id seen, including one made ambiguous by a name, so a second person with it is refused)
-    const seenIds = {};
+    const seenIds = new Set();
 
     let nodeData = [];
     // first pass: add all vertices and assign vertex IDs
@@ -147,11 +147,11 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       nextPerson.pedigreeID = pedigreeID;
 
       if (nextPerson.properties.id) {
-        if (seenIds.hasOwnProperty(nextPerson.properties.id)) {
+        if (seenIds.has(nextPerson.properties.id)) {
           throw 'Unable to import pedigree: multiple persons with the same ID ['
             + nextPerson.properties.id + ']';
         }
-        seenIds[nextPerson.properties.id] = true;
+        seenIds.add(nextPerson.properties.id);
         if (nameToID.hasOwnProperty(nextPerson.properties.id)
             && nameToID[nextPerson.properties.id] !== pedigreeID) {
           delete nameToID[nextPerson.properties.id];
@@ -185,12 +185,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       }
     }
 
-    // (each person's own vertex, recorded when it was added: looking it up by id or name fails when
-    // that id or name is ambiguous)
-    let getPersonID = function(person) {
-      return person.pedigreeID;
-    };
-
     let findReferencedPerson = function(reference, refType) {
       if (ambiguousReferences.hasOwnProperty(reference)) {
         throw 'Unable to import pedigree: ambiguous reference to ['
@@ -221,7 +215,9 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     for (let i = 0; i < nodeData.length; i++) {
       let nextPerson = nodeData[i];
 
-      let personID = getPersonID(nextPerson);
+      // (each person's own vertex, recorded when it was added: looking it up again by id or name
+      // fails when that id or name is ambiguous)
+      let personID = nextPerson.pedigreeID;
 
       // as the GA4GH importer: an adoptive parent makes the child adopted, under the adoptive
       // parents; two of a kind are both kept; a parent's code must fit their own gender (checked
@@ -329,7 +325,7 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     try {
       for (const nextPerson of nodeData){
         if (nextPerson.partners){
-          let nextPersonId = getPersonID(nextPerson);
+          let nextPersonId = nextPerson.pedigreeID;
           for (let i=0; i < nextPerson.partners.length; i++){
             // (Both partners usually carry the extension; setting the same flags twice is harmless.)
             const partnerId = findReferencedPerson(nextPerson.partners[i].ref, 'partner');

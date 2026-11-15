@@ -135,7 +135,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
   // (every reference between people is read as a person's place in nodeData, so ids only need to be
   // unique, and names never need to be)
-  const seenIds = {};
+  const seenIds = new Set();
 
   let nodeData = [];
   let nodeDataLookup = {};
@@ -179,11 +179,11 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     nextPerson.pedigreeID = pedigreeID;
 
     if (nextPerson.properties.id) {
-      if (seenIds.hasOwnProperty(nextPerson.properties.id)) {
+      if (seenIds.has(nextPerson.properties.id)) {
         throw 'Unable to import pedigree: multiple persons with the same ID ['
         + nextPerson.properties.id + ']';
       }
-      seenIds[nextPerson.properties.id] = true;
+      seenIds.add(nextPerson.properties.id);
     }
   }
 
@@ -218,8 +218,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     if (leftOut) {
       console.warn(leftOut);
     }
-    let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].pedigreeID : null;
-    let fatherLink = (parents.father != null) ? nodeData[parents.father.node].pedigreeID : null;
+    let motherID = (parents.mother != null) ? nodeData[parents.mother.node].pedigreeID : null;
+    let fatherID = (parents.father != null) ? nodeData[parents.father.node].pedigreeID : null;
     // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION_URL): with any parent relationship
     // in the file (placed or not), those codes say whether the person is adopted, and the extension
     // is left alone.
@@ -227,28 +227,22 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
       newG.properties[personID].isAdopted = true;
     }
 
-    if (motherLink == null && fatherLink == null) {
+    if (motherID == null && fatherID == null) {
       continue;
     }
 
     // create a virtual parent in case one of the parents is missing
-    let fatherID = null;
-    let motherID = null;
-    if (fatherLink == null) {
+    if (fatherID == null) {
       fatherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
         'gender': 'M',
         'comments': 'unknown'
       }, newG.defaultPersonNodeWidth);
-    } else {
-      fatherID = fatherLink;
     }
-    if (motherLink == null) {
+    if (motherID == null) {
       motherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
         'gender': 'F',
         'comments': 'unknown'
       }, newG.defaultPersonNodeWidth);
-    } else {
-      motherID = motherLink;
     }
 
     if (fatherID === personID || motherID === personID) {
@@ -270,7 +264,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   try {
     for (const nextPerson of nodeData){
       if (nextPerson.partners){
-        let nextPersonId = undefined;
+        const nextPersonId = nextPerson.pedigreeID;
         for (let i=0; i < nextPerson.partners.length; i++){
           const partner = nextPerson.partners[i];
           if (partner < nextPerson.nodeId){
@@ -279,9 +273,6 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
           const partnerType = nextPerson.partnerType[i];
 
-          if (nextPersonId === undefined){
-            nextPersonId = nextPerson.pedigreeID;
-          }
           const partnerId = nodeData[partner].pedigreeID;
           let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
           if (!relNode && nextPersonId !== partnerId) {

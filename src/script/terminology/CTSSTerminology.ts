@@ -15,7 +15,8 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
   getLookupURL(id: any): any {
     // the ID as a quoted phrase, so the service's query syntax reads none of its characters (every
     // colon, not just the first); an empty terms parameter, as the service refuses a request without
-    // one; and the columns asked for, as processLookupResponse reads the text from the second
+    // one; the columns asked for, as processLookupResponse reads the text from the second; and the
+    // service's largest page, as a short code can be part of many others
     const phrase = '"' + this.desanitizeID(id).replace(/[\\"]/g, '\\$&') + '"';
     return (
       this._ctssBaseUrl +
@@ -23,17 +24,19 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
       encodeURIComponent(this._valueColumn) +
       ',' +
       encodeURIComponent(this._textColumn) +
-      '&terms=&q=' +
+      '&maxList=500&terms=&q=' +
       encodeURIComponent(this._valueColumn + ':' + phrase)
     );
   }
 
   processLookupResponse(id: any, response: any): any {
     const parsed = JSON.parse(response.responseText);
-    // the row for this very code (the service's search can also match codes that only contain it)
-    const wanted = String(this.desanitizeID(id)).toLowerCase();
-    const rows = (parsed.length > 3 && parsed[3]) ? parsed[3] : [];
-    const row = rows.find((r: any) => r && String(r[0]).toLowerCase() === wanted);
+    // the row for this very code (the service's search can also match codes that only contain it),
+    // compared as IDs are kept - sanitized, which can't be undone exactly - and in the same case first
+    const rows = (parsed.length > 3 && parsed[3]) ? parsed[3].filter((r: any) => r) : [];
+    const kept = (r: any) => this.sanitizeID(String(r[0]));
+    const row = rows.find((r: any) => kept(r) === id)
+      || rows.find((r: any) => kept(r).toLowerCase() === String(id).toLowerCase());
     if (row) {
       return row[1];
     }
