@@ -13,12 +13,18 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
   }
 
   getLookupURL(id: any): any {
+    // the ID as a quoted phrase, so the service's query syntax reads none of its characters (every
+    // colon, not just the first); an empty terms parameter, as the service refuses a request without
+    // one; and the columns asked for, as processLookupResponse reads the text from the second
+    const phrase = '"' + this.desanitizeID(id).replace(/[\\"]/g, '\\$&') + '"';
     return (
       this._ctssBaseUrl +
-      '?q=' +
+      '?df=' +
       encodeURI(this._valueColumn) +
-      '%3A' +
-      encodeURI(this.desanitizeID(id).replace(':', '\\:'))
+      ',' +
+      encodeURI(this._textColumn) +
+      '&terms=&q=' +
+      encodeURIComponent(this._valueColumn + ':' + phrase)
     );
   }
 
@@ -39,8 +45,8 @@ export default class CTSSTerminology extends AbstractAjaxTerminology {
       encodeURI(this._textColumn) +
       '&maxList=' +
       this.getSearchCount() +
-      '&term=' +
-      encodeURI(searchTerm)
+      '&terms=' +
+      encodeURIComponent(searchTerm)
     );
   }
 
