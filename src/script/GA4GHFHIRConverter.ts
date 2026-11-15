@@ -177,6 +177,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
     let pedigreeID = newG._addVertex(null, BaseGraph.TYPE.PERSON, nextPerson.properties,
       newG.defaultPersonNodeWidth);
+    nextPerson.pedigreeID = pedigreeID;
 
     if (nextPerson.properties.id) {
       if (externalIDToID.hasOwnProperty(nextPerson.properties.id)) {
@@ -216,14 +217,10 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
 
   }
 
+  // (each person's own vertex, recorded when it was added: looking it up by id or name fails when
+  // that id or name is ambiguous)
   let getPersonID = function (person) {
-    if (person.properties.hasOwnProperty('id')) {
-      return externalIDToID[person.properties.id];
-    }
-
-    if (person.hasOwnProperty('fName')) {
-      return nameToID[person.properties.fName];
-    }
+    return person.pedigreeID;
   };
 
   let findReferencedPerson = function (reference, refType) {

@@ -838,3 +838,21 @@ describe('GA4GHFHIRConverter gene results', () => {
     expect(read.geneResults).toEqual({ BRCA1: 'heterozygous' });
   });
 });
+
+describe('GA4GHFHIRConverter.initFromFHIR person ids', () => {
+  beforeEach(() => {
+    vi.stubGlobal('editor', mockEditor);
+  });
+
+  it('keeps a child\'s parents when the child\'s Patient id is also someone else\'s first name', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(simpleGG) }, 'all', null, null));
+    const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+    const john = patients.find((p) => p.name && p.name[0].given[0] === 'John');
+    const child = patients.find((p) => p !== john && !(p.name && p.name[0].given && p.name[0].given[0] === 'Jane'));
+    // John (read first) is named after the child's Patient id
+    john.name[0].given[0] = child.id;
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    expect(people.filter((v) => graph.getParents(v).length === 2)).toHaveLength(1);
+  });
+});
