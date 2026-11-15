@@ -855,4 +855,49 @@ describe('GA4GHFHIRConverter.initFromFHIR person ids', () => {
     const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
     expect(people.filter((v) => graph.getParents(v).length === 2)).toHaveLength(1);
   });
+
+  // An export of simpleGG (John and Jane, consanguineous, with a child) with John renamed after Jane's
+  // Patient id, so Jane, a mother and a partner, has an id that is also someone's name.
+  function janesIdIsJohnsName() {
+    const gg = structuredClone(simpleGG);
+    gg[2].prop.consangr = 'Y';
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+    const given = (p) => p.name && p.name[0].given && p.name[0].given[0];
+    patients.find((p) => given(p) === 'John').name[0].given[0] = patients.find((p) => given(p) === 'Jane').id;
+    return JSON.stringify(exported);
+  }
+
+  it('keeps a mother whose Patient id is also someone else\'s first name', () => {
+    const graph = GA4GHFHIRConverter.initFromFHIR(janesIdIsJohnsName());
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    const child = people.find((v) => graph.getParents(v).length === 2);
+    expect(graph.getParents(child).map((v) => graph.properties[v].gender).sort()).toEqual(['F', 'M']);
+  });
+
+  it('keeps a partner whose Patient id is also someone else\'s first name, with the couple\'s details', () => {
+    const graph = GA4GHFHIRConverter.initFromFHIR(janesIdIsJohnsName());
+    const relationships = Object.keys(graph.properties).map(Number).filter((v) => graph.isRelationship(v));
+    expect(relationships.map((v) => graph.properties[v].consangr)).toEqual(['Y']);
+  });
+
+  it('reads two people with the same first name', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(simpleGG) }, 'all', null, null));
+    const patients = exported.entry.map((e) => e.resource).filter((r) => r.resourceType === 'Patient');
+    for (const p of patients) {
+      p.name = [{ given: ['Sam'] }];
+    }
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported));
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    expect(people.filter((v) => graph.getParents(v).length === 2)).toHaveLength(1);
+  });
+
+  it('still refuses two people with the same Patient id', () => {
+    const exported = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(simpleGG) }, 'all', null, null));
+    const patients = exported.entry.filter((e) => e.resource.resourceType === 'Patient');
+    const copy = structuredClone(patients[0]);
+    copy.fullUrl = 'urn:uuid:00000000-0000-4000-8000-000000000000';
+    exported.entry.push(copy);
+    expect(() => GA4GHFHIRConverter.initFromFHIR(JSON.stringify(exported))).toThrow(/multiple persons with the same ID/);
+  });
 });

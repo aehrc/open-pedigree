@@ -133,10 +133,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   // }
   let newG = new BaseGraph();
 
-  let nameToID = {};
-  let externalIDToID = {};
-  let ambiguousReferences = {};
-  let hasID = {};
+  // (every reference between people is read as a person's place in nodeData, so ids only need to be
+  // unique, and names never need to be)
+  const seenIds = {};
 
   let nodeData = [];
   let nodeDataLookup = {};
@@ -180,69 +179,13 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     nextPerson.pedigreeID = pedigreeID;
 
     if (nextPerson.properties.id) {
-      if (externalIDToID.hasOwnProperty(nextPerson.properties.id)) {
+      if (seenIds.hasOwnProperty(nextPerson.properties.id)) {
         throw 'Unable to import pedigree: multiple persons with the same ID ['
         + nextPerson.properties.id + ']';
       }
-      if (nameToID.hasOwnProperty(nextPerson.properties.id)
-        && nameToID[nextPerson.properties.id] !== pedigreeID) {
-        delete nameToID[nextPerson.properties.id];
-        ambiguousReferences[nextPerson.properties.id] = true;
-      } else {
-        externalIDToID[nextPerson.properties.id] = pedigreeID;
-        hasID[nextPerson.properties.id] = true;
-      }
+      seenIds[nextPerson.properties.id] = true;
     }
-    if (nextPerson.properties.fName) {
-      if (nameToID.hasOwnProperty(nextPerson.properties.fName)
-        && nameToID[nextPerson.properties.fName] !== pedigreeID) {
-        // multiple nodes have this first name
-        delete nameToID[nextPerson.properties.fName];
-        ambiguousReferences[nextPerson.properties.fName] = true;
-      } else if (externalIDToID.hasOwnProperty(nextPerson.properties.fName)
-        && externalIDToID[nextPerson.properties.fName] !== pedigreeID) {
-        // some other node has this name as an ID
-        delete externalIDToID[nextPerson.properties.fName];
-        ambiguousReferences[nextPerson.properties.fName] = true;
-      } else {
-        nameToID[nextPerson.properties.fName] = pedigreeID;
-      }
-    }
-    // only use externalID if id is not present
-    if (nextPerson.properties.hasOwnProperty('externalId')
-      && !hasID.hasOwnProperty(pedigreeID)) {
-      externalIDToID[nextPerson.properties.externalId] = pedigreeID;
-      hasID[pedigreeID] = true;
-    }
-
   }
-
-  // (each person's own vertex, recorded when it was added: looking it up by id or name fails when
-  // that id or name is ambiguous)
-  let getPersonID = function (person) {
-    return person.pedigreeID;
-  };
-
-  let findReferencedPerson = function (reference, refType) {
-    if (ambiguousReferences.hasOwnProperty(reference)) {
-      throw 'Unable to import pedigree: ambiguous reference to ['
-      + reference + ']';
-    }
-
-    if (externalIDToID.hasOwnProperty(reference)) {
-      return externalIDToID[reference];
-    }
-
-    if (nameToID.hasOwnProperty(reference)) {
-      return nameToID[reference];
-    }
-
-    throw 'Unable to import pedigree: ['
-    + reference
-    + '] is not a valid '
-    + refType
-    + ' reference (does not correspond to a name or an ID of another person)';
-  };
 
   let defaultEdgeWeight = 1;
 
@@ -253,7 +196,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
   for (let i = 0; i < nodeData.length; i++) {
     let nextPerson = nodeData[i];
 
-    let personID = getPersonID(nextPerson);
+    let personID = nextPerson.pedigreeID;
 
     const fetus = !!newG.properties[personID] && FETAL_STATUSES.indexOf(newG.properties[personID].lifeStatus) !== -1;
     const chosen = chooseParentClaims(nextPerson.parentClaims || [], fetus);
@@ -275,8 +218,8 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
     if (leftOut) {
       console.warn(leftOut);
     }
-    let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].properties.id : null;
-    let fatherLink = (parents.father != null) ? nodeData[parents.father.node].properties.id : null;
+    let motherLink = (parents.mother != null) ? nodeData[parents.mother.node].pedigreeID : null;
+    let fatherLink = (parents.father != null) ? nodeData[parents.father.node].pedigreeID : null;
     // Adopted with no parents in the pedigree (see ADOPTED_EXTENSION_URL): with any parent relationship
     // in the file (placed or not), those codes say whether the person is adopted, and the extension
     // is left alone.
@@ -297,7 +240,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         'comments': 'unknown'
       }, newG.defaultPersonNodeWidth);
     } else {
-      fatherID = findReferencedPerson(fatherLink, 'father');
+      fatherID = fatherLink;
     }
     if (motherLink == null) {
       motherID = newG._addVertex(null, BaseGraph.TYPE.PERSON, {
@@ -305,7 +248,7 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
         'comments': 'unknown'
       }, newG.defaultPersonNodeWidth);
     } else {
-      motherID = findReferencedPerson(motherLink, 'mother');
+      motherID = motherLink;
     }
 
     if (fatherID === personID || motherID === personID) {
@@ -337,9 +280,9 @@ GA4GHFHIRConverter.initFromFHIR = function (inputText) {
           const partnerType = nextPerson.partnerType[i];
 
           if (nextPersonId === undefined){
-            nextPersonId = findReferencedPerson(nextPerson.properties.id, 'partner');
+            nextPersonId = nextPerson.pedigreeID;
           }
-          const partnerId = findReferencedPerson(nodeData[partner].properties.id, 'partner');
+          const partnerId = nodeData[partner].pedigreeID;
           let relNode = newG.getRelationshipNode(nextPersonId, partnerId);
           if (!relNode && nextPersonId !== partnerId) {
             // a couple with no shared child: their only child is a placeholder

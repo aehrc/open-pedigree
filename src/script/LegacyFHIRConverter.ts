@@ -126,6 +126,8 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     let externalIDToID = {};
     let ambiguousReferences = {};
     let hasID = {};
+    // (every id seen, including one made ambiguous by a name, so a second person with it is refused)
+    const seenIds = {};
 
     let nodeData = [];
     // first pass: add all vertices and assign vertex IDs
@@ -145,10 +147,11 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
       nextPerson.pedigreeID = pedigreeID;
 
       if (nextPerson.properties.id) {
-        if (externalIDToID.hasOwnProperty(nextPerson.properties.id)) {
+        if (seenIds.hasOwnProperty(nextPerson.properties.id)) {
           throw 'Unable to import pedigree: multiple persons with the same ID ['
             + nextPerson.properties.id + ']';
         }
+        seenIds[nextPerson.properties.id] = true;
         if (nameToID.hasOwnProperty(nextPerson.properties.id)
             && nameToID[nextPerson.properties.id] !== pedigreeID) {
           delete nameToID[nextPerson.properties.id];
