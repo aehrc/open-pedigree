@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.1.0...open-pedigree-v2.2.0) (2026-11-15)
+
+
+### Features
+
+* imports list every problem in the file, not just the first ([#106](https://github.com/aehrc/open-pedigree/issues/106)) ([a8ea806](https://github.com/aehrc/open-pedigree/commit/a8ea8063519b19db2070fd42ba90b888a318ebd7))
+
+
+### Bug Fixes
+
+* FHIR imports where an id is also someone's name; CTSS requests the NLM service accepts ([#104](https://github.com/aehrc/open-pedigree/issues/104)) ([a77a924](https://github.com/aehrc/open-pedigree/commit/a77a9247164ca314d883fcbe43641cfd9658d652))
+
 ## [2.1.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.0.0...open-pedigree-v2.1.0) (2026-11-13)
 
 
