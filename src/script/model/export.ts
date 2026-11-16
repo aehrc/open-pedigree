@@ -253,6 +253,9 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
 
 // The canvas, serialised as SVG.
 function canvasAsSVG() {
+  // (a fill redraw still pending - entries just added or removed - is done first)
+  var view = editor.getView && editor.getView();
+  view && view.flushFillRedraw && view.flushFillRedraw();
   // Plain DOM calls: this was written against Prototype.js ($('canvas'), .down()), which is gone,
   // so every call threw - no SVG export, and no image embedded in a saved pedigree.
   var image = document.getElementById('canvas');

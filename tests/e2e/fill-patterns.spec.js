@@ -309,22 +309,6 @@ test('the node menu\'s swatches show the patterns too', async ({ page }) => {
     .map((el) => el.dataset.fillPattern || null))).toEqual(['0']);
 });
 
-test('an undo keeps what each entry has, so the shading never changes meaning', async ({ page }) => {
-  await open(page);
-  const [father, , child] = await people(page);
-  await setProperties(page, child, { setDisorders: ['A'] });
-  await setProperties(page, father, { setDisorders: ['B'] });
-  await toggle(page);
-  const solid = await fillPatternId(page, 0);
-  const hatched = await fillPatternId(page, 1);
-  expect(await sectorFills(page, child)).toEqual([solid]);
-  // an unrelated change, undone (an undo reloads the pedigree)
-  await setProperties(page, father, { setFirstName: 'Fred' });
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
-  expect(await sectorFills(page, child)).toEqual([solid]);
-  expect(await sectorFills(page, father)).toEqual([hatched]);
-});
-
 test('a mark goes back to black when the person\'s last fill goes, whatever else redraws', async ({ page }) => {
   await open(page);
   const [, , child] = await people(page);
@@ -372,4 +356,18 @@ test('after an undo or redo the shading is what the legend lists, its first entr
   for (const entry of listed) {
     await expect.poll(() => sectorFills(page, personWith[entry.id])).toEqual([await fillPatternId(page, Number(entry.pattern))]);
   }
+});
+
+test('a new entry in an earlier legend moves the ones after it, in the drawing and the legend', async ({ page }) => {
+  await open(page);
+  const [father, mother] = await people(page);
+  await toggle(page);
+  await setProperties(page, father, { setGenes: ['BRCA1'] });
+  expect(await sectorFills(page, father)).toEqual([await fillPatternId(page, 0)]);
+  // a disorder goes before every gene: BRCA1 moves to the second pattern
+  await setProperties(page, mother, { setDisorders: ['D'] });
+  const hatched = await fillPatternId(page, 1);
+  await expect.poll(() => sectorFills(page, father)).toEqual([hatched]);
+  expect(await sectorFills(page, mother)).toEqual([await fillPatternId(page, 0)]);
+  expect((await swatchPatterns(page)).sort()).toEqual(['pattern:0', 'pattern:1']);
 });

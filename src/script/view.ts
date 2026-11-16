@@ -384,28 +384,42 @@ export default class View {
   }
 
   /**
-   * Redraws the fills once, soon: after a legend entry goes, the later entries move up a pattern.
-   * (One redraw however many entries go at once, e.g. while a pedigree is reloaded.)
+   * The legends' entries changed (one added or removed): patterns follow their order, so the entries
+   * listed after it can move. Redraws the fills once, soon - however many change at once, e.g. while
+   * a pedigree loads - or at once if something draws the image first (flushFillRedraw).
    */
-  scheduleFillRedraw(): void {
+  fillOrderChanged(): void {
+    this._fillPatternRegistry.invalidate();
     if (!this._fillPatterns || this._fillRedrawScheduled) {
       return;
     }
     this._fillRedrawScheduled = true;
-    Promise.resolve().then(() => {
-      this._fillRedrawScheduled = false;
-      if (this._fillPatterns) {
-        this._redrawFills();
-      }
-    });
+    Promise.resolve().then(() => this.flushFillRedraw());
+  }
+
+  /** Does a pending fill redraw now (before the drawing is read, e.g. by an export). */
+  flushFillRedraw(): void {
+    if (!this._fillRedrawScheduled) {
+      return;
+    }
+    this._fillRedrawScheduled = false;
+    if (this._fillPatterns) {
+      this._redrawFills();
+    }
   }
 
   // The legends whose entries fill a symbol: disorders, genes, then custom legend items.
   _fillPatternLegends(): any[] {
     var legends: any[] = [editor.getDisorderLegend(), editor.getGeneLegend()];
-    var custom = editor._questionnaireLegends || {};
-    Object.keys(custom).forEach(function(linkId) {
-      legends.push(custom[linkId]);
+    // (custom legends in the questionnaire's order, as their boxes and a person's fills are)
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    ((config && config.items) || []).forEach(function(item: any) {
+      if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation')) {
+        var legend = editor.getQuestionnaireLegend(item.linkId);
+        if (legend && legends.indexOf(legend) === -1) {
+          legends.push(legend);
+        }
+      }
     });
     return legends.filter(Boolean);
   }

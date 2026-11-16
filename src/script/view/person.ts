@@ -756,6 +756,9 @@ export default class Person extends AbstractPerson {
         }
         var answer = _this.getQuestionnaireAnswer(item.linkId) || [];
         var legend = editor.getQuestionnaireLegend(item.linkId);
+        if (!legend) {
+          return;
+        }
         answer.forEach(function(v: any) {
           result.push(entry(legend, v.code));
         });

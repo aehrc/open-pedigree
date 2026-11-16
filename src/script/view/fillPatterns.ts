@@ -47,6 +47,8 @@ let registries = 0;
 export class FillPatternRegistry {
   _idPrefix: string;
   _order: () => string[];
+  // key -> place in the order, rebuilt after the legends change (invalidate)
+  _places: Map<string, number> = null;
 
   constructor(order: () => string[] = () => []) {
     registries += 1;
@@ -60,9 +62,26 @@ export class FillPatternRegistry {
    * An entry no legend lists yet takes the next place.
    */
   indexFor(key: string): number {
-    const order = this._order();
-    const place = order.indexOf(key);
-    return (place === -1 ? order.length : place) % PATTERNS.length;
+    const places = this._placeMap();
+    const place = places.has(key) ? places.get(key) : places.size;
+    return place % PATTERNS.length;
+  }
+
+  /** Forgets the order, so the next lookup reads it again (after a legend entry is added or removed). */
+  invalidate(): void {
+    this._places = null;
+  }
+
+  _placeMap(): Map<string, number> {
+    if (!this._places) {
+      this._places = new Map();
+      this._order().forEach((key) => {
+        if (!this._places.has(key)) {
+          this._places.set(key, this._places.size);
+        }
+      });
+    }
+    return this._places;
   }
 
   /** The `<pattern>` element id for a pattern index. */
@@ -78,9 +97,9 @@ export class FillPatternRegistry {
     return 'url(#' + this.patternId(this.indexFor(key)) + (rotated ? ROTATED_SUFFIX : '') + ')';
   }
 
-  /** Whether an entry's pattern is the solid one (marks drawn over it need to stand out). */
+  /** Whether an entry's pattern is the solid one (marks drawn over it need to stand out); never for an entry no legend lists. */
   isSolid(key: string): boolean {
-    return this.indexFor(key) === 0;
+    return this._placeMap().has(key) && this.indexFor(key) === 0;
   }
 
   /** Adds every pattern to the SVG's <defs> (making one if needed), once. */

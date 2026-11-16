@@ -139,6 +139,14 @@ export default class Legend {
     return shown;
   }
 
+  // Tells the view this legend's entries changed (patterns follow the legends' order).
+  _orderChanged(): void {
+    const view = editor.getView && editor.getView();
+    if (this.fillsSymbols() && view && view.fillOrderChanged) {
+      view.fillOrderChanged();
+    }
+  }
+
   // Whether this legend draws patterns now.
   _patternsOn(): boolean {
     const view = editor.getView && editor.getView();
@@ -254,6 +262,8 @@ export default class Legend {
       this._affectedNodes[id] = [nodeID];
       const listElement = this._generateElement(id, name);
       this._list.appendChild(listElement);
+      // (a new entry: patterns follow the legends' order, so later entries can move)
+      this._orderChanged();
     } else {
       this._affectedNodes[id].push(nodeID);
     }
@@ -278,10 +288,8 @@ export default class Legend {
         if(Object.keys(this._affectedNodes).length === 0) {
           this._legendBox.style.display = 'none';
         }
-        // (with patterns on, the entries listed after it move up a pattern)
-        if (this._patternsOn()) {
-          editor.getView().scheduleFillRedraw();
-        }
+        // (the entries listed after it move up a pattern)
+        this._orderChanged();
       } else {
         this._updateCaseNumbersForObject(id);
       }

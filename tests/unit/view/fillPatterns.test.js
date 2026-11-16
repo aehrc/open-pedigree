@@ -24,11 +24,22 @@ describe('FillPatternRegistry', () => {
     const registry = over(order);
     expect(registry.indexFor('disorder:B')).toBe(1);
     order.shift();
+    registry.invalidate();
     expect(registry.indexFor('disorder:B')).toBe(0);
   });
 
-  it('gives an entry no legend lists yet the next place', () => {
+  it('gives an entry no legend lists yet the next place, but never counts it solid', () => {
     expect(over(['disorder:A']).indexFor('gene:new')).toBe(1);
+    expect(over([]).isSolid('gene:new')).toBe(false);
+  });
+
+  it('reads the order again once told it changed', () => {
+    const order = ['disorder:A'];
+    const registry = over(order);
+    expect(registry.indexFor('disorder:B')).toBe(1);
+    order.unshift('disorder:B');
+    registry.invalidate();
+    expect(registry.indexFor('disorder:B')).toBe(0);
   });
 
   it('has its own pattern ids, so two editors on a page don\'t share them', () => {
