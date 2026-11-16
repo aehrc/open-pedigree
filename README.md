@@ -184,6 +184,8 @@ On import, a variant marked *Present* with no allelic state reads as *Positive*.
 
 The Observation's value is still the gene, so a reader that ignores components reads the genes as before. PED, PEDX, DADA2 and BOADICEA have nowhere to put a result.
 
+A record-link provider can send a linked record's results with its genes, as the answer `{ "linkId": "gene_results", "value": { "BRCA1": "heterozygous" } }` (keys as the `candidate_genes` entries give the genes, values as above). It's reserved like the legends, so it needs no Questionnaire item, and a refresh treats each gene's result as any linked value: set when the record changes it, cleared when the record drops it only while the person still holds it, and left alone for genes that never came from the record.
+
 ## Import problems and notes
 
 An import that finds a problem with the file imports nothing. It doesn't stop at the first problem: it reports every one it can find, so a file can be fixed in one go. A single problem is reported as it always was. Several are listed in one message, `Unable to import pedigree: N problems found:`, numbered in the order they were found, which follows the file within each check (at most 20, then how many more).
