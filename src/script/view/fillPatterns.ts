@@ -28,7 +28,7 @@ export const PATTERNS: FillPattern[] = [
   { name: 'solid', size: 6, content: `<rect width="6" height="6" fill="${BLACK}"/>` },
   { name: 'diagonal /', size: 6, content: `<path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="${BLACK}" stroke-width="1"/>` },
   // Bold and wider apart, so it isn't read as 'diagonal /' turned round once a symbol is small.
-  { name: 'bold diagonal \\', size: 10, content: `<path d="M0,0 L10,10 M-1,9 L1,11 M9,-1 L11,1" stroke="${BLACK}" stroke-width="3.5"/>` },
+  { name: 'bold diagonal \\', size: 10, content: `<path d="M0,0 L10,10 M-2,8 L2,12 M8,-2 L12,2" stroke="${BLACK}" stroke-width="3.5"/>` },
   { name: 'cross-hatch', size: 6, content: `<path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5 M0,0 L6,6 M-1,5 L1,7 M5,-1 L7,1" stroke="${BLACK}" stroke-width="0.8"/>` },
   { name: 'dots', size: 5, content: `<circle cx="2.5" cy="2.5" r="1.2" fill="${BLACK}"/>` },
   { name: 'horizontal', size: 5, content: `<path d="M0,2.5 H5" stroke="${BLACK}" stroke-width="1"/>` },

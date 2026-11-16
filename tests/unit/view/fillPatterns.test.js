@@ -21,6 +21,25 @@ describe('FillPatternRegistry', () => {
     expect(weight('bold horizontal')).toBeGreaterThanOrEqual(3 * weight('horizontal'));
   });
 
+  it('carries each diagonal stroke across the tile\'s corners far enough to cover its width (no notches between tiles)', () => {
+    PATTERNS.forEach((pattern) => {
+      const width = /stroke-width="([\d.]+)"/.exec(pattern.content);
+      const path = /<path d="([^"]+)"/.exec(pattern.content);
+      if (!width || !path) {
+        return;
+      }
+      const corners = [[0, 0], [0, pattern.size], [pattern.size, 0], [pattern.size, pattern.size]];
+      // every diagonal segment centred on a corner: the piece that joins the next tile's stroke
+      for (const [, x1, y1, x2, y2] of Array.from(path[1].matchAll(/M(-?[\d.]+),(-?[\d.]+) L(-?[\d.]+),(-?[\d.]+)/g), (m) => m.map(Number))) {
+        const mid = [(x1 + x2) / 2, (y1 + y2) / 2];
+        if (Math.abs(x2 - x1) === Math.abs(y2 - y1) && corners.some(([cx, cy]) => cx === mid[0] && cy === mid[1])) {
+          // the stroke's edge meets the tile's side width/2 along the line from the corner
+          expect(Math.hypot(x2 - x1, y2 - y1) / 2, pattern.name).toBeGreaterThanOrEqual(Number(width[1]) / 2);
+        }
+      }
+    });
+  });
+
   it('repeats past the last pattern', () => {
     const order = Array.from({ length: PATTERNS.length + 1 }, (_, i) => 'disorder:' + i);
     expect(over(order).indexFor('disorder:' + PATTERNS.length)).toBe(0);
