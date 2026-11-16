@@ -1190,7 +1190,7 @@ export default class PedigreeEditor {
     if (relink) {
       var input = relinkRefreshInput(answers || [], previousSnapshot, isLegend, legendKey, function(linkId: string, value: any): boolean {
         return isUnusableAnswer(resolveSetter(linkId), value);
-      }, isMap, mapKey);
+      }, isMap, mapKey, mapValueUsable);
       answers = input.answers;
       baseline = input.snapshot;
     }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, CLEAR_VALUES, clearValueFor, sameValue, GENE_RESULTS_LINK_ID } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, CLEAR_VALUES, clearValueFor, sameValue } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { GENE_RESULTS_LINK_ID, isGeneResultCode } from 'pedigree/model/geneResults';
 
 const SETTER_FOR = {
   first_name: 'setFirstName', gender: 'setGender', dob: 'setBirthDate', dod: 'setDeathDate', weeks: 'setGestationAge', disorders: 'setDisorders',
@@ -244,7 +245,7 @@ describe('gene results from a linked record (a map, key by key)', () => {
     isLegend: () => false,
     isMap: (linkId) => linkId === GENE_RESULTS_LINK_ID,
     mapKey: (_linkId, key) => sanitise(key),
-    mapValueUsable: (_linkId, v) => ['heterozygous', 'homozygous', 'negative'].indexOf(v) !== -1,
+    mapValueUsable: (_linkId, v) => isGeneResultCode(v),
     legendKey: (_linkId, e) => e,
     legendSetterEntry: (_linkId, e) => e,
     current: (setter) => current[setter],
@@ -333,6 +334,28 @@ describe('gene results from a linked record (a map, key by key)', () => {
     const a = results({ TP53: 'negative', BRCA1: 'heterozygous' });
     const b = results({ BRCA1: 'heterozygous', TP53: 'negative' });
     expect(JSON.stringify(a.snapshot)).toBe(JSON.stringify(b.snapshot));
+  });
+
+  it('on linking to another record, clears the previous record\'s result where the new one sends an unusable value', () => {
+    const usable = (_l, v) => isGeneResultCode(v);
+    const input = relinkRefreshInput([{ linkId: GENE_RESULTS_LINK_ID, value: { BRCA1: 'Heterozygous' } }],
+      { gene_results: { BRCA1: 'negative' } }, () => false, (_l, e) => e, () => false,
+      (linkId) => linkId === GENE_RESULTS_LINK_ID, (_l, key) => sanitise(key), usable);
+    const r = results(input.answers[0].value, { current: { setGeneResults: { BRCA1: 'negative' } }, snapshot: input.snapshot });
+    expect(r.properties).toEqual({ setGeneResults: {} });
+  });
+
+  it('takes a usable value over an unusable one for the same gene', () => {
+    const r = results({ 'HGNC:1100': 'Heterozygous', HGNC_C_1100: 'homozygous' }, {
+      current: { setGeneResults: { 'HGNC:1100': 'negative' } }, snapshot: { gene_results: { 'HGNC:1100': 'negative' } },
+    });
+    expect(r.properties).toEqual({ setGeneResults: { HGNC_C_1100: 'homozygous' } });
+    expect(r.snapshot).toEqual({ gene_results: { HGNC_C_1100: 'homozygous' } });
+  });
+
+  it('never keeps tracking an unusable value a snapshot holds', () => {
+    const r = results({ BRCA1: 'Heterozygous' }, { snapshot: { gene_results: { BRCA1: 'Heterozygous' } } });
+    expect(r.snapshot).toEqual({});
   });
 
   it('takes a blank result as none', () => {

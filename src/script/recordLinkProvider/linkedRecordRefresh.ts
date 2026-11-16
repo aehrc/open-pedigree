@@ -26,9 +26,6 @@ import { isBlankValue } from 'pedigree/model/helpers';
 // linkId -> the last non-empty value the linked record sent for it.
 export type LinkedRecordSnapshot = Record<string, any>;
 
-// The linked record's gene results, `{<gene ID>: <result code>}`, for Person.setGeneResults: a
-// reserved linkId, like the reserved legends (pedigree-gene-results-from-linked-rows).
-export const GENE_RESULTS_LINK_ID = 'gene_results';
 
 export interface LinkedRecordRefreshInput {
   answers: { linkId: string, value: any }[];
@@ -207,18 +204,20 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
 
     if (input.isMap && input.isMap(linkId)) {
       const usable = (v: any): boolean => (input.mapValueUsable ? input.mapValueUsable(linkId, v) : true);
-      const incoming = filledEntries(answer.value, usable);
-      const previous = hadLast ? filledEntries(last[linkId]) : {};
       const keyOf = (key: string): string => (input.mapKey ? input.mapKey(linkId, key) : key);
-      // A value the setter can't take leaves the node alone (as an unusable date does): it counts as
-      // unchanged, and the record's last usable value stays tracked so it can still be cleared.
       const sent = filledEntries(answer.value);
-      Object.keys(sent).forEach((key) => {
-        if (!usable(sent[key])) {
-          const lastKey = Object.keys(previous).find((k) => keyOf(k) === keyOf(key));
-          if (lastKey !== undefined) {
-            incoming[lastKey] = previous[lastKey];
-          }
+      const previous = hadLast ? filledEntries(last[linkId], usable) : {};
+      const incoming: Record<string, any> = {};
+      Object.keys(sent).filter((key) => usable(sent[key])).forEach((key) => {
+        incoming[key] = sent[key];
+      });
+      // A value the setter can't take leaves the node alone (as an unusable date does): it counts as
+      // unchanged, and the record's last usable value stays tracked so it can still be cleared -
+      // unless the record also sent a usable value for that key.
+      Object.keys(sent).filter((key) => !usable(sent[key])).forEach((key) => {
+        const lastKey = Object.keys(previous).find((k) => keyOf(k) === keyOf(key));
+        if (lastKey !== undefined && !Object.keys(incoming).some((k) => keyOf(k) === keyOf(key))) {
+          incoming[lastKey] = previous[lastKey];
         }
       });
       if (Object.keys(incoming).length > 0) {
@@ -330,11 +329,18 @@ export function relinkRefreshInput(
   legendKey: (linkId: string, entry: any) => string,
   isUnusable: (linkId: string, value: any) => boolean = () => false,
   isMap: (linkId: string) => boolean = () => false,
-  mapKey: (linkId: string, key: string) => string = (_linkId, key) => key
+  mapKey: (linkId: string, key: string) => string = (_linkId, key) => key,
+  mapValueUsable: (linkId: string, value: any) => boolean = () => true
 ): { answers: { linkId: string, value: any }[], snapshot: LinkedRecordSnapshot } {
   const previous = previousSnapshot || {};
-  const all = (answers || []).filter((answer) => !!answer).map((answer) =>
-    (isUnusable(answer.linkId, answer.value) ? { linkId: answer.linkId, value: null } : answer));
+  const all = (answers || []).filter((answer) => !!answer).map((answer) => {
+    if (isMap(answer.linkId)) {
+      // (a map's unusable values are left out, so the previous record's value for that key clears,
+      // as an unusable scalar's does)
+      return { linkId: answer.linkId, value: filledEntries(answer.value, (v) => mapValueUsable(answer.linkId, v)) };
+    }
+    return isUnusable(answer.linkId, answer.value) ? { linkId: answer.linkId, value: null } : answer;
+  });
   const answered: Record<string, any> = {};
   all.forEach((answer) => {
     answered[answer.linkId] = answer.value;

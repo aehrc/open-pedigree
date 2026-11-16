@@ -1,5 +1,4 @@
-import { GENE_RESULTS_LINK_ID } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
-import { isGeneResultCode } from 'pedigree/model/geneResults';
+import { isGeneResultCode, GENE_RESULTS_LINK_ID } from 'pedigree/model/geneResults';
 import {
   MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL,
   PEDIGREE_INDIVIDUAL_URL, RETIRED_BASE, replacementFor,
