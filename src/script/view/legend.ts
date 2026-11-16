@@ -260,13 +260,11 @@ export default class Legend {
     }
     if(!this._hasAffectedNodes(id)) {
       this._affectedNodes[id] = [nodeID];
+      // (a new entry: patterns follow the legends' order, so later entries can move; told first, so
+      // its own swatch is drawn in its place - getObjectIDs lists it last in this legend)
+      this._orderChanged();
       const listElement = this._generateElement(id, name);
       this._list.appendChild(listElement);
-      // (a new entry: patterns follow the legends' order, so later entries can move - and its own
-      // swatch, drawn before it was listed, is drawn again in its place)
-      this._orderChanged();
-      const bubble = listElement.querySelector('.disorder-color');
-      bubble && this.drawSwatch(bubble as HTMLElement, id);
     } else {
       this._affectedNodes[id].push(nodeID);
     }

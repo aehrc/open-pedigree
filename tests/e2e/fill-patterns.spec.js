@@ -394,11 +394,40 @@ test('a custom legend\'s entries follow the disorders and genes, phenotypes taki
     window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: questionnaire, questionnaireTerminologyBaseUrl: 'http://example.org/fhir' });
     window.editor.getSaveLoadEngine().createGraphFromImportData('f 1 0 0 1 1', 'ped', {}, true, true);
   });
-  await page.waitForTimeout(300);
+  await expect.poll(() => people(page)).toHaveLength(1);
   const [person] = await people(page);
   // two phenotypes (listed before the custom legend in the questionnaire), then a custom entry
   await setProperties(page, person, { setHPO: ['HP:0001250', 'HP:0001251'] });
   await setProperties(page, person, { setQuestionnaireAnswer_signs: [{ code: 'S1', display: 'Sign 1' }] });
   await page.evaluate(() => window.editor.getView().setFillPatterns(true));
   await expect.poll(() => sectorFills(page, person)).toEqual([await fillPatternId(page, 0)]);
+});
+
+test('a save straight after a change leaves the legend matching the drawing', async ({ page }) => {
+  await open(page);
+  const [father, mother] = await people(page);
+  await toggle(page);
+  await setProperties(page, father, { setGenes: ['BRCA1'] });
+  // in one go: a disorder added (BRCA1 moves to the second pattern), then the saved image drawn
+  const swatches = await page.evaluate((id) => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: id, properties: { setDisorders: ['D'] } } }));
+    window.editor.getView().withoutPatterns(() => null);
+    return Array.from(document.querySelectorAll('#legend-box li[id^="gene-"] .disorder-color')).map((el) => el.dataset.fillPattern);
+  }, mother);
+  expect(swatches).toEqual(['1']);
+});
+
+test('patterns turned off while a redraw is pending still redraw on later changes', async ({ page }) => {
+  await open(page);
+  const [father, mother, child] = await people(page);
+  await toggle(page);
+  await setProperties(page, father, { setGenes: ['BRCA1'] });
+  await page.evaluate((id) => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: id, properties: { setDisorders: ['D'] } } }));
+    window.editor.getView().setFillPatterns(false);
+  }, mother);
+  await toggle(page);
+  // a further change, in an earlier legend: BRCA1 (on someone else) moves again
+  await setProperties(page, child, { setDisorders: ['E'] });
+  await expect.poll(() => sectorFills(page, father)).toEqual([await fillPatternId(page, 2)]);
 });

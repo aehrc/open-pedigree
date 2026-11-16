@@ -349,6 +349,8 @@ export default class View {
       var paper = editor.getPaper && editor.getPaper();
       paper && this._fillPatternRegistry.ensureDefinitions(paper.canvas);
     }
+    // (everything is redrawn: nothing stays pending)
+    this._fillRedrawScheduled = false;
     this._redrawFills();
     // (the toolbar's Patterns toggle shows the state, however it was set)
     syncToggleButton('action-patterns', this._fillPatterns);
@@ -368,7 +370,10 @@ export default class View {
       return draw();
     } finally {
       this._fillPatterns = true;
-      this._redrawFills(false);
+      // (a redraw that was pending - the legends changed - is done now, swatches included)
+      var pending = this._fillRedrawScheduled;
+      this._fillRedrawScheduled = false;
+      this._redrawFills(pending);
     }
   }
 
@@ -399,7 +404,8 @@ export default class View {
 
   /** Does a pending fill redraw now (before the drawing is read, e.g. by an export). */
   flushFillRedraw(): void {
-    // (with patterns off for a moment - withoutPatterns - the redraw stays pending for when they're back)
+    // (with patterns off for a moment - inside withoutPatterns - it stays pending: withoutPatterns
+    // does it as patterns come back)
     if (!this._fillRedrawScheduled || !this._fillPatterns) {
       return;
     }

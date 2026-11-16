@@ -621,8 +621,6 @@ export default class PedigreeEditor {
         _this._initialiseQuestionnaireTerminologies(options);
 
         var view = _this.getView();
-        // (new custom legends: fill patterns follow the legends' order)
-        view && view.fillOrderChanged && view.fillOrderChanged();
         if (view) {
           var nodeMap = view.getNodeMap();
           for (var nodeID in nodeMap) {
@@ -636,6 +634,8 @@ export default class PedigreeEditor {
         // default, so its QuestionnaireResponses were kept aside: apply those that match now.
         var changed = _this.applyPendingQuestionnaireResponses();
         if (view) {
+          // (new custom legends: fill patterns follow the legends' order)
+          view.fillOrderChanged();
           changed.forEach(function(nodeID: any) {
             // assignProperties resets the node to what the graph holds, so the view shows the applied
             // responses too (its disorder/phenotype/gene lists through their setters, see Person).
