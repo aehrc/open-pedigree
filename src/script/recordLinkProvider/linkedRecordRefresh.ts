@@ -15,6 +15,9 @@ import { isBlankValue } from 'pedigree/model/helpers';
  *   the user set in the diagram (or one open-pedigree rejected) is never wiped;
  * - legend lists: remove the entries the record dropped, add the ones it added, and keep
  *   entries that never came from the record.
+ * - maps (gene results, `{<gene>: <result>}`): each key as a value of its own - set what the
+ *   record changed, clear what it dropped only where the node still holds the record's last
+ *   value, and keep keys that never came from the record.
  *
  * No editor or DOM access: the caller injects setter resolution and node lookups, so this is
  * unit-testable on its own. `Pedigree._dispatchLinkedRecordRefresh()` wires it to a real node.
@@ -22,6 +25,10 @@ import { isBlankValue } from 'pedigree/model/helpers';
 
 // linkId -> the last non-empty value the linked record sent for it.
 export type LinkedRecordSnapshot = Record<string, any>;
+
+// The linked record's gene results, `{<gene ID>: <result code>}`, for Person.setGeneResults: a
+// reserved linkId, like the reserved legends (pedigree-gene-results-from-linked-rows).
+export const GENE_RESULTS_LINK_ID = 'gene_results';
 
 export interface LinkedRecordRefreshInput {
   answers: { linkId: string, value: any }[];
@@ -34,6 +41,10 @@ export interface LinkedRecordRefreshInput {
   legendKey: (linkId: string, entry: any) => string;
   // The value to hand the setter for a newly added incoming legend entry.
   legendSetterEntry: (linkId: string, entry: any) => any;
+  // Whether linkId is a map, `{<key>: <value>}`, reconciled key by key (gene results).
+  isMap?: (linkId: string) => boolean;
+  // The comparable form of a map key (e.g. a gene ID as the Genes legend sanitises it).
+  mapKey?: (linkId: string, key: string) => string;
   // setter name -> the node's current value, via the matching getter.
   current: (setter: string) => any;
   snapshot: LinkedRecordSnapshot;
@@ -118,6 +129,68 @@ function sameJson(a: any, b: any): boolean {
   return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
 }
 
+// A map answer as a plain object (anything else, e.g. null or an array, is no entries).
+function asMap(value: any): Record<string, any> {
+  return (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+}
+
+// The map's entries whose value isn't blank.
+function filledEntries(value: any): Record<string, any> {
+  const map = asMap(value);
+  const filled: Record<string, any> = {};
+  Object.keys(map).forEach((key) => {
+    if (!isEmptyAnswer(map[key])) {
+      filled[key] = map[key];
+    }
+  });
+  return filled;
+}
+
+// The node's next map: the record's changes since `previous` applied key by key to `current`.
+function reconcileMap(current: Record<string, any>, previous: Record<string, any>, incoming: Record<string, any>,
+  keyOf: (key: string) => string): Record<string, any> {
+  const next: Record<string, any> = Object.assign({}, current);
+  const nodeKey = (key: string): string | undefined => Object.keys(next).find((k) => keyOf(k) === keyOf(key));
+  const previousByKey: Record<string, any> = {};
+  Object.keys(previous).forEach((key) => {
+    previousByKey[keyOf(key)] = previous[key];
+  });
+  const incomingByKey: Record<string, string> = {};
+  Object.keys(incoming).forEach((key) => {
+    incomingByKey[keyOf(key)] = key;
+  });
+  Object.keys(incoming).forEach((key) => {
+    const last = previousByKey[keyOf(key)];
+    if (last === incoming[key]) {
+      return; // unchanged since the last refresh
+    }
+    const held = nodeKey(key);
+    if (held !== undefined) {
+      if (next[held] === incoming[key]) {
+        return;
+      }
+      delete next[held];
+    }
+    next[key] = incoming[key];
+  });
+  Object.keys(previous).forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(incomingByKey, keyOf(key))) {
+      return;
+    }
+    // dropped by the record: cleared only while the node still holds the record's value
+    const held = nodeKey(key);
+    if (held !== undefined && next[held] === previous[key]) {
+      delete next[held];
+    }
+  });
+  return next;
+}
+
+// A map's entries in key order, to compare two maps regardless of the order they were built in.
+function sortedEntries(map: Record<string, any>): [string, any][] {
+  return Object.keys(map).sort().map((key) => [key, map[key]] as [string, any]);
+}
+
 export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): LinkedRecordRefreshResult {
   const clears: Record<string, any> = {};
   const sets: Record<string, any> = {};
@@ -130,6 +203,23 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
     const linkId = answer.linkId;
     const setter = input.resolveSetter(linkId);
     const hadLast = Object.prototype.hasOwnProperty.call(last, linkId);
+
+    if (input.isMap && input.isMap(linkId)) {
+      const incoming = filledEntries(answer.value);
+      const previous = hadLast ? filledEntries(last[linkId]) : {};
+      const keyOf = (key: string): string => (input.mapKey ? input.mapKey(linkId, key) : key);
+      if (Object.keys(incoming).length > 0) {
+        snapshot[linkId] = incoming;
+      } else {
+        delete snapshot[linkId];
+      }
+      const current = asMap(input.current(setter));
+      const next = reconcileMap(current, previous, incoming, keyOf);
+      if (!sameJson(sortedEntries(next), sortedEntries(current))) {
+        sets[setter] = next;
+      }
+      continue;
+    }
 
     if (input.isLegend(linkId)) {
       const incoming: any[] = Array.isArray(answer.value) ? answer.value : [];
@@ -214,8 +304,8 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
  * Every value the new record has is applied, since it's the record the user chose; where it has
  * none, the previous record's value is cleared, but only while the node still holds it, so
  * anything entered in the diagram stays. So the baseline passed to computeLinkedRecordRefresh()
- * is the previous record's snapshot minus whatever the new record sends (for legend lists, minus
- * the entries it sends). And the previous record's linkIds that the new one leaves out are
+ * is the previous record's snapshot minus whatever the new record sends (for legend lists and
+ * maps, minus the entries it sends). And the previous record's linkIds that the new one leaves out are
  * answered as empty, so they clear too. So is a value the new record sends that can't be used
  * (isUnusable, e.g. an unparseable date): the previous record's value mustn't linger untracked.
  * Re-linking the same record is an ordinary refresh.
@@ -225,7 +315,9 @@ export function relinkRefreshInput(
   previousSnapshot: LinkedRecordSnapshot,
   isLegend: (linkId: string) => boolean,
   legendKey: (linkId: string, entry: any) => string,
-  isUnusable: (linkId: string, value: any) => boolean = () => false
+  isUnusable: (linkId: string, value: any) => boolean = () => false,
+  isMap: (linkId: string) => boolean = () => false,
+  mapKey: (linkId: string, key: string) => string = (_linkId, key) => key
 ): { answers: { linkId: string, value: any }[], snapshot: LinkedRecordSnapshot } {
   const previous = previousSnapshot || {};
   const all = (answers || []).filter((answer) => !!answer).map((answer) =>
@@ -243,7 +335,20 @@ export function relinkRefreshInput(
   const baseline: LinkedRecordSnapshot = {};
   Object.keys(previous).forEach((linkId) => {
     const incoming = answered[linkId];
-    if (isLegend(linkId)) {
+    if (isMap(linkId)) {
+      // (as a legend list: the previous record's keys the new one doesn't send)
+      const incomingKeys = Object.keys(filledEntries(incoming)).map((key) => mapKey(linkId, key));
+      const previousEntries = filledEntries(previous[linkId]);
+      const kept: Record<string, any> = {};
+      Object.keys(previousEntries).forEach((key) => {
+        if (incomingKeys.indexOf(mapKey(linkId, key)) === -1) {
+          kept[key] = previousEntries[key];
+        }
+      });
+      if (Object.keys(kept).length > 0) {
+        baseline[linkId] = kept;
+      }
+    } else if (isLegend(linkId)) {
       const incomingKeys = (Array.isArray(incoming) ? incoming : []).map((e) => legendKey(linkId, e));
       const kept = (Array.isArray(previous[linkId]) ? previous[linkId] : [])
         .filter((e: any) => incomingKeys.indexOf(legendKey(linkId, e)) === -1);

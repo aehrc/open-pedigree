@@ -31,7 +31,7 @@ import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider'
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
-import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, GENE_RESULTS_LINK_ID } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
 import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import { isBlankValue } from 'pedigree/model/helpers';
@@ -915,6 +915,10 @@ export default class PedigreeEditor {
    * design D2 of generalize-patient-provider-import) to dispatch imported answers generically.
    */
   _resolveQuestionnaireSetter(linkId: any): any {
+    if (linkId === GENE_RESULTS_LINK_ID) {
+      // (a linked record's gene results: reserved, with or without a Questionnaire item)
+      return 'setGeneResults';
+    }
     if (RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId)) {
       return RESERVED_LEGEND_TARGETS[linkId].setter;
     }
@@ -1168,12 +1172,19 @@ export default class PedigreeEditor {
     var legendKey = function(linkId: string, entry: any): string {
       return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
     };
+    // Gene results are a map keyed by gene ID, compared as the Genes legend keys them.
+    var isMap = function(linkId: string): boolean {
+      return linkId === GENE_RESULTS_LINK_ID;
+    };
+    var mapKey = function(_linkId: string, key: string): string {
+      return sanitise('candidate_genes', key);
+    };
     var previousSnapshot = node.getLinkedRecordSnapshot();
     var baseline = previousSnapshot;
     if (relink) {
       var input = relinkRefreshInput(answers || [], previousSnapshot, isLegend, legendKey, function(linkId: string, value: any): boolean {
         return isUnusableAnswer(resolveSetter(linkId), value);
-      });
+      }, isMap, mapKey);
       answers = input.answers;
       baseline = input.snapshot;
     }
@@ -1198,6 +1209,8 @@ export default class PedigreeEditor {
         return { code: String(entry), display: String(entry) };
       },
       current: current,
+      isMap: isMap,
+      mapKey: mapKey,
       snapshot: baseline
     });
     return {
