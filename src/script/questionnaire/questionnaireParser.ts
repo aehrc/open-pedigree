@@ -1,3 +1,5 @@
+import { GENE_RESULTS_LINK_ID } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { isGeneResultCode } from 'pedigree/model/geneResults';
 import {
   MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL,
   PEDIGREE_INDIVIDUAL_URL, RETIRED_BASE, replacementFor,
@@ -99,6 +101,13 @@ export const RESERVED_LEGEND_TARGETS: any = {
   'disorders':       { propertyBagKey: 'disorders',     setter: 'setDisorders', getter: 'getDisorders',    ccMethod: 'getCodeableConceptFromDisorder' },
   'candidate_genes': { propertyBagKey: 'candidateGenes', setter: 'setGenes',     getter: 'getGenes',        ccMethod: 'getCodeableConceptFromGene' },
   'hpo_positive':    { propertyBagKey: 'hpoTerms',       setter: 'setHPO',       getter: 'getPhenotypes',   ccMethod: 'getCodeableConceptFromPhenotype' }
+};
+
+// Reserved linkIds whose answer is a map, `{<key>: <value>}`, reconciled key by key on a linked
+// record's refresh (linkedRecordRefresh.ts): the Person setter/getter, the reserved legend whose IDs
+// key it (compared as that legend sanitises them), and which values the setter can take.
+export const RESERVED_MAP_TARGETS: any = {
+  [GENE_RESULTS_LINK_ID]: { setter: 'setGeneResults', getter: 'getGeneResults', keyedBy: 'candidate_genes', isUsable: isGeneResultCode }
 };
 
 // Standard FHIR extension for a rendering hint (radio buttons vs a dropdown) on an inline

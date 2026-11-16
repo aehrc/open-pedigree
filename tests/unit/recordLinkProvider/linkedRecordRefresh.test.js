@@ -244,6 +244,7 @@ describe('gene results from a linked record (a map, key by key)', () => {
     isLegend: () => false,
     isMap: (linkId) => linkId === GENE_RESULTS_LINK_ID,
     mapKey: (_linkId, key) => sanitise(key),
+    mapValueUsable: (_linkId, v) => ['heterozygous', 'homozygous', 'negative'].indexOf(v) !== -1,
     legendKey: (_linkId, e) => e,
     legendSetterEntry: (_linkId, e) => e,
     current: (setter) => current[setter],
@@ -311,6 +312,27 @@ describe('gene results from a linked record (a map, key by key)', () => {
       current: { setGeneResults: { HGNC_C_1100: 'heterozygous' } }, snapshot: { gene_results: { 'HGNC:1100': 'heterozygous' } },
     });
     expect(r.properties).toEqual({ setGeneResults: { 'HGNC:1100': 'homozygous' } });
+  });
+
+  it('ignores a value the setter can\'t take, keeping what the node holds', () => {
+    // e.g. a host sending a label: it mustn't wipe the result, nor be snapshotted as applied
+    const r = results({ BRCA1: 'Heterozygous' }, {
+      current: { setGeneResults: { BRCA1: 'negative' } }, snapshot: { gene_results: { BRCA1: 'negative' } },
+    });
+    expect(r.properties).toEqual({});
+    expect(r.valuesChanged).toBe(false);
+  });
+
+  it('sets and snapshots nothing for a value the setter can\'t take on a first import', () => {
+    const r = results({ BRCA1: 'Heterozygous' });
+    expect(r.valuesChanged).toBe(false);
+    expect(r.snapshot).toEqual({});
+  });
+
+  it('snapshots the same results alike whatever order the record sends them in', () => {
+    const a = results({ TP53: 'negative', BRCA1: 'heterozygous' });
+    const b = results({ BRCA1: 'heterozygous', TP53: 'negative' });
+    expect(JSON.stringify(a.snapshot)).toBe(JSON.stringify(b.snapshot));
   });
 
   it('takes a blank result as none', () => {

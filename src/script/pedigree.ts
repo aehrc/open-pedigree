@@ -31,9 +31,9 @@ import EmptyPatientProvider from 'pedigree/patientProvider/EmptyPatientProvider'
 import EmptyRecordLinkProvider from 'pedigree/recordLinkProvider/EmptyRecordLinkProvider';
 import type AbstractRecordLinkProvider from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
 import type { RecordLinkAction } from 'pedigree/recordLinkProvider/AbstractRecordLinkProvider';
-import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, GENE_RESULTS_LINK_ID } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
+import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer } from 'pedigree/recordLinkProvider/linkedRecordRefresh';
 import LinkedRowsCheck from 'pedigree/recordLinkProvider/linkedRowsCheck';
-import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
+import { parseQuestionnaire, RESERVED_LEGEND_TARGETS, RESERVED_MAP_TARGETS, MAPS_TO_FIELD_TARGETS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import { isBlankValue } from 'pedigree/model/helpers';
 import Legend from 'pedigree/view/legend';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
@@ -60,6 +60,9 @@ Object.keys(RESERVED_LEGEND_TARGETS).forEach(function(linkId: string) {
 });
 Object.keys(MAPS_TO_FIELD_TARGETS).forEach(function(field: string) {
   SETTER_TO_GETTER[MAPS_TO_FIELD_TARGETS[field].setter] = MAPS_TO_FIELD_TARGETS[field].getter;
+});
+Object.keys(RESERVED_MAP_TARGETS).forEach(function(linkId: string) {
+  SETTER_TO_GETTER[RESERVED_MAP_TARGETS[linkId].setter] = RESERVED_MAP_TARGETS[linkId].getter;
 });
 
 export default class PedigreeEditor {
@@ -915,9 +918,9 @@ export default class PedigreeEditor {
    * design D2 of generalize-patient-provider-import) to dispatch imported answers generically.
    */
   _resolveQuestionnaireSetter(linkId: any): any {
-    if (linkId === GENE_RESULTS_LINK_ID) {
-      // (a linked record's gene results: reserved, with or without a Questionnaire item)
-      return 'setGeneResults';
+    if (RESERVED_MAP_TARGETS.hasOwnProperty(linkId)) {
+      // (e.g. a linked record's gene results: reserved, with or without a Questionnaire item)
+      return RESERVED_MAP_TARGETS[linkId].setter;
     }
     if (RESERVED_LEGEND_TARGETS.hasOwnProperty(linkId)) {
       return RESERVED_LEGEND_TARGETS[linkId].setter;
@@ -1172,12 +1175,15 @@ export default class PedigreeEditor {
     var legendKey = function(linkId: string, entry: any): string {
       return isReserved(linkId) ? sanitise(linkId, entryId(entry)) : entryId(entry);
     };
-    // Gene results are a map keyed by gene ID, compared as the Genes legend keys them.
+    // Reserved maps (gene results) are keyed by a legend's IDs, compared as that legend keys them.
     var isMap = function(linkId: string): boolean {
-      return linkId === GENE_RESULTS_LINK_ID;
+      return RESERVED_MAP_TARGETS.hasOwnProperty(linkId);
     };
-    var mapKey = function(_linkId: string, key: string): string {
-      return sanitise('candidate_genes', key);
+    var mapKey = function(linkId: string, key: string): string {
+      return sanitise(RESERVED_MAP_TARGETS[linkId].keyedBy, key);
+    };
+    var mapValueUsable = function(linkId: string, value: any): boolean {
+      return RESERVED_MAP_TARGETS[linkId].isUsable(value);
     };
     var previousSnapshot = node.getLinkedRecordSnapshot();
     var baseline = previousSnapshot;
@@ -1211,6 +1217,7 @@ export default class PedigreeEditor {
       current: current,
       isMap: isMap,
       mapKey: mapKey,
+      mapValueUsable: mapValueUsable,
       snapshot: baseline
     });
     return {

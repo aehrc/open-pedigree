@@ -45,6 +45,9 @@ export interface LinkedRecordRefreshInput {
   isMap?: (linkId: string) => boolean;
   // The comparable form of a map key (e.g. a gene ID as the Genes legend sanitises it).
   mapKey?: (linkId: string, key: string) => string;
+  // Whether a map value is one the setter can take (others are ignored, as an unusable date is,
+  // so they never replace what the node holds).
+  mapValueUsable?: (linkId: string, value: any) => boolean;
   // setter name -> the node's current value, via the matching getter.
   current: (setter: string) => any;
   snapshot: LinkedRecordSnapshot;
@@ -134,12 +137,13 @@ function asMap(value: any): Record<string, any> {
   return (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
 }
 
-// The map's entries whose value isn't blank.
-function filledEntries(value: any): Record<string, any> {
+// The map's entries whose value isn't blank (and is usable), in key order, so the same entries
+// always snapshot alike.
+function filledEntries(value: any, usable: (v: any) => boolean = () => true): Record<string, any> {
   const map = asMap(value);
   const filled: Record<string, any> = {};
-  Object.keys(map).forEach((key) => {
-    if (!isEmptyAnswer(map[key])) {
+  Object.keys(map).sort().forEach((key) => {
+    if (!isEmptyAnswer(map[key]) && usable(map[key])) {
       filled[key] = map[key];
     }
   });
@@ -155,10 +159,7 @@ function reconcileMap(current: Record<string, any>, previous: Record<string, any
   Object.keys(previous).forEach((key) => {
     previousByKey[keyOf(key)] = previous[key];
   });
-  const incomingByKey: Record<string, string> = {};
-  Object.keys(incoming).forEach((key) => {
-    incomingByKey[keyOf(key)] = key;
-  });
+  const incomingKeys = new Set(Object.keys(incoming).map(keyOf));
   Object.keys(incoming).forEach((key) => {
     const last = previousByKey[keyOf(key)];
     if (last === incoming[key]) {
@@ -174,7 +175,7 @@ function reconcileMap(current: Record<string, any>, previous: Record<string, any
     next[key] = incoming[key];
   });
   Object.keys(previous).forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(incomingByKey, keyOf(key))) {
+    if (incomingKeys.has(keyOf(key))) {
       return;
     }
     // dropped by the record: cleared only while the node still holds the record's value
@@ -205,11 +206,23 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
     const hadLast = Object.prototype.hasOwnProperty.call(last, linkId);
 
     if (input.isMap && input.isMap(linkId)) {
-      const incoming = filledEntries(answer.value);
+      const usable = (v: any): boolean => (input.mapValueUsable ? input.mapValueUsable(linkId, v) : true);
+      const incoming = filledEntries(answer.value, usable);
       const previous = hadLast ? filledEntries(last[linkId]) : {};
       const keyOf = (key: string): string => (input.mapKey ? input.mapKey(linkId, key) : key);
+      // A value the setter can't take leaves the node alone (as an unusable date does): it counts as
+      // unchanged, and the record's last usable value stays tracked so it can still be cleared.
+      const sent = filledEntries(answer.value);
+      Object.keys(sent).forEach((key) => {
+        if (!usable(sent[key])) {
+          const lastKey = Object.keys(previous).find((k) => keyOf(k) === keyOf(key));
+          if (lastKey !== undefined) {
+            incoming[lastKey] = previous[lastKey];
+          }
+        }
+      });
       if (Object.keys(incoming).length > 0) {
-        snapshot[linkId] = incoming;
+        snapshot[linkId] = filledEntries(incoming); // (in key order)
       } else {
         delete snapshot[linkId];
       }
