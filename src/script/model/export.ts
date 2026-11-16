@@ -359,14 +359,24 @@ function canvasAsSVG() {
       context.fillStyle = '#FFFFFF';
       context.fillRect(0, 0, size.width, size.height);
       context.drawImage(image, 0, 0, size.width, size.height);
+      // (the callbacks run later, outside the catch in onload: each settles the export itself)
+      const failed = (err: any) => reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
       canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(tooLarge());
-          return;
+        try {
+          if (!blob) {
+            reject(tooLarge());
+            return;
+          }
+          blob.arrayBuffer().then((buffer) => {
+            try {
+              resolve(new Blob([withDensity(new Uint8Array(buffer), dpi).buffer as ArrayBuffer], { type: 'image/png' }));
+            } catch (err) {
+              failed(err);
+            }
+          }, failed);
+        } catch (err) {
+          failed(err);
         }
-        blob.arrayBuffer().then((buffer) => {
-          resolve(new Blob([withDensity(new Uint8Array(buffer), dpi).buffer as ArrayBuffer], { type: 'image/png' }));
-        }, reject);
       }, 'image/png');
     };
     image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);

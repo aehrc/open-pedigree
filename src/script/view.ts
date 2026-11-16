@@ -49,9 +49,19 @@ export default class View {
     this._generationNumerals = null;
     this._fillPatterns = false;
     this._fillPatternRegistry = new FillPatternRegistry();
-    // A pedigree loaded with patterns on takes them afresh, its first entry solid.
+    // A different pedigree loaded with patterns on takes them afresh, its first entry solid; an
+    // undo or redo (also a load) keeps what each entry has, so the shading never changes meaning.
     document.addEventListener('pedigree:load:finish', () => {
-      if (this._fillPatterns) {
+      if (!this._fillPatterns || editor.getView() !== this) {
+        return;
+      }
+      var registry = this._fillPatternRegistry;
+      var known = this._fillPatternLegends().some(function(legend: any) {
+        return legend.getObjectIDs().some(function(id: string) { return registry.has(legend.fillKey(id)); });
+      });
+      if (known) {
+        this._redrawFills();
+      } else {
         this.setFillPatterns(true);
       }
     });

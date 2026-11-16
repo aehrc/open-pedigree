@@ -254,12 +254,20 @@ test('marks inside a solid symbol are drawn white', async ({ page }) => {
   const [, , child] = await people(page);
   await setProperties(page, child, { setLifeStatus: 'unborn' });
   await setProperties(page, child, { setDisorders: ['D1'] });
-  const unbornFill = () => page.evaluate((id) => window.editor.getView().getNode(id).getGraphics().getUnbornShape().attr('fill'), child);
-  expect((await unbornFill()).toUpperCase()).toBe('#000000');
+  const unborn = () => page.evaluate((id) => {
+    const shape = window.editor.getView().getNode(id).getGraphics().getUnbornShape();
+    return { fill: String(shape.attr('fill')).toUpperCase(), stroke: String(shape.attr('stroke')).toUpperCase() };
+  }, child);
+  expect((await unborn()).fill).toBe('#000000');
   await toggle(page);
-  expect((await unbornFill()).toUpperCase()).toBe('#FFFFFF');
+  // white, outlined in black (it also crosses hatched sectors where several meet)
+  expect(await unborn()).toEqual({ fill: '#FFFFFF', stroke: '#000000' });
   await toggle(page);
-  expect((await unbornFill()).toUpperCase()).toBe('#000000');
+  expect((await unborn()).fill).toBe('#000000');
+  // and back to black once the solid entry is gone
+  await toggle(page);
+  await setProperties(page, child, { setDisorders: [] });
+  expect((await unborn()).fill).toBe('#000000');
 });
 
 test('a pedigree loaded with patterns on takes them afresh, its first entry solid', async ({ page }) => {
@@ -283,4 +291,51 @@ test('the node menu\'s swatches show the patterns too', async ({ page }) => {
   await page.evaluate((id) => window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100), father);
   await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.menu-box .field-disorders .disorder-color'))
     .map((el) => el.dataset.fillPattern || null))).toEqual(['0']);
+});
+
+test('an undo keeps what each entry has, so the shading never changes meaning', async ({ page }) => {
+  await open(page);
+  const [father, , child] = await people(page);
+  await setProperties(page, child, { setDisorders: ['A'] });
+  await setProperties(page, father, { setDisorders: ['B'] });
+  await toggle(page);
+  const solid = await fillPatternId(page, 0);
+  const hatched = await fillPatternId(page, 1);
+  expect(await sectorFills(page, child)).toEqual([solid]);
+  // an unrelated change, undone (an undo reloads the pedigree)
+  await setProperties(page, father, { setFirstName: 'Fred' });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  expect(await sectorFills(page, child)).toEqual([solid]);
+  expect(await sectorFills(page, father)).toEqual([hatched]);
+});
+
+test('a reload that lists the entries in another order keeps what each has', async ({ page }) => {
+  await open(page);
+  const [father, , child] = await people(page);
+  await setProperties(page, child, { setDisorders: ['A'] });
+  await setProperties(page, father, { setDisorders: ['B'] });
+  await toggle(page);
+  const solid = await fillPatternId(page, 0);
+  // the legend now lists B first (as a reload in another node order would), then a load finishes
+  await page.evaluate(() => {
+    const list = document.querySelector('#legend-box li[id="disorder-B"]').parentElement;
+    list.insertBefore(document.querySelector('#legend-box li[id="disorder-B"]'), list.firstChild);
+    document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
+  });
+  expect(await sectorFills(page, child)).toEqual([solid]);
+});
+
+test('a mark goes back to black when the person\'s last fill goes, whatever else redraws', async ({ page }) => {
+  await open(page);
+  const [, , child] = await people(page);
+  await setProperties(page, child, { setLifeStatus: 'unborn' });
+  await setProperties(page, child, { setDisorders: ['D1'] });
+  await toggle(page);
+  const fill = await page.evaluate((id) => {
+    const node = window.editor.getView().getNode(id);
+    node._disorders = [];
+    node.getGraphics().updateDisorderShapes();
+    return String(node.getGraphics().getUnbornShape().attr('fill')).toUpperCase();
+  }, child);
+  expect(fill).toBe('#000000');
 });

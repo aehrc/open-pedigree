@@ -276,6 +276,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     var fills = this.getNode().getAllNodeFills();
     var colors = fills.map(function(f: any) { return f.color; });
     if (colors.length == 0) {
+      this.updateMarkContrast();
       return;
     }
     // With the Patterns toggle on, each sector takes its entry's pattern instead of its colour
@@ -358,27 +359,30 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   }
 
   /**
-   * Draws the marks inside the symbol (the unborn "P", the carrier mark, a group's count) white on
-   * a solid black pattern fill, where black would vanish; as usual otherwise.
+   * Draws the marks inside the symbol (the unborn "P", the carrier mark, a group's count) white with
+   * a thin black outline when the person has a solid black pattern fill - black would vanish on it,
+   * and the outline keeps the mark where it also crosses a hatched sector; as usual otherwise.
    */
   updateMarkContrast(): void {
     var view = editor.getView && editor.getView();
     var registry = view && view.isFillPatternsOn && view.isFillPatternsOn() ? view.getFillPatternRegistry() : null;
     var node = this.getNode();
     var onSolid = !!registry && node.getAllNodeFills().some(function(f: any) { return registry.isSolid(f.key); });
-    var recolour = function(shape: any, usual: string) {
+    var recolour = function(shape: any, usual: any) {
       if (!shape) {
         return;
       }
       var items = shape.type === 'set' ? shape.items : [shape];
       items.forEach(function(el: any) {
-        el && el.attr && el.attr({ fill: onSolid ? '#FFFFFF' : usual });
+        el && el.attr && el.attr(onSolid ? { fill: '#FFFFFF', stroke: '#000000', 'stroke-width': 1 } : usual);
       });
     };
-    recolour(this._unbornShape, '#000000');
+    var attributes = (PedigreeEditorParameters as any).attributes;
+    recolour(this._unbornShape, { fill: '#000000', stroke: 'none' });
     recolour(this._carrierGraphic, node.getCarrierStatus && node.getCarrierStatus() == 'presymptomatic'
-      ? (PedigreeEditorParameters as any).attributes.presymptomaticShape.fill : (PedigreeEditorParameters as any).attributes.carrierShape.fill);
-    recolour((this as any)._label, '#000000');
+      ? { fill: attributes.presymptomaticShape.fill, stroke: attributes.presymptomaticShape.stroke, 'stroke-width': 1 }
+      : { fill: attributes.carrierShape.fill, stroke: '#000000', 'stroke-width': 1 });
+    recolour((this as any)._label, { fill: '#000000', stroke: 'none' });
   }
 
   /**

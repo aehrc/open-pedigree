@@ -76,9 +76,14 @@ export class FillPatternRegistry {
     return 'url(#' + this.patternId(this.indexFor(key)) + (rotated ? ROTATED_SUFFIX : '') + ')';
   }
 
-  /** Whether an entry's pattern is the solid one (marks drawn over it need to be white). */
+  /** Whether an entry has a pattern yet. */
+  has(key: string): boolean {
+    return this._indexOf.has(key);
+  }
+
+  /** Whether an entry's pattern is the solid one (marks drawn over it need to stand out); assigns none. */
   isSolid(key: string): boolean {
-    return this.indexFor(key) === 0;
+    return this._indexOf.has(key) && this._indexOf.get(key) % PATTERNS.length === 0;
   }
 
   /** Adds every pattern to the SVG's <defs> (making one if needed), once. */

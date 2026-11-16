@@ -60,11 +60,7 @@ function applySelectizeSwatches(container: any, legend: any): void {
       item.prepend(colorBubble);
     }
     // (its colour, or its pattern with the Patterns toggle on, as the legend shows it)
-    if (typeof legend.drawSwatch === 'function') {
-      legend.drawSwatch(colorBubble, value);
-    } else {
-      colorBubble.style.background = legend.getObjectColor(value);
-    }
+    legend.drawSwatch(colorBubble, value);
   });
 }
 
@@ -291,7 +287,12 @@ export default class NodeMenu {
           colorBubble.className = 'disorder-color';
           item.prepend(colorBubble);
         }
-        colorBubble.style.background = color;
+        var legend = editor.getQuestionnaireLegend(fieldLinkId);
+        if (legend) {
+          legend.drawSwatch(colorBubble, id);
+        } else {
+          colorBubble.style.background = color;
+        }
       });
     }.bind(this);
     document.addEventListener('questionnaire-legend:color', function(event: any) {

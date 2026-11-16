@@ -57,6 +57,13 @@ describe('FillPatternRegistry', () => {
     expect(registry.isSolid('gene:B')).toBe(false);
   });
 
+  it('only looks when asked whether an entry is solid: it assigns nothing', () => {
+    const registry = new FillPatternRegistry();
+    expect(registry.isSolid('disorder:A')).toBe(false);
+    expect(registry.has('disorder:A')).toBe(false);
+    expect(registry.indexFor('gene:B')).toBe(0);
+  });
+
   it('draws a legend swatch of a pattern', () => {
     const registry = new FillPatternRegistry();
     const swatch = registry.swatchSVG(3);
