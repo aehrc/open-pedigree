@@ -403,3 +403,19 @@ test('a ref named like an object property is answered like any other', async ({ 
   await expect(page.locator(NOTICE)).toContainText('Linked to a record that no longer exists');
   await expect(page.locator(MARK)).toHaveCount(0);
 });
+
+test('a gene result changed in the record is marked, and Update brings it in', async ({ page }) => {
+  const GINA = 'record:1/instance:3';
+  const gina = (results) => [{ linkId: 'first_name', value: 'Gina' },
+    { linkId: 'candidate_genes', value: [{ id: 'BRCA1', name: 'BRCA1' }] }, { linkId: 'gene_results', value: results }];
+  await openSavedPedigree(page, {
+    extraLinks: [{ person: 0, ref: GINA, answers: gina({ BRCA1: 'heterozygous' }) }],
+    rows: { [RUTH]: { answers: LINKED[RUTH] }, [SAM]: { answers: LINKED[SAM] }, [GINA]: { answers: gina({ BRCA1: 'homozygous' }) } },
+  });
+
+  await expect(page.locator(NOTICE)).toContainText('1 person\'s linked record has changed since this pedigree was saved.');
+  await page.locator(`${NOTICE} button`, { hasText: 'Update' }).click();
+  await expect(page.locator(NOTICE)).toHaveCount(0);
+  const id = await personNamed(page, 'Gina');
+  expect(await page.evaluate((n) => window.editor.getView().getNode(n).getGeneResults(), id)).toEqual({ BRCA1: 'homozygous' });
+});
