@@ -337,6 +337,7 @@ function canvasAsSVG() {
     return Promise.reject(tooLarge());
   }
   return new Promise((resolve, reject) => {
+    const failed = (err: any) => reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
     const image = new Image();
     image.onerror = () => reject(new Error('The pedigree drawing could not be read as an image.'));
     image.onload = () => {
@@ -344,7 +345,7 @@ function canvasAsSVG() {
       try {
         draw();
       } catch (err) {
-        reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
+        failed(err);
       }
     };
     const draw = () => {
@@ -360,7 +361,6 @@ function canvasAsSVG() {
       context.fillRect(0, 0, size.width, size.height);
       context.drawImage(image, 0, 0, size.width, size.height);
       // (the callbacks run later, outside the catch in onload: each settles the export itself)
-      const failed = (err: any) => reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
       canvas.toBlob((blob) => {
         try {
           if (!blob) {

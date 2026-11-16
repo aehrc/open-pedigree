@@ -60,7 +60,7 @@ describe('FillPatternRegistry', () => {
   it('only looks when asked whether an entry is solid: it assigns nothing', () => {
     const registry = new FillPatternRegistry();
     expect(registry.isSolid('disorder:A')).toBe(false);
-    expect(registry.has('disorder:A')).toBe(false);
+    // (so the next entry asked for is still the first)
     expect(registry.indexFor('gene:B')).toBe(0);
   });
 

@@ -287,12 +287,7 @@ export default class NodeMenu {
           colorBubble.className = 'disorder-color';
           item.prepend(colorBubble);
         }
-        var legend = editor.getQuestionnaireLegend(fieldLinkId);
-        if (legend) {
-          legend.drawSwatch(colorBubble, id);
-        } else {
-          colorBubble.style.background = color;
-        }
+        editor.getQuestionnaireLegend(fieldLinkId).drawSwatch(colorBubble, id);
       });
     }.bind(this);
     document.addEventListener('questionnaire-legend:color', function(event: any) {

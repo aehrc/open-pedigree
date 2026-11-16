@@ -368,6 +368,11 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     var registry = view && view.isFillPatternsOn && view.isFillPatternsOn() ? view.getFillPatternRegistry() : null;
     var node = this.getNode();
     var onSolid = !!registry && node.getAllNodeFills().some(function(f: any) { return registry.isSolid(f.key); });
+    // (marks are only touched when they stand out now, or did: otherwise they're as drawn)
+    if (!onSolid && !(this as any)._marksStandOut) {
+      return;
+    }
+    (this as any)._marksStandOut = onSolid;
     var recolour = function(shape: any, usual: any) {
       if (!shape) {
         return;

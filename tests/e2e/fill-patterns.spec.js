@@ -256,7 +256,9 @@ test('marks inside a solid symbol are drawn white', async ({ page }) => {
   await setProperties(page, child, { setDisorders: ['D1'] });
   const unborn = () => page.evaluate((id) => {
     const shape = window.editor.getView().getNode(id).getGraphics().getUnbornShape();
-    return { fill: String(shape.attr('fill')).toUpperCase(), stroke: String(shape.attr('stroke')).toUpperCase() };
+    // (black either way: #000 as drawn, #000000 once put back)
+    const black = (c) => (/^#000(000)?$/.test(c) ? '#000000' : c);
+    return { fill: black(String(shape.attr('fill')).toUpperCase()), stroke: black(String(shape.attr('stroke')).toUpperCase()) };
   }, child);
   expect((await unborn()).fill).toBe('#000000');
   await toggle(page);
@@ -272,15 +274,49 @@ test('marks inside a solid symbol are drawn white', async ({ page }) => {
 
 test('a pedigree loaded with patterns on takes them afresh, its first entry solid', async ({ page }) => {
   await open(page);
-  const [father] = await people(page);
-  await setProperties(page, father, { setDisorders: ['Old A', 'Old B'] });
+  const [father, mother] = await people(page);
+  // a pedigree with X on the father, kept to load later
+  await setProperties(page, father, { setDisorders: ['X'] });
+  const withX = await page.evaluate(() => window.editor.getGraph().toJSON());
+  // now another state: Old A and Old B on the mother, X gone; patterns on (Old A solid, Old B hatched)
+  await setProperties(page, father, { setDisorders: [] });
+  await setProperties(page, mother, { setDisorders: ['Old A', 'Old B'] });
   await toggle(page);
-  // another pedigree, through the import (the same load the backend uses)
-  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('h 1 0 0 1 1\nh 2 0 0 2 1\nh 3 1 2 1 1', 'ped', {}, false, true));
-  const [newFather] = await people(page);
-  await setProperties(page, newFather, { setDisorders: ['New A'] });
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:load:finish')));
-  expect(await sectorFills(page, newFather)).toEqual([await fillPatternId(page, 0)]);
+  // the X pedigree loaded (as a backend, a template or an import loads one): X is drawn solid
+  await page.evaluate((json) => window.editor.getSaveLoadEngine().createGraphFromSerializedData(json), withX);
+  const [loadedFather] = await people(page);
+  expect(await sectorFills(page, loadedFather)).toEqual([await fillPatternId(page, 0)]);
+});
+
+test('an undo through a state with no fills keeps what each entry has', async ({ page }) => {
+  await open(page);
+  // entries added against node order (the last-drawn person first), so a reload that lists them in
+  // node order would list them the other way round
+  const ids = (await people(page)).sort((x, y) => x - y);
+  const father = ids[0];
+  const child = ids[ids.length - 1];
+  await setProperties(page, child, { setDisorders: ['A'] });
+  await setProperties(page, father, { setDisorders: ['B'] });
+  await toggle(page);
+  const solid = await fillPatternId(page, 0);
+  const hatched = await fillPatternId(page, 1);
+  await setProperties(page, child, { setDisorders: [] });
+  await setProperties(page, father, { setDisorders: [] });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  expect(await sectorFills(page, child)).toEqual([solid]);
+  expect(await sectorFills(page, father)).toEqual([hatched]);
+});
+
+test('marks are left as drawn while patterns have never been on', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  await setProperties(page, father, { setCarrierStatus: 'carrier' });
+  const before = await page.evaluate((id) => window.editor.getView().getNode(id).getGraphics().getCarrierGraphics().attr(), father);
+  await setProperties(page, father, { setGenes: ['BRCA1'] });
+  const after = await page.evaluate((id) => window.editor.getView().getNode(id).getGraphics().getCarrierGraphics().attr(), father);
+  expect({ fill: after.fill, stroke: after.stroke, 'stroke-width': after['stroke-width'] })
+    .toEqual({ fill: before.fill, stroke: before.stroke, 'stroke-width': before['stroke-width'] });
 });
 
 test('the node menu\'s swatches show the patterns too', async ({ page }) => {
@@ -337,5 +373,5 @@ test('a mark goes back to black when the person\'s last fill goes, whatever else
     node.getGraphics().updateDisorderShapes();
     return String(node.getGraphics().getUnbornShape().attr('fill')).toUpperCase();
   }, child);
-  expect(fill).toBe('#000000');
+  expect(fill).toMatch(/^#000(000)?$/);
 });

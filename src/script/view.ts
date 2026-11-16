@@ -49,21 +49,22 @@ export default class View {
     this._generationNumerals = null;
     this._fillPatterns = false;
     this._fillPatternRegistry = new FillPatternRegistry();
-    // A different pedigree loaded with patterns on takes them afresh, its first entry solid; an
-    // undo or redo (also a load) keeps what each entry has, so the shading never changes meaning.
-    document.addEventListener('pedigree:load:finish', () => {
-      if (!this._fillPatterns || editor.getView() !== this) {
+    // A pedigree loaded with patterns on takes them afresh, its first entry solid: reset as the load
+    // starts (before its people are drawn), reseeded in legend order once it's done. An undo or redo
+    // (a restoring load) keeps what each entry has, so the shading never changes meaning.
+    var reseedOnFinish = false;
+    document.addEventListener('pedigree:load:start', (event: any) => {
+      if (!this._fillPatterns || editor.getView() !== this || (event.detail && event.detail.restoring)) {
         return;
       }
-      var registry = this._fillPatternRegistry;
-      var known = this._fillPatternLegends().some(function(legend: any) {
-        return legend.getObjectIDs().some(function(id: string) { return registry.has(legend.fillKey(id)); });
-      });
-      if (known) {
-        this._redrawFills();
-      } else {
+      this._fillPatternRegistry.reset();
+      reseedOnFinish = true;
+    });
+    document.addEventListener('pedigree:load:finish', () => {
+      if (reseedOnFinish && this._fillPatterns && editor.getView() === this) {
         this.setFillPatterns(true);
       }
+      reseedOnFinish = false;
     });
     this._deidentified = null;
 
