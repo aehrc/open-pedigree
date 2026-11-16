@@ -399,13 +399,12 @@ export default class View {
 
   /** Does a pending fill redraw now (before the drawing is read, e.g. by an export). */
   flushFillRedraw(): void {
-    if (!this._fillRedrawScheduled) {
+    // (with patterns off for a moment - withoutPatterns - the redraw stays pending for when they're back)
+    if (!this._fillRedrawScheduled || !this._fillPatterns) {
       return;
     }
     this._fillRedrawScheduled = false;
-    if (this._fillPatterns) {
-      this._redrawFills();
-    }
+    this._redrawFills();
   }
 
   // The legends whose entries fill a symbol: disorders, genes, then custom legend items.
@@ -416,7 +415,8 @@ export default class View {
     ((config && config.items) || []).forEach(function(item: any) {
       if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation')) {
         var legend = editor.getQuestionnaireLegend(item.linkId);
-        if (legend && legends.indexOf(legend) === -1) {
+        // (only those that fill a symbol: the phenotypes legend is a questionnaire item too)
+        if (legend && legend.fillsSymbols() && legends.indexOf(legend) === -1) {
           legends.push(legend);
         }
       }

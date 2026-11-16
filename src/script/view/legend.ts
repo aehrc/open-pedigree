@@ -262,8 +262,11 @@ export default class Legend {
       this._affectedNodes[id] = [nodeID];
       const listElement = this._generateElement(id, name);
       this._list.appendChild(listElement);
-      // (a new entry: patterns follow the legends' order, so later entries can move)
+      // (a new entry: patterns follow the legends' order, so later entries can move - and its own
+      // swatch, drawn before it was listed, is drawn again in its place)
       this._orderChanged();
+      const bubble = listElement.querySelector('.disorder-color');
+      bubble && this.drawSwatch(bubble as HTMLElement, id);
     } else {
       this._affectedNodes[id].push(nodeID);
     }

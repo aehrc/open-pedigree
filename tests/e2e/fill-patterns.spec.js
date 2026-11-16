@@ -371,3 +371,34 @@ test('a new entry in an earlier legend moves the ones after it, in the drawing a
   expect(await sectorFills(page, mother)).toEqual([await fillPatternId(page, 0)]);
   expect((await swatchPatterns(page)).sort()).toEqual(['pattern:0', 'pattern:1']);
 });
+
+test('a custom legend\'s entries follow the disorders and genes, phenotypes taking no place', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.route(/ontoserver|\/fhir\//, (route) => route.abort());
+  await page.goto('/localEditor.html');
+  await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
+  await retireAutoCreatedEditor(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('#work-area, #editor-menu').forEach((el) => el.remove());
+    document.querySelectorAll('.msdialog-modal-container').forEach((el) => el.remove());
+    const MAPPING = 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/questionnaire-field-mapping';
+    const questionnaire = {
+      ...window.OpenPedigree.defaultQuestionnaire,
+      item: [...window.OpenPedigree.defaultQuestionnaire.item, {
+        linkId: 'extra', type: 'group', text: 'Extra', item: [
+          { linkId: 'signs', type: 'choice', text: 'Signs', repeats: true, answerValueSet: 'http://example.org/fhir/ValueSet/signs',
+            extension: [{ url: MAPPING, valueCode: 'mapsToLegendCondition' }] },
+        ],
+      }],
+    };
+    window.editor = window.OpenPedigree.initialiseEditor({ questionnaireLocal: questionnaire, questionnaireTerminologyBaseUrl: 'http://example.org/fhir' });
+    window.editor.getSaveLoadEngine().createGraphFromImportData('f 1 0 0 1 1', 'ped', {}, true, true);
+  });
+  await page.waitForTimeout(300);
+  const [person] = await people(page);
+  // two phenotypes (listed before the custom legend in the questionnaire), then a custom entry
+  await setProperties(page, person, { setHPO: ['HP:0001250', 'HP:0001251'] });
+  await setProperties(page, person, { setQuestionnaireAnswer_signs: [{ code: 'S1', display: 'Sign 1' }] });
+  await page.evaluate(() => window.editor.getView().setFillPatterns(true));
+  await expect.poll(() => sectorFills(page, person)).toEqual([await fillPatternId(page, 0)]);
+});

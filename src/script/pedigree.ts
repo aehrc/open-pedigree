@@ -621,6 +621,8 @@ export default class PedigreeEditor {
         _this._initialiseQuestionnaireTerminologies(options);
 
         var view = _this.getView();
+        // (new custom legends: fill patterns follow the legends' order)
+        view && view.fillOrderChanged && view.fillOrderChanged();
         if (view) {
           var nodeMap = view.getNodeMap();
           for (var nodeID in nodeMap) {
