@@ -19,7 +19,8 @@ async function open(page) {
     window.editor = window.OpenPedigree.initialiseEditor({ backend: window.OpenPedigree.localStorageBackend, patientDataUrl: 'local:fillPatterns' });
   });
   await expect.poll(() => page.evaluate(() => !window.editor.isAwaitingFirstLoad())).toBe(true);
-  await page.evaluate(() => document.querySelectorAll('.msdialog-modal-container').forEach((el) => el.remove()));
+  // (only the template chooser: the export dialog's container is needed)
+  await page.evaluate(() => document.querySelectorAll('.pedigree-template-chooser').forEach((c) => (c.closest('.msdialog-modal-container') || c).remove()));
   // a couple and their child
   await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('f 1 0 0 1 1\nf 2 0 0 2 1\nf 3 1 2 2 1', 'ped', {}, false, true));
 }
@@ -114,4 +115,96 @@ test('a screenshot of patterned symbols, for a look', async ({ page }) => {
   await setProperties(page, child, { setDisorders: ['A', 'B', 'C', 'D'] });
   await toggle(page);
   await page.locator('#canvas').screenshot({ path: 'test-results/fill-patterns.png' });
+});
+
+// --- exports (pedigree-patterns-and-png-export) ---
+
+// Exports through the dialog: `type` and optional select values; resolves to the download's bytes.
+async function exportThroughDialog(page, type, selects = {}) {
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  await page.locator(`input[name="export-type"][value="${type}"]`).check();
+  for (const [name, value] of Object.entries(selects)) {
+    await page.locator(`select[name="${name}"]`).selectOption(value);
+  }
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#export_button').click()]);
+  const fs = require('fs');
+  return { name: download.suggestedFilename(), bytes: fs.readFileSync(await download.path()) };
+}
+test('PNG export at 300 DPI: the drawing at 300/96 its size, on white, recording its resolution', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  await setProperties(page, father, { setDisorders: ['Disorder A'] });
+  const { name, bytes } = await exportThroughDialog(page, 'png', { 'png-dpi': '300' });
+  expect(name).toBe('open-pedigree.png');
+  expect(Array.from(bytes.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  // IHDR: the size; then the pHYs chunk, 11811 pixels a metre (300 DPI)
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  expect(bytes.toString('latin1', 37, 41)).toBe('pHYs');
+  expect(bytes.readUInt32BE(41)).toBe(11811);
+  // the drawing's own size, as SVG export (what the PNG is made from) records it
+  const svg = (await exportThroughDialog(page, 'svg')).bytes.toString('utf8');
+  const svgSize = { width: parseFloat(/<svg[^>]* width="([^"]+)"/.exec(svg)[1]), height: parseFloat(/<svg[^>]* height="([^"]+)"/.exec(svg)[1]) };
+  expect(width).toBe(Math.ceil(svgSize.width * 300 / 96));
+  expect(height).toBe(Math.ceil(svgSize.height * 300 / 96));
+  // a corner pixel is white (the background), read back in the page
+  const corner = await page.evaluate(async (b64) => {
+    const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(bitmap, 0, 0);
+    return Array.from(context.getImageData(0, 0, 1, 1).data);
+  }, bytes.toString('base64'));
+  expect(corner).toEqual([255, 255, 255, 255]);
+});
+
+test('a de-identified PNG is drawn de-identified', async ({ page }) => {
+  await open(page);
+  // which privacy level the drawing is rendered at while exporting
+  await page.evaluate(() => {
+    const view = window.editor.getView();
+    const original = view.withDeidentifiedRendering.bind(view);
+    window.__renderedAt = [];
+    view.withDeidentifiedRendering = (privacy, draw) => { window.__renderedAt.push(privacy); return original(privacy, draw); };
+  });
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  await page.locator('input[name="export-type"][value="png"]').check();
+  await page.locator('input[name="privacy-options"][value="nopersonal"]').check();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#export_button').click()]);
+  expect(download.suggestedFilename()).toBe('open-pedigree.png');
+  expect(await page.evaluate(() => window.__renderedAt)).toEqual(['nopersonal']);
+});
+
+test('a drawing too large for the chosen resolution is refused with a message, and nothing saved', async ({ page }) => {
+  await open(page);
+  // 40 siblings: wider than a canvas can be at 600 DPI
+  const ped = ['g 1 0 0 1 1', 'g 2 0 0 2 1'].concat(Array.from({ length: 40 }, (_, i) => `g c${i} 1 2 ${1 + (i % 2)} 1`)).join('\n');
+  await page.evaluate((text) => window.editor.getSaveLoadEngine().createGraphFromImportData(text, 'ped', {}, false, true), ped);
+  const messages = [];
+  page.on('dialog', (dialog) => messages.push(dialog.message()));
+  let downloaded = false;
+  page.on('download', () => { downloaded = true; });
+  await page.evaluate(() => window.editor.getExportSelector().show());
+  await page.locator('input[name="export-type"][value="png"]').check();
+  await page.locator('select[name="png-dpi"]').selectOption('600');
+  await page.locator('#export_button').click();
+  await expect.poll(() => messages.length).toBeGreaterThan(0);
+  expect(messages[0]).toMatch(/too large to draw as a 600 DPI PNG .*choose a lower resolution/);
+  expect(downloaded).toBe(false);
+});
+
+test('with patterns on, SVG and PDF exports carry the patterns', async ({ page }) => {
+  await open(page);
+  const [father, mother] = await people(page);
+  await setProperties(page, father, { setDisorders: ['Disorder A'] });
+  await setProperties(page, mother, { setDisorders: ['Disorder B'] });
+  await toggle(page);
+  const svg = (await exportThroughDialog(page, 'svg')).bytes.toString('utf8');
+  expect(svg).toMatch(/<pattern id="op-fill-\d+-0"/);
+  expect(svg).toMatch(/fill="url\(#op-fill-\d+-1\)"/);
+  const pdf = (await exportThroughDialog(page, 'pdf')).bytes.toString('latin1');
+  expect(pdf).toContain('/Pattern');
 });

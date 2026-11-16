@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit/js/pdfkit.standalone';
 import SVGtoPDF from 'svg-to-pdfkit';
+import { pngSize, fitsCanvas, withDensity } from 'pedigree/model/pngDensity';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
@@ -315,6 +316,50 @@ function canvasAsSVG() {
 
 
 
+/**
+ * The pedigree as a PNG at `dpi` (pedigree-patterns-and-png-export): the drawing SVG export gives
+ * (privacy setting included), on white, rasterised at its size at 96 px per inch scaled by
+ * dpi / 96, with the resolution recorded in the file. Resolves to the PNG; rejects when the drawing
+ * is too large to rasterise at that resolution (suggesting a lower one) or can't be drawn.
+ */
+(PedigreeExport as any).exportAsPNG = function(pedigree, privacySetting = 'all', dpi = 300): Promise<Blob> {
+  const svg = (PedigreeExport as any).exportAsSVG(pedigree, privacySetting);
+  const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
+  const size = pngSize(parseFloat(root.getAttribute('width')), parseFloat(root.getAttribute('height')), dpi);
+  const tooLarge = () => new Error('The pedigree is too large to draw as a ' + dpi + ' DPI PNG ('
+    + size.width + ' x ' + size.height + ' pixels): choose a lower resolution.');
+  if (!fitsCanvas(size)) {
+    return Promise.reject(tooLarge());
+  }
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onerror = () => reject(new Error('The pedigree drawing could not be read as an image.'));
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(tooLarge());
+        return;
+      }
+      context.fillStyle = '#FFFFFF';
+      context.fillRect(0, 0, size.width, size.height);
+      context.drawImage(image, 0, 0, size.width, size.height);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(tooLarge());
+          return;
+        }
+        blob.arrayBuffer().then((buffer) => {
+          resolve(new Blob([withDensity(new Uint8Array(buffer), dpi).buffer as ArrayBuffer], { type: 'image/png' }));
+        }, reject);
+      }, 'image/png');
+    };
+    image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+};
+
 PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize = 'A4', layout = 'landscape', legendPos = 'TopRight'){
   var pedigreeImage = PedigreeExport.exportAsSVG(pedigree, privacySetting);
 
@@ -345,6 +390,9 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
     }
     for (let li of c.getElementsByTagName('li')){
       let colourArray = li.getElementsByClassName('disorder-color');
+      // (with the Patterns toggle on, the swatch is its entry's pattern: drawn the same in the PDF)
+      let pattern = (colourArray && colourArray[0] && colourArray[0].dataset.fillPattern !== undefined)
+        ? parseInt(colourArray[0].dataset.fillPattern, 10) : undefined;
       if (colourArray){
         colour = colourArray[0].style.backgroundColor;
         if (colour.startsWith('#')){
@@ -366,7 +414,7 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
         cases = casesArray[0].textContent;
       }
 
-      legendSection.items.push({colour: colour, name: name, cases: cases});
+      legendSection.items.push({colour: colour, pattern: pattern, name: name, cases: cases});
       itemCount++;
     }
   }
@@ -448,7 +496,11 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
     for (let item of cat.items){
       // console.log(item);
       doc.save();
-      doc.rect(xOffset, yOffset, 8, 8).fill(item.colour, 1);
+      if (item.pattern !== undefined) {
+        SVGtoPDF(doc, editor.getView().getFillPatternRegistry().swatchSVG(item.pattern, 8), xOffset, yOffset, { width: 8, height: 8 });
+      } else {
+        doc.rect(xOffset, yOffset, 8, 8).fill(item.colour, 1);
+      }
       doc.restore();
       doc.fontSize(10);
       doc.text(item.name + ' (' + item.cases + ')', xOffset + 10, yOffset, {lineBreak: false});
