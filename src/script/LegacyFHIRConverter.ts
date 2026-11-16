@@ -124,9 +124,11 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
     let newG = new Graph();
 
     let nameToID = {};
+    // (References are matched to a person's id, else their first name. In the files open-pedigree
+    // wrote, every parent and partner reference is "#<FMH id>" - FMH_<n> - so an external ID is
+    // never one, and isn't registered.)
     let externalIDToID = {};
     let ambiguousReferences = {};
-    let hasID = {};
     // (every id seen, including one made ambiguous by a name, so a second person with it is refused)
     const seenIds = new Set();
 
@@ -161,7 +163,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
           ambiguousReferences[nextPerson.properties.id] = true;
         } else {
           externalIDToID[nextPerson.properties.id] = pedigreeID;
-          hasID[nextPerson.properties.id] = true;
         }
       }
       if (nextPerson.properties.fName) {
@@ -179,12 +180,6 @@ LegacyFHIRConverter.initFromFHIR = function(inputText) {
         } else {
           nameToID[nextPerson.properties.fName] = pedigreeID;
         }
-      }
-      // only use externalID if id is not present
-      if (nextPerson.properties.hasOwnProperty('externalId')
-          && !hasID.hasOwnProperty(pedigreeID)) {
-        externalIDToID[nextPerson.properties.externalId] = pedigreeID;
-        hasID[pedigreeID] = true;
       }
     }
 
