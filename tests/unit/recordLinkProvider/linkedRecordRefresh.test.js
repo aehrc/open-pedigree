@@ -353,6 +353,12 @@ describe('gene results from a linked record (a map, key by key)', () => {
     expect(r.snapshot).toEqual({ gene_results: { HGNC_C_1100: 'homozygous' } });
   });
 
+  it('keeps one result for a gene sent twice under different spellings', () => {
+    const r = results({ 'HGNC:1100': 'homozygous', HGNC_C_1100: 'negative' });
+    expect(Object.keys(r.snapshot.gene_results)).toHaveLength(1);
+    expect(Object.keys(r.properties.setGeneResults)).toHaveLength(1);
+  });
+
   it('never keeps tracking an unusable value a snapshot holds', () => {
     const r = results({ BRCA1: 'Heterozygous' }, { snapshot: { gene_results: { BRCA1: 'Heterozygous' } } });
     expect(r.snapshot).toEqual({});

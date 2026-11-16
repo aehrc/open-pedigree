@@ -26,7 +26,6 @@ import { isBlankValue } from 'pedigree/model/helpers';
 // linkId -> the last non-empty value the linked record sent for it.
 export type LinkedRecordSnapshot = Record<string, any>;
 
-
 export interface LinkedRecordRefreshInput {
   answers: { linkId: string, value: any }[];
   // linkId -> the Person setter name the answer goes to (Pedigree._resolveQuestionnaireSetter).
@@ -207,9 +206,14 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
       const keyOf = (key: string): string => (input.mapKey ? input.mapKey(linkId, key) : key);
       const sent = filledEntries(answer.value);
       const previous = hadLast ? filledEntries(last[linkId], usable) : {};
+      // (one value per key: a key sent twice under different spellings keeps its first, in key order)
       const incoming: Record<string, any> = {};
+      const incomingKeyed = new Set<string>();
       Object.keys(sent).filter((key) => usable(sent[key])).forEach((key) => {
-        incoming[key] = sent[key];
+        if (!incomingKeyed.has(keyOf(key))) {
+          incomingKeyed.add(keyOf(key));
+          incoming[key] = sent[key];
+        }
       });
       // A value the setter can't take leaves the node alone (as an unusable date does): it counts as
       // unchanged, and the record's last usable value stays tracked so it can still be cleared -
@@ -320,6 +324,9 @@ export function computeLinkedRecordRefresh(input: LinkedRecordRefreshInput): Lin
  * maps, minus the entries it sends). And the previous record's linkIds that the new one leaves out are
  * answered as empty, so they clear too. So is a value the new record sends that can't be used
  * (isUnusable, e.g. an unparseable date): the previous record's value mustn't linger untracked.
+ * For a map (isMap, e.g. gene results), entries are matched by mapKey, and an entry whose value
+ * can't be used (mapValueUsable) is left out, so the previous record's value for that key clears
+ * too - unlike an ordinary refresh, which leaves the node alone for one.
  * Re-linking the same record is an ordinary refresh.
  */
 export function relinkRefreshInput(

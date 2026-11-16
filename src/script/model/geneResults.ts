@@ -4,13 +4,13 @@
  * gene with no entry is not tested.
  */
 
-// 'positive': a variant was found, its zygosity unknown (e.g. a family's report, or another tool's
-// record without one). Heteroplasmic and homoplasmic are mitochondrial genes' states: with them,
-// every allelic state LOINC lists (53034-5) is kept.
 // The linkId a linked record's gene results come under, `{<gene ID>: <result code>}`: reserved, like
 // the reserved legends (pedigree-gene-results-from-linked-rows).
 export const GENE_RESULTS_LINK_ID = 'gene_results';
 
+// 'positive': a variant was found, its zygosity unknown (e.g. a family's report, or another tool's
+// record without one). Heteroplasmic and homoplasmic are mitochondrial genes' states: with them,
+// every allelic state LOINC lists (53034-5) is kept.
 export const GENE_RESULT_CODES = ['heterozygous', 'homozygous', 'hemizygous', 'heteroplasmic', 'homoplasmic', 'positive', 'negative'];
 
 // Drawn under the symbol after the gene (U+2212 minus, as typeset pedigrees use).
