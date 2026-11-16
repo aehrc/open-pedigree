@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.2.0...open-pedigree-v2.3.0) (2026-11-16)
+
+
+### Features
+
+* a gene's result can come from a linked record ([#108](https://github.com/aehrc/open-pedigree/issues/108)) ([3830075](https://github.com/aehrc/open-pedigree/commit/38300751faffa405dd6ec413cdcd8855b7aca46e))
+
 ## [2.2.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.1.0...open-pedigree-v2.2.0) (2026-11-15)
 
 
