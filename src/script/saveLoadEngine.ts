@@ -273,7 +273,7 @@ export default class SaveLoadEngine {
       jsonData: jsonData,
       setSaveInProgress: this.setSaveInProgress.bind(this),
       // (the saved image never has generation numbering: it's view state)
-      svgData: editor.getView().withoutGenerationNumbering(() => canvasToSvg(image))
+      svgData: editor.getView().withoutPatterns(() => editor.getView().withoutGenerationNumbering(() => canvasToSvg(image)))
     });
     backgroundParent.insertBefore(background, backgroundPosition);
   }

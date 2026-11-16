@@ -251,21 +251,27 @@ export default class PedigreeEditor {
     importButton && importButton.addEventListener('click', function(event: any) {
       editor.getImportSelector().show();
     });
-    // generation numbering (II-3): view state only, so not an undo step and not saved
-    var numberingButton = document.getElementById('action-numbering');
-    var toggleNumbering = function() {
-      editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
-    };
-    numberingButton && numberingButton.addEventListener('click', toggleNumbering);
-    // (a toggle button: reachable with Tab, switched with Enter or Space; once per press, not per key repeat)
-    numberingButton && numberingButton.addEventListener('keydown', function(event: any) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        if (event.repeat) {
-          return;
+    // A toolbar toggle: switched by a click, or Enter or Space once per press (not per key repeat).
+    var wireToggle = function(id: string, toggle: () => void) {
+      var button = document.getElementById(id);
+      button && button.addEventListener('click', toggle);
+      button && button.addEventListener('keydown', function(event: any) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (event.repeat) {
+            return;
+          }
+          toggle();
         }
-        toggleNumbering();
-      }
+      });
+    };
+    // generation numbering (II-3) and black-and-white fill patterns: view state only, so not an undo
+    // step and not saved
+    wireToggle('action-numbering', function() {
+      editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
+    });
+    wireToggle('action-patterns', function() {
+      editor.getView().setFillPatterns(!editor.getView().isFillPatternsOn());
     });
 
     var exportButton = document.getElementById('action-export');
@@ -628,6 +634,8 @@ export default class PedigreeEditor {
         // default, so its QuestionnaireResponses were kept aside: apply those that match now.
         var changed = _this.applyPendingQuestionnaireResponses();
         if (view) {
+          // (new custom legends: fill patterns follow the legends' order)
+          view.fillOrderChanged();
           changed.forEach(function(nodeID: any) {
             // assignProperties resets the node to what the graph holds, so the view shows the applied
             // responses too (its disorder/phenotype/gene lists through their setters, see Person).

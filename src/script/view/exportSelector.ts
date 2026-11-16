@@ -41,6 +41,7 @@ export default class ExportSelector {
     typeListElement.appendChild(_addTypeOption(false,  'GA4GH FHIR', 'GA4GH'));
     typeListElement.appendChild(_addTypeOption(false,  'SVG', 'svg'));
     typeListElement.appendChild(_addTypeOption(false,  'PDF', 'pdf'));
+    typeListElement.appendChild(_addTypeOption(false,  'PNG', 'png'));
     typeListElement.appendChild(_addTypeOption(false,  'DADA2', 'DADA2'));
 
     var fileDownload = document.createElement('a');
@@ -163,6 +164,25 @@ export default class ExportSelector {
         {label: 'Bottom Right', options: {value: 'BottomRight'}}
       ]));
 
+    // PNG: the drawing at a chosen resolution (pedigree-patterns-and-png-export)
+    var configListElementPNG = document.createElement('table');
+    configListElementPNG.id = 'pngOptions';
+    configListElementPNG.style.display = 'none';
+    var pngHeaderRow = document.createElement('tr');
+    var pngHeaderTd = document.createElement('td');
+    var pngHeaderLabel = document.createElement('label');
+    pngHeaderLabel.className = 'export-config-header';
+    pngHeaderLabel.textContent = 'PNG export options:';
+    pngHeaderTd.appendChild(pngHeaderLabel);
+    pngHeaderRow.appendChild(pngHeaderTd);
+    configListElementPNG.appendChild(pngHeaderRow);
+    configListElementPNG.appendChild(_addSelectOption('png-dpi', 'export-subconfig-label', 'Resolution ',
+      [
+        {label: '150 DPI', options: {value: '150'}},
+        {label: '300 DPI (print)', options: {value: '300', selected: true}},
+        {label: '600 DPI', options: {value: '600'}}
+      ]));
+
     var promptConfig = document.createElement('div');
     promptConfig.className = 'import-section';
     promptConfig.textContent = 'Options:';
@@ -172,6 +192,7 @@ export default class ExportSelector {
     dataSection3.appendChild(configListElementPED);
     dataSection3.appendChild(configListElementPrivacy);
     dataSection3.appendChild(configListElementPDF);
+    dataSection3.appendChild(configListElementPNG);
     mainDiv.appendChild(dataSection3);
 
     var buttons = document.createElement('div');
@@ -220,6 +241,7 @@ export default class ExportSelector {
     var pedOptionsTable = document.getElementById('pedOptions');
     var privacyOptionsTable = document.getElementById('privacyOptions');
     var pdfOptionsTable = document.getElementById('pdfOptions');
+    var pngOptionsTable = document.getElementById('pngOptions');
 
     if (exportType == 'ped') {
       pedOptionsTable.style.display = '';
@@ -236,6 +258,7 @@ export default class ExportSelector {
     } else {
       pdfOptionsTable.style.display = 'none';
     }
+    pngOptionsTable.style.display = (exportType == 'png') ? '' : 'none';
   }
 
   /**
@@ -268,6 +291,20 @@ export default class ExportSelector {
         var fileName = 'open-pedigree-GA4GH-fhir.json';
         var mimeType = 'application/fhir+json';
         saveAs(new Blob([exportString], {type: mimeType}), fileName);
+      } else if (exportType == 'png') {
+        var dpi = parseInt((document.querySelector('select[name="png-dpi"]') as any).value, 10);
+        // (asynchronous: the drawing is rasterised as an image first)
+        var failed = function(err: any) {
+          console.log('Error exporting the pedigree PNG', err);
+          alert('The pedigree image could not be exported: ' + ((err && err.message) || err));
+        };
+        try {
+          (PedigreeExport as any).exportAsPNG(editor.getGraph().DG, privacySetting, dpi).then(function(blob: Blob) {
+            saveAs(blob, 'open-pedigree.png');
+          }, failed);
+        } catch (err) {
+          failed(err);
+        }
       } else if (exportType == 'svg' || exportType == 'pdf') {
         // Building the image can fail (see PedigreeExport.exportAsSVG): say so, rather than close
         // the dialog with nothing downloaded.

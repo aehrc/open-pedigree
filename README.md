@@ -186,6 +186,14 @@ The Observation's value is still the gene, so a reader that ignores components r
 
 A record-link provider can send a linked record's results with its genes, as the answer `{ "linkId": "gene_results", "value": { "BRCA1": "heterozygous" } }` (keys as the `candidate_genes` entries give the genes, values as above). It's reserved like the legends, so it needs no Questionnaire item, and a refresh treats each gene's result as any linked value: set when the record changes it, cleared when the record drops it only while the person still holds it, and left alone for genes that never came from the record.
 
+## Black-and-white patterns and PNG export
+
+The toolbar's **Patterns** toggle draws each disorder, gene and custom legend entry with a black-and-white pattern instead of a colour, for colour-blind users and for printing ([#3](https://github.com/aehrc/open-pedigree/issues/3)). The legend's swatches show the same patterns. The first entry is solid black, as in a classic pedigree. Later entries get diagonal hatching both ways, cross-hatching, dots, horizontal and vertical lines, a grid, sparse dots and dense hatching. Each entry's pattern is its place in the order the legends list their entries (disorders, then genes, then custom legends), so the drawing always matches the legend. Adding or removing an entry moves the ones listed after it (a new disorder moves every gene down a pattern). Past ten entries the patterns repeat. Like *Numbers*, the toggle is view state: it's off when the editor opens, never saved, and never undone. A host can set it with `editor.getView().setFillPatterns(true)`.
+
+SVG, PDF and PNG exports draw what's shown, and the PDF's legend shows the patterns too. The diagram image saved with a pedigree (what a host stores and previews) is always drawn in colour.
+
+**PNG** export gives the same drawing as SVG export, privacy options included, on a white background, at 150, 300 (the default) or 600 DPI. The image is the drawing's size at 96 px per inch, scaled by the resolution ÷ 96, and the file records its resolution, so print software sizes it right. A drawing too large for the browser to draw at that resolution is refused with a message suggesting a lower one.
+
 ## Import problems and notes
 
 An import that finds a problem with the file imports nothing. It doesn't stop at the first problem: it reports every one it can find, so a file can be fixed in one go. A single problem is reported as it always was. Several are listed in one message, `Unable to import pedigree: N problems found:`, numbered in the order they were found, which follows the file within each check (at most 20, then how many more).

@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit/js/pdfkit.standalone';
 import SVGtoPDF from 'svg-to-pdfkit';
+import { pngSize, fitsCanvas, withDensity } from 'pedigree/model/pngDensity';
 import blobStream from 'blob-stream';
 import GA4GHFHIRConverter from 'pedigree/GA4GHFHIRConverter';
 import BaseGraph, { PLACEHOLDER_ID_PREFIX, isPlaceholderProperties } from 'pedigree/model/baseGraph';
@@ -252,6 +253,9 @@ PedigreeExport.exportAsSVG = function(pedigree, privacySetting = 'all') {
 
 // The canvas, serialised as SVG.
 function canvasAsSVG() {
+  // (a fill redraw still pending - entries just added or removed - is done first)
+  var view = editor.getView && editor.getView();
+  view && view.flushFillRedraw && view.flushFillRedraw();
   // Plain DOM calls: this was written against Prototype.js ($('canvas'), .down()), which is gone,
   // so every call threw - no SVG export, and no image embedded in a saved pedigree.
   var image = document.getElementById('canvas');
@@ -315,6 +319,73 @@ function canvasAsSVG() {
 
 
 
+/**
+ * The pedigree as a PNG at `dpi` (pedigree-patterns-and-png-export): the drawing SVG export gives
+ * (privacy setting included), on white, rasterised at its size at 96 px per inch scaled by
+ * dpi / 96, with the resolution recorded in the file. Resolves to the PNG; rejects when the drawing
+ * is too large to rasterise at that resolution (suggesting a lower one) or can't be drawn.
+ */
+(PedigreeExport as any).exportAsPNG = function(pedigree, privacySetting = 'all', dpi = 300): Promise<Blob> {
+  const svg = (PedigreeExport as any).exportAsSVG(pedigree, privacySetting);
+  const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
+  const width = parseFloat(root.getAttribute('width'));
+  const height = parseFloat(root.getAttribute('height'));
+  if (!(width > 0) || !(height > 0)) {
+    return Promise.reject(new Error('The pedigree drawing has no size to draw (is it empty?).'));
+  }
+  const size = pngSize(width, height, dpi);
+  const tooLarge = () => new Error('The pedigree is too large to draw as a ' + dpi + ' DPI PNG ('
+    + size.width + ' x ' + size.height + ' pixels): choose a lower resolution.');
+  if (!fitsCanvas(size)) {
+    return Promise.reject(tooLarge());
+  }
+  return new Promise((resolve, reject) => {
+    const failed = (err: any) => reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
+    const image = new Image();
+    image.onerror = () => reject(new Error('The pedigree drawing could not be read as an image.'));
+    image.onload = () => {
+      // (anything thrown here, e.g. a canvas the browser won't read back, must still settle the export)
+      try {
+        draw();
+      } catch (err) {
+        failed(err);
+      }
+    };
+    const draw = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(tooLarge());
+        return;
+      }
+      context.fillStyle = '#FFFFFF';
+      context.fillRect(0, 0, size.width, size.height);
+      context.drawImage(image, 0, 0, size.width, size.height);
+      // (the callbacks run later, outside the catch in onload: each settles the export itself)
+      canvas.toBlob((blob) => {
+        try {
+          if (!blob) {
+            reject(tooLarge());
+            return;
+          }
+          blob.arrayBuffer().then((buffer) => {
+            try {
+              resolve(new Blob([withDensity(new Uint8Array(buffer), dpi).buffer as ArrayBuffer], { type: 'image/png' }));
+            } catch (err) {
+              failed(err);
+            }
+          }, failed);
+        } catch (err) {
+          failed(err);
+        }
+      }, 'image/png');
+    };
+    image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+};
+
 PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize = 'A4', layout = 'landscape', legendPos = 'TopRight'){
   var pedigreeImage = PedigreeExport.exportAsSVG(pedigree, privacySetting);
 
@@ -345,6 +416,9 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
     }
     for (let li of c.getElementsByTagName('li')){
       let colourArray = li.getElementsByClassName('disorder-color');
+      // (with the Patterns toggle on, the swatch is its entry's pattern: drawn the same in the PDF)
+      let pattern = (colourArray && colourArray[0] && colourArray[0].dataset.fillPattern !== undefined)
+        ? parseInt(colourArray[0].dataset.fillPattern, 10) : undefined;
       if (colourArray){
         colour = colourArray[0].style.backgroundColor;
         if (colour.startsWith('#')){
@@ -366,7 +440,7 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
         cases = casesArray[0].textContent;
       }
 
-      legendSection.items.push({colour: colour, name: name, cases: cases});
+      legendSection.items.push({colour: colour, pattern: pattern, name: name, cases: cases});
       itemCount++;
     }
   }
@@ -448,7 +522,11 @@ PedigreeExport.exportAsPDF = function(pedigree, privacySetting = 'all', pageSize
     for (let item of cat.items){
       // console.log(item);
       doc.save();
-      doc.rect(xOffset, yOffset, 8, 8).fill(item.colour, 1);
+      if (item.pattern !== undefined) {
+        SVGtoPDF(doc, editor.getView().getFillPatternRegistry().swatchSVG(item.pattern, 8), xOffset, yOffset, { width: 8, height: 8 });
+      } else {
+        doc.rect(xOffset, yOffset, 8, 8).fill(item.colour, 1);
+      }
       doc.restore();
       doc.fontSize(10);
       doc.text(item.name + ' (' + item.cases + ')', xOffset + 10, yOffset, {lineBreak: false});

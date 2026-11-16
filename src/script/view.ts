@@ -6,11 +6,26 @@ import PersonGroup from 'pedigree/view/personGroup';
 import LineSet from 'pedigree/view/lineSet';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { drawCornerCurve, drawLevelChangeCurve } from 'pedigree/view/graphicHelpers';
+import { FillPatternRegistry } from 'pedigree/view/fillPatterns';
+
+// A toolbar toggle button showing its state.
+function syncToggleButton(id: string, on: boolean): void {
+  var button = document.getElementById(id);
+  if (button) {
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', String(on));
+  }
+}
 
 export default class View {
   _nodeMap: any;
   // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
   _generationNumbering: boolean;
+  // black-and-white fill patterns (pedigree-patterns-and-png-export): the toolbar toggle, and which
+  // pattern each legend entry has
+  _fillPatterns: boolean;
+  _fillPatternRegistry: FillPatternRegistry;
+  _fillRedrawScheduled: boolean;
   _generationNumerals: any;
   // while a de-identified export is drawn: 'nopersonal' or 'minimal' (see withDeidentifiedRendering)
   _deidentified: any;
@@ -33,6 +48,10 @@ export default class View {
     this._nodeMap = {};
     this._generationNumbering = false;
     this._generationNumerals = null;
+    this._fillPatterns = false;
+    // (an entry's pattern is its place in the legends' order: see FillPatternRegistry)
+    this._fillPatternRegistry = new FillPatternRegistry(() => this._fillKeyOrder());
+    this._fillRedrawScheduled = false;
     this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
@@ -309,10 +328,121 @@ export default class View {
     this._generationNumbering = !!on;
     this.updateGenerationNumbering();
     // (the toolbar's Numbers toggle shows the state, however it was set)
-    var button = document.getElementById('action-numbering');
-    if (button) {
-      button.classList.toggle('active', this._generationNumbering);
-      button.setAttribute('aria-pressed', String(this._generationNumbering));
+    syncToggleButton('action-numbering', this._generationNumbering);
+  }
+
+  /**
+   * Whether fills are drawn as black-and-white patterns instead of colours: view state only, off
+   * when the editor opens, never saved or undone (as numbering).
+   */
+  isFillPatternsOn(): boolean {
+    return this._fillPatterns;
+  }
+
+  getFillPatternRegistry(): FillPatternRegistry {
+    return this._fillPatternRegistry;
+  }
+
+  setFillPatterns(on: boolean): void {
+    this._fillPatterns = !!on;
+    if (this._fillPatterns) {
+      var paper = editor.getPaper && editor.getPaper();
+      paper && this._fillPatternRegistry.ensureDefinitions(paper.canvas);
+    }
+    // (everything is redrawn: nothing stays pending)
+    this._fillRedrawScheduled = false;
+    this._redrawFills();
+    // (the toolbar's Patterns toggle shows the state, however it was set)
+    syncToggleButton('action-patterns', this._fillPatterns);
+  }
+
+  /**
+   * Runs `draw` with colour fills, for the diagram image saved with a pedigree: patterns are view
+   * state, so what's saved never depends on them. Returns what `draw` returns.
+   */
+  withoutPatterns(draw: () => any): any {
+    if (!this._fillPatterns) {
+      return draw();
+    }
+    this._fillPatterns = false;
+    try {
+      this._redrawFills(false);
+      return draw();
+    } finally {
+      this._fillPatterns = true;
+      // (a redraw that was pending - the legends changed - is done now, swatches included)
+      var pending = this._fillRedrawScheduled;
+      this._fillRedrawScheduled = false;
+      this._redrawFills(pending);
+    }
+  }
+
+  // Every fill-producing legend's entries, in the order the legends list them (the patterns' order).
+  _fillKeyOrder(): string[] {
+    var order: string[] = [];
+    this._fillPatternLegends().forEach(function(legend: any) {
+      legend.getObjectIDs().forEach(function(id: string) {
+        order.push(legend.fillKey(id));
+      });
+    });
+    return order;
+  }
+
+  /**
+   * The legends' entries changed (one added or removed): patterns follow their order, so the entries
+   * listed after it can move. Redraws the fills once, soon - however many change at once, e.g. while
+   * a pedigree loads - or at once if something draws the image first (flushFillRedraw).
+   */
+  fillOrderChanged(): void {
+    this._fillPatternRegistry.invalidate();
+    if (!this._fillPatterns || this._fillRedrawScheduled) {
+      return;
+    }
+    this._fillRedrawScheduled = true;
+    Promise.resolve().then(() => this.flushFillRedraw());
+  }
+
+  /** Does a pending fill redraw now (before the drawing is read, e.g. by an export). */
+  flushFillRedraw(): void {
+    // (with patterns off for a moment - inside withoutPatterns - it stays pending: withoutPatterns
+    // does it as patterns come back)
+    if (!this._fillRedrawScheduled || !this._fillPatterns) {
+      return;
+    }
+    this._fillRedrawScheduled = false;
+    this._redrawFills();
+  }
+
+  // The legends whose entries fill a symbol: disorders, genes, then custom legend items.
+  _fillPatternLegends(): any[] {
+    var legends: any[] = [editor.getDisorderLegend(), editor.getGeneLegend()];
+    // (custom legends in the questionnaire's order, as their boxes and a person's fills are)
+    var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
+    ((config && config.items) || []).forEach(function(item: any) {
+      if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation')) {
+        var legend = editor.getQuestionnaireLegend(item.linkId);
+        // (only those that fill a symbol: the phenotypes legend is a questionnaire item too)
+        if (legend && legend.fillsSymbols() && legends.indexOf(legend) === -1) {
+          legends.push(legend);
+        }
+      }
+    });
+    return legends.filter(Boolean);
+  }
+
+  // Redraws every person's fills (and, unless just for a moment, the legends' swatches).
+  _redrawFills(swatches: boolean = true): void {
+    var map = this.getNodeMap();
+    Object.keys(map).forEach(function(id) {
+      var graphics = map[id] && map[id].getGraphics && map[id].getGraphics();
+      if (graphics && typeof graphics.updateDisorderShapes === 'function') {
+        graphics.updateDisorderShapes();
+      }
+    });
+    if (swatches) {
+      this._fillPatternLegends().forEach(function(legend: any) {
+        legend.refreshSwatches && legend.refreshSwatches();
+      });
     }
   }
 

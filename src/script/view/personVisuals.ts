@@ -45,6 +45,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   _isSelected: any;
   _carrierGraphic: any;
   _evalLabel: any;
+  // whether the marks inside the symbol were made to stand out on a solid pattern fill
+  _marksStandOut: boolean;
   _linkedRecordChangedMark: any;
 
   constructor(node: any, x: any, y: any) {
@@ -273,10 +275,25 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   updateDisorderShapes(): any {
     this._disorderShapes && this._disorderShapes.remove();
-    var colors = this.getNode().getAllNodeColors();
+    var fills = this.getNode().getAllNodeFills();
+    var colors = fills.map(function(f: any) { return f.color; });
     if (colors.length == 0) {
+      this.updateMarkContrast();
       return;
     }
+    // With the Patterns toggle on, each sector takes its entry's pattern instead of its colour
+    // (pedigree-patterns-and-png-export): set on the element, as Raphael has no pattern fills.
+    var view = editor.getView();
+    var patterns = view && view.isFillPatternsOn && view.isFillPatternsOn() ? view.getFillPatternRegistry() : null;
+    var applyFill = function(shape: any, index: number, rotated = false) {
+      if (patterns) {
+        var nodes = shape.type === 'set' ? shape.items : [shape];
+        nodes.forEach(function(el: any) {
+          el.node && el.node.setAttribute('fill', patterns.fillFor(fills[index].key, rotated));
+        });
+      }
+      return shape;
+    };
 
     var gradient = function(color: any, angle: any) {
       var hsb = Raphael.rgb2hsb(color),
@@ -307,7 +324,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
         }
         var slice = editor.getPaper().path(['M', x1, y1, corner,'L', x2, y2, 'L',this.getX(), this.getY(),'z']);
         color = gradient(colors[k], 70);
-        disorderShapes.push(slice.attr({fill: color, 'stroke-width':.5, stroke: 'none' }));
+        disorderShapes.push(applyFill(slice.attr({fill: color, 'stroke-width':.5, stroke: 'none' }), k));
         x1 = x2;
         y1 = y2;
       }
@@ -328,8 +345,9 @@ export default class PersonVisuals extends AbstractPersonVisuals {
 
       for(var i = 0; i < colors.length; i++) {
         color = gradient(colors[i], (i * disorderAngle)+delta);
-        disorderShapes.push(sector(editor.getPaper(), this.getX(), this.getY(), radius,
-          this.getNode().getGender(), i * disorderAngle, (i+1) * disorderAngle, color));
+        // (an unknown-sex diamond is drawn turned -45°: its pattern is turned back)
+        disorderShapes.push(applyFill(sector(editor.getPaper(), this.getX(), this.getY(), radius,
+          this.getNode().getGender(), i * disorderAngle, (i+1) * disorderAngle, color), i, this.getNode().getGender() == 'U'));
       }
 
       (disorderShapes.length < 2) ? disorderShapes.attr('stroke', 'none') : disorderShapes.attr({stroke: '#595959', 'stroke-width':.03});
@@ -339,6 +357,40 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     }
     this._disorderShapes = disorderShapes;
     this._disorderShapes.flatten().insertAfter(this.getGenderGraphics().flatten());
+    this.updateMarkContrast();
+  }
+
+  /**
+   * Draws the marks inside the symbol (the unborn "P", the carrier mark, a group's count) white with
+   * a thin black outline when the person has a solid black pattern fill - black would vanish on it,
+   * and the outline keeps the mark where it also crosses a hatched sector; as usual otherwise.
+   */
+  updateMarkContrast(): void {
+    var view = editor.getView && editor.getView();
+    var registry = view && view.isFillPatternsOn && view.isFillPatternsOn() ? view.getFillPatternRegistry() : null;
+    var node = this.getNode();
+    var onSolid = !!registry && node.getAllNodeFills().some(function(f: any) { return registry.isSolid(f.key); });
+    // (marks are only touched when they stand out now, or did: otherwise they're as drawn)
+    if (!onSolid && !this._marksStandOut) {
+      return;
+    }
+    this._marksStandOut = onSolid;
+    var recolour = function(shape: any, usual: any) {
+      if (!shape) {
+        return;
+      }
+      var items = shape.type === 'set' ? shape.items : [shape];
+      items.forEach(function(el: any) {
+        el && el.attr && el.attr(onSolid ? { fill: '#FFFFFF', stroke: '#000000', 'stroke-width': 1 } : usual);
+      });
+    };
+    var attributes = (PedigreeEditorParameters as any).attributes;
+    // (put back as drawn: text in the default black, no outline)
+    recolour(this._unbornShape, { fill: '#000', stroke: 'none' });
+    recolour(this._carrierGraphic, node.getCarrierStatus && node.getCarrierStatus() == 'presymptomatic'
+      ? { fill: attributes.presymptomaticShape.fill, stroke: attributes.presymptomaticShape.stroke, 'stroke-width': 1 }
+      : { fill: attributes.carrierShape.fill, stroke: '#000000', 'stroke-width': 1 });
+    recolour((this as any)._label, { fill: '#000', stroke: 'none' });
   }
 
   /**
@@ -477,6 +529,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     } else {
       this._unbornShape = null;
     }
+    this.updateMarkContrast();
   }
 
   /**
@@ -590,6 +643,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     } else {
       this._carrierGraphic = null;
     }
+    this.updateMarkContrast();
   }
 
   /**

@@ -106,6 +106,83 @@ export default class Legend {
     }
   }
 
+  /** The key this legend's entry has in the fill-pattern registry (View.getFillPatternRegistry). */
+  fillKey(id: any): string {
+    return (this._idPrefix || this._getPrefix()) + ':' + id;
+  }
+
+  /** Whether this legend's entries fill a person's symbol (so the Patterns toggle applies to them). */
+  fillsSymbols(): boolean {
+    return true;
+  }
+
+  /**
+   * This legend's entries' IDs, in the order the legend shows them (not Object.keys order, which puts
+   * numeric IDs, e.g. OMIM numbers, first).
+   */
+  getObjectIDs(): string[] {
+    const shown: string[] = [];
+    const items = this._list ? Array.from(this._list.children) as HTMLElement[] : [];
+    const prefix = this._getPrefix() + '-';
+    items.forEach((item) => {
+      const id = item.id && item.id.indexOf(prefix) === 0 ? item.id.substring(prefix.length) : null;
+      if (id !== null && Object.prototype.hasOwnProperty.call(this._affectedNodes, id)) {
+        shown.push(id);
+      }
+    });
+    // (any not in the list yet, after)
+    Object.keys(this._affectedNodes).forEach((id) => {
+      if (shown.indexOf(id) === -1) {
+        shown.push(id);
+      }
+    });
+    return shown;
+  }
+
+  // Tells the view this legend's entries changed (patterns follow the legends' order).
+  _orderChanged(): void {
+    const view = editor.getView && editor.getView();
+    if (this.fillsSymbols() && view && view.fillOrderChanged) {
+      view.fillOrderChanged();
+    }
+  }
+
+  // Whether this legend draws patterns now.
+  _patternsOn(): boolean {
+    const view = editor.getView && editor.getView();
+    return this.fillsSymbols() && !!(view && view.isFillPatternsOn && view.isFillPatternsOn());
+  }
+
+  /**
+   * Draws an entry's swatch as the drawing shows it: its pattern with the Patterns toggle on
+   * (pedigree-patterns-and-png-export), else its colour. `data-fill-pattern` says which pattern,
+   * for the PDF export's legend.
+   */
+  drawSwatch(bubble: HTMLElement, id: any): void {
+    if (this._patternsOn()) {
+      const registry = editor.getView().getFillPatternRegistry();
+      const index = registry.indexFor(this.fillKey(id));
+      bubble.style.backgroundColor = '';
+      bubble.innerHTML = registry.swatchSVG(index);
+      bubble.dataset.fillPattern = String(index);
+    } else {
+      bubble.innerHTML = '';
+      bubble.style.backgroundColor = this.getObjectColor(id);
+      delete bubble.dataset.fillPattern;
+    }
+  }
+
+  /** Redraws every entry's swatch (after the Patterns toggle changes). */
+  refreshSwatches(): void {
+    this.getObjectIDs().forEach((id) => {
+      const item = this._getListElementForObjectWithID(id);
+      const bubble = item && item.querySelector('.disorder-color');
+      if (bubble) {
+        this.drawSwatch(bubble as HTMLElement, id);
+      }
+    });
+  }
+
   getCurrentTerms(): any[] {
     const currentTerms: any[] = [];
     for (const id in this._affectedNodes) {
@@ -183,6 +260,9 @@ export default class Legend {
     }
     if(!this._hasAffectedNodes(id)) {
       this._affectedNodes[id] = [nodeID];
+      // (a new entry: patterns follow the legends' order, so later entries can move; told first, so
+      // its own swatch is drawn in its place - getObjectIDs lists it last in this legend)
+      this._orderChanged();
       const listElement = this._generateElement(id, name);
       this._list.appendChild(listElement);
     } else {
@@ -209,6 +289,8 @@ export default class Legend {
         if(Object.keys(this._affectedNodes).length === 0) {
           this._legendBox.style.display = 'none';
         }
+        // (the entries listed after it move up a pattern)
+        this._orderChanged();
       } else {
         this._updateCaseNumbersForObject(id);
       }
@@ -302,7 +384,7 @@ export default class Legend {
     item.appendChild(nameSpan);
     const bubble = document.createElement('span');
     bubble.className = 'disorder-color';
-    bubble.style.backgroundColor = color;
+    this.drawSwatch(bubble, id);
     item.prepend(bubble);
     const countLabel = document.createElement('span');
     countLabel.className = 'disorder-cases';
@@ -316,7 +398,8 @@ export default class Legend {
     const me = this;
     item.addEventListener('mouseover', function() {
       var nameEl = item.querySelector('.disorder-name') as HTMLElement;
-      if (nameEl) { nameEl.style.background = color; nameEl.style.cursor = 'default'; }
+      // (a light grey with the Patterns toggle on: no colour shows anywhere then)
+      if (nameEl) { nameEl.style.background = me._patternsOn() ? '#E6E6E6' : color; nameEl.style.cursor = 'default'; }
       me._affectedNodes[id] && me._affectedNodes[id].forEach(function(nodeID: any) {
         const node = editor.getNode(nodeID);
         node && node.getGraphics().highlight();

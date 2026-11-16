@@ -44,6 +44,7 @@ function makeLegend() {
     getDisorder: (id) => ({ getID: () => id, getName: () => `name ${id}` }),
     getTerm: (id) => ({ getID: () => id, getName: () => `name ${id}` }),
     getObjectColor: () => '#ffffff',
+    fillKey: (id) => 'legend:' + id,
     desanitizeID: (id) => id,
   };
 }

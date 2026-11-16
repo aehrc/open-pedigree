@@ -22,7 +22,7 @@ describe('LocalStorageBackend.save options', () => {
         localStorage.clear();
         LocalStorageBackend._context = undefined;
         globalThis.editor = {
-            getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
+            getView: () => ({ withoutGenerationNumbering: (fn) => fn(), withoutPatterns: (fn) => fn() }),
             getGraph: () => ({ DG: {}, getMaxNodeId: () => -1 }),
             flagClosing: vi.fn(),
         };
@@ -107,7 +107,7 @@ describe('LocalStorageBackend.load format', () => {
         const alertSpy = vi.fn();
         globalThis.alert = alertSpy;
         globalThis.editor = {
-            getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
+            getView: () => ({ withoutGenerationNumbering: (fn) => fn(), withoutPatterns: (fn) => fn() }),
             getGraph: () => ({ DG: {} }),
             flagClosing: vi.fn(),
         };

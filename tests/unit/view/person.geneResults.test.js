@@ -36,6 +36,7 @@ function makeLegend() {
     },
     getTerm: (id) => ({ getID: () => id, getName: () => `name ${id}` }),
     getObjectColor: () => '#ffffff',
+    fillKey: (id) => 'legend:' + id,
     sanitizeID: (id) => id,
     desanitizeID: (id) => id,
     displayName: (id) => `name ${id}`,
