@@ -34,6 +34,7 @@ function makeMockLegend() {
     getDisorder: (id) => ({ getID: () => id, getName: () => 'Name-of-' + id }),
     getCurrentTerms: () => [],
     getObjectColor: () => '#ffffff',
+    fillKey: (id) => 'legend:' + id,
     addCase: vi.fn(),
     removeCase: vi.fn(),
     addToCache: vi.fn(),

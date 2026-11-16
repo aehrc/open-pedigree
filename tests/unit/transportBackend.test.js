@@ -34,7 +34,7 @@ describe('createTransportBackend', () => {
         TemplateSelector.mockClear();
         maxNodeId = -1; // (an empty canvas)
         globalThis.editor = {
-            getView: () => ({ withoutGenerationNumbering: (fn) => fn() }),
+            getView: () => ({ withoutGenerationNumbering: (fn) => fn(), withoutPatterns: (fn) => fn() }),
             getGraph: () => ({ DG: {}, getMaxNodeId: () => maxNodeId }),
             getVersionUpdater: () => ({ updateToCurrentVersion: (d) => d }),
             flagClosing: vi.fn(),

@@ -37,6 +37,7 @@ function makeMockLegend() {
       this._affectedNodes[id] = (this._affectedNodes[id] || []).filter((n) => n !== nodeID);
     }),
     getObjectColor: vi.fn(() => '#ffffff'),
+    fillKey: (id) => 'legend:' + id,
   };
 }
 
@@ -133,6 +134,7 @@ describe('Person.setQuestionnaireLegendAnswer', () => {
       getQuestionnaireLegend: () => legend,
       getDisorderLegend: () => ({
         getObjectColor: () => '#real-disorder-color',
+        fillKey: (id) => 'legend:' + id,
         getDisorder: (id) => ({ getID: () => id, getName: () => id }),
         addCase: vi.fn(),
         removeCase: vi.fn(),
