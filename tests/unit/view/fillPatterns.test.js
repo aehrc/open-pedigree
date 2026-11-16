@@ -10,8 +10,34 @@ describe('FillPatternRegistry', () => {
     expect(PATTERNS[0].name).toBe('solid');
     expect(registry.indexFor('disorder:D1')).toBe(0);
     expect(registry.indexFor('gene:BRCA1')).toBe(1);
-    expect(PATTERNS.map((p) => p.name)).toEqual(['solid', 'diagonal /', 'diagonal \\', 'cross-hatch', 'dots',
-      'horizontal', 'vertical', 'grid', 'sparse dots', 'dense diagonal']);
+    expect(PATTERNS.map((p) => p.name)).toEqual(['solid', 'diagonal /', 'bold diagonal \\', 'cross-hatch', 'dots',
+      'horizontal', 'vertical', 'grid', 'sparse dots', 'bold horizontal']);
+  });
+
+  it('draws look-alike line patterns at different weights, so they stay apart when a symbol is small', () => {
+    const weight = (name) => Number(/stroke-width="([\d.]+)"/.exec(PATTERNS.find((p) => p.name === name).content)[1]);
+    // the two diagonals differ by more than direction (thin lines read alike once a symbol is small)
+    expect(weight('bold diagonal \\')).toBeGreaterThanOrEqual(3 * weight('diagonal /'));
+    expect(weight('bold horizontal')).toBeGreaterThanOrEqual(3 * weight('horizontal'));
+  });
+
+  it('carries each diagonal stroke across the tile\'s corners far enough to cover its width (no notches between tiles)', () => {
+    PATTERNS.forEach((pattern) => {
+      const width = /stroke-width="([\d.]+)"/.exec(pattern.content);
+      const path = /<path d="([^"]+)"/.exec(pattern.content);
+      if (!width || !path) {
+        return;
+      }
+      const corners = [[0, 0], [0, pattern.size], [pattern.size, 0], [pattern.size, pattern.size]];
+      // every diagonal segment centred on a corner: the piece that joins the next tile's stroke
+      for (const [, x1, y1, x2, y2] of Array.from(path[1].matchAll(/M(-?[\d.]+),(-?[\d.]+) L(-?[\d.]+),(-?[\d.]+)/g), (m) => m.map(Number))) {
+        const mid = [(x1 + x2) / 2, (y1 + y2) / 2];
+        if (Math.abs(x2 - x1) === Math.abs(y2 - y1) && corners.some(([cx, cy]) => cx === mid[0] && cy === mid[1])) {
+          // the stroke's edge meets the tile's side width/2 along the line from the corner
+          expect(Math.hypot(x2 - x1, y2 - y1) / 2, pattern.name).toBeGreaterThanOrEqual(Number(width[1]) / 2);
+        }
+      }
+    });
   });
 
   it('repeats past the last pattern', () => {
