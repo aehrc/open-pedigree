@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.3.0...open-pedigree-v2.4.0) (2026-11-16)
+
+
+### Features
+
+* black-and-white patterns and PNG export at a chosen resolution ([#110](https://github.com/aehrc/open-pedigree/issues/110)) ([5afacf2](https://github.com/aehrc/open-pedigree/commit/5afacf21e2d44fb62a142e692ac8031bb7abecfa))
+
 ## [2.3.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.2.0...open-pedigree-v2.3.0) (2026-11-16)
 
 
