@@ -54,5 +54,6 @@ export default class PersonGroupVisuals extends PersonVisuals {
     var x = (this.getNode().getLifeStatus() == 'aborted') ? this.getX() + 8 : this.getX();
     this._label = editor.getPaper().text(x, y, text).attr(PedigreeEditorParameters.attributes.descendantGroupLabel);
     this._label.node.setAttribute('class', 'no-mouse-interaction');
+    this.updateMarkContrast();
   }
 }

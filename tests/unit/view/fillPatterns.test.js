@@ -41,11 +41,20 @@ describe('FillPatternRegistry', () => {
     registry.ensureDefinitions(svg);
     registry.ensureDefinitions(svg);
     const patterns = svg.querySelectorAll('defs > pattern');
-    expect(patterns).toHaveLength(PATTERNS.length);
+    // each, and each turned back +45° for diamonds (drawn turned -45°)
+    expect(patterns).toHaveLength(PATTERNS.length * 2);
+    expect(svg.querySelector('#' + registry.patternId(1) + '-r').getAttribute('patternTransform')).toBe('rotate(45)');
     expect(patterns[0].getAttribute('id')).toBe(registry.patternId(0));
     expect(patterns[1].getAttribute('patternUnits')).toBe('userSpaceOnUse');
     // each over white, so a pattern's gaps read as white
     expect(patterns[1].querySelector('rect').getAttribute('fill')).toBe('#FFFFFF');
+  });
+
+  it('names the turned variant for a diamond, and knows the solid one', () => {
+    const registry = new FillPatternRegistry();
+    expect(registry.fillFor('disorder:A', true)).toBe('url(#' + registry.patternId(0) + '-r)');
+    expect(registry.isSolid('disorder:A')).toBe(true);
+    expect(registry.isSolid('gene:B')).toBe(false);
   });
 
   it('draws a legend swatch of a pattern', () => {

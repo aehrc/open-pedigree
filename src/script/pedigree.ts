@@ -251,37 +251,27 @@ export default class PedigreeEditor {
     importButton && importButton.addEventListener('click', function(event: any) {
       editor.getImportSelector().show();
     });
-    // generation numbering (II-3): view state only, so not an undo step and not saved
-    var numberingButton = document.getElementById('action-numbering');
-    var toggleNumbering = function() {
+    // A toolbar toggle: switched by a click, or Enter or Space once per press (not per key repeat).
+    var wireToggle = function(id: string, toggle: () => void) {
+      var button = document.getElementById(id);
+      button && button.addEventListener('click', toggle);
+      button && button.addEventListener('keydown', function(event: any) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (event.repeat) {
+            return;
+          }
+          toggle();
+        }
+      });
+    };
+    // generation numbering (II-3) and black-and-white fill patterns: view state only, so not an undo
+    // step and not saved
+    wireToggle('action-numbering', function() {
       editor.getView().setGenerationNumbering(!editor.getView().isGenerationNumberingOn());
-    };
-    numberingButton && numberingButton.addEventListener('click', toggleNumbering);
-    // (a toggle button: reachable with Tab, switched with Enter or Space; once per press, not per key repeat)
-    numberingButton && numberingButton.addEventListener('keydown', function(event: any) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        if (event.repeat) {
-          return;
-        }
-        toggleNumbering();
-      }
     });
-
-    // black-and-white fill patterns: view state only, as numbering
-    var patternsButton = document.getElementById('action-patterns');
-    var togglePatterns = function() {
+    wireToggle('action-patterns', function() {
       editor.getView().setFillPatterns(!editor.getView().isFillPatternsOn());
-    };
-    patternsButton && patternsButton.addEventListener('click', togglePatterns);
-    patternsButton && patternsButton.addEventListener('keydown', function(event: any) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        if (event.repeat) {
-          return;
-        }
-        togglePatterns();
-      }
     });
 
     var exportButton = document.getElementById('action-export');

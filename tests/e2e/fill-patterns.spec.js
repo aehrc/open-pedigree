@@ -68,7 +68,8 @@ test('the Patterns toggle draws each entry with its own pattern, solid first, an
   expect(await sectorFills(page, father)).toEqual([registry.solid]);
   expect((await swatchPatterns(page)).sort()).toEqual(['pattern:0', 'pattern:1']);
   // the patterns are defined in the canvas's SVG, so exports carry them
-  expect(await page.evaluate(() => document.querySelectorAll('#canvas svg defs pattern').length)).toBe(10);
+  // (each pattern, and each turned back for diamonds)
+  expect(await page.evaluate(() => document.querySelectorAll('#canvas svg defs pattern').length)).toBe(20);
 
   await toggle(page);
   await expect(page.locator('#action-patterns')).toHaveAttribute('aria-pressed', 'false');
@@ -207,4 +208,79 @@ test('with patterns on, SVG and PDF exports carry the patterns', async ({ page }
   expect(svg).toMatch(/fill="url\(#op-fill-\d+-1\)"/);
   const pdf = (await exportThroughDialog(page, 'pdf')).bytes.toString('latin1');
   expect(pdf).toContain('/Pattern');
+});
+
+// --- review fixes ---
+
+const fillPatternId = (page, n, rotated = false) => page.evaluate(({ i, r }) =>
+  'url(#' + window.editor.getView().getFillPatternRegistry().patternId(i) + (r ? '-r' : '') + ')', { i: n, r: rotated });
+
+test('legend order decides, numeric IDs included: the first entry shown is solid', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  // (Object.keys would put 113705 before 604370)
+  await setProperties(page, father, { setDisorders: ['604370', '113705'] });
+  await toggle(page);
+  expect(await sectorFills(page, father)).toEqual([await fillPatternId(page, 0), await fillPatternId(page, 1)]);
+});
+
+test('phenotypes keep their swatch: they don\'t fill a symbol', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  // (added with patterns on: the swatch is drawn then)
+  await toggle(page);
+  await setProperties(page, father, { setDisorders: ['D'], setHPO: ['HP:0001250'] });
+  // (the phenotype legend's entries are hpo-<id>)
+  const phenotypes = await page.evaluate(() => Array.from(document.querySelectorAll('#legend-box li[id^="hpo-"] .disorder-color'))
+    .map((el) => ({ pattern: el.dataset.fillPattern || null })));
+  const disorders = await page.evaluate(() => Array.from(document.querySelectorAll('#legend-box li[id^="disorder-"] .disorder-color'))
+    .map((el) => el.dataset.fillPattern || null));
+  expect(disorders).toEqual(['0']);
+  expect(phenotypes.length).toBeGreaterThan(0);
+  expect(phenotypes.every((s) => s.pattern === null)).toBe(true);
+});
+
+test('an unknown-sex diamond takes the pattern turned back, so it reads as its swatch', async ({ page }) => {
+  await open(page);
+  const [, , child] = await people(page);
+  await setProperties(page, child, { setGender: 'U' });
+  await setProperties(page, child, { setDisorders: ['D1', 'D2'] });
+  await toggle(page);
+  expect(await sectorFills(page, child)).toEqual([await fillPatternId(page, 0, true), await fillPatternId(page, 1, true)]);
+});
+
+test('marks inside a solid symbol are drawn white', async ({ page }) => {
+  await open(page);
+  const [, , child] = await people(page);
+  await setProperties(page, child, { setLifeStatus: 'unborn' });
+  await setProperties(page, child, { setDisorders: ['D1'] });
+  const unbornFill = () => page.evaluate((id) => window.editor.getView().getNode(id).getGraphics().getUnbornShape().attr('fill'), child);
+  expect((await unbornFill()).toUpperCase()).toBe('#000000');
+  await toggle(page);
+  expect((await unbornFill()).toUpperCase()).toBe('#FFFFFF');
+  await toggle(page);
+  expect((await unbornFill()).toUpperCase()).toBe('#000000');
+});
+
+test('a pedigree loaded with patterns on takes them afresh, its first entry solid', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  await setProperties(page, father, { setDisorders: ['Old A', 'Old B'] });
+  await toggle(page);
+  // another pedigree, through the import (the same load the backend uses)
+  await page.evaluate(() => window.editor.getSaveLoadEngine().createGraphFromImportData('h 1 0 0 1 1\nh 2 0 0 2 1\nh 3 1 2 1 1', 'ped', {}, false, true));
+  const [newFather] = await people(page);
+  await setProperties(page, newFather, { setDisorders: ['New A'] });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:load:finish')));
+  expect(await sectorFills(page, newFather)).toEqual([await fillPatternId(page, 0)]);
+});
+
+test('the node menu\'s swatches show the patterns too', async ({ page }) => {
+  await open(page);
+  const [father] = await people(page);
+  await setProperties(page, father, { setDisorders: ['D1'] });
+  await toggle(page);
+  await page.evaluate((id) => window.editor.getNodeMenu().show(window.editor.getView().getNode(id), 100, 100), father);
+  await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.menu-box .field-disorders .disorder-color'))
+    .map((el) => el.dataset.fillPattern || null))).toEqual(['0']);
 });

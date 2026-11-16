@@ -64,12 +64,28 @@ export function physChunk(dpi: number): Uint8Array {
 // The PNG signature and the IHDR chunk (always first, always 25 bytes) come before anything else.
 const AFTER_IHDR = 8 + 25;
 
-/** The PNG with a pHYs chunk recording `dpi`, right after its header (replacing none: canvases write none). */
+/**
+ * The PNG with one pHYs chunk recording `dpi`, right after its header: any the encoder wrote (Safari's
+ * writes 72 DPI) is dropped, as a PNG may have only one.
+ */
 export function withDensity(png: Uint8Array, dpi: number): Uint8Array {
-  const chunk = physChunk(dpi);
-  const result = new Uint8Array(png.length + chunk.length);
-  result.set(png.subarray(0, AFTER_IHDR), 0);
-  result.set(chunk, AFTER_IHDR);
-  result.set(png.subarray(AFTER_IHDR), AFTER_IHDR + chunk.length);
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  const kept: Uint8Array[] = [png.subarray(0, AFTER_IHDR), physChunk(dpi)];
+  let offset = AFTER_IHDR;
+  while (offset + 12 <= png.length) {
+    const length = view.getUint32(offset);
+    const end = offset + 12 + length;
+    const type = String.fromCharCode(png[offset + 4], png[offset + 5], png[offset + 6], png[offset + 7]);
+    if (type !== 'pHYs') {
+      kept.push(png.subarray(offset, Math.min(end, png.length)));
+    }
+    offset = end;
+  }
+  const result = new Uint8Array(kept.reduce((total, part) => total + part.length, 0));
+  let at = 0;
+  kept.forEach((part) => {
+    result.set(part, at);
+    at += part.length;
+  });
   return result;
 }

@@ -36,12 +36,43 @@ describe('the resolution in the PNG (pHYs)', () => {
     expect(view.getUint32(17).toString(16)).toBe('78a53f76');
   });
 
-  it('goes right after the header, the rest unchanged', () => {
-    const png = new Uint8Array(33 + 4).map((_, i) => i);
-    const out = withDensity(png, 300);
-    expect(out).toHaveLength(37 + 21);
-    expect(Array.from(out.subarray(0, 33))).toEqual(Array.from(png.subarray(0, 33)));
-    expect(String.fromCharCode(...out.subarray(37, 41))).toBe('pHYs');
-    expect(Array.from(out.subarray(54))).toEqual([33, 34, 35, 36]);
+  // A chunk: length, type, data, (a dummy) CRC.
+  const chunk = (type, data) => {
+    const out = new Uint8Array(12 + data.length);
+    new DataView(out.buffer).setUint32(0, data.length);
+    out.set([...type].map((c) => c.charCodeAt(0)), 4);
+    out.set(data, 8);
+    return out;
+  };
+  const join = (...parts) => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    parts.forEach((p) => { out.set(p, at); at += p.length; });
+    return out;
+  };
+  const header = new Uint8Array(33).map((_, i) => i);
+  const types = (png) => {
+    const found = [];
+    const view = new DataView(png.buffer);
+    for (let at = 33; at + 12 <= png.length; at += 12 + view.getUint32(at)) {
+      found.push(String.fromCharCode(...png.subarray(at + 4, at + 8)));
+    }
+    return found;
+  };
+
+  it('goes right after the header, the other chunks unchanged', () => {
+    const idat = chunk('IDAT', [1, 2, 3]);
+    const iend = chunk('IEND', []);
+    const out = withDensity(join(header, idat, iend), 300);
+    expect(Array.from(out.subarray(0, 33))).toEqual(Array.from(header));
+    expect(types(out)).toEqual(['pHYs', 'IDAT', 'IEND']);
+    expect(Array.from(out.subarray(54, 54 + idat.length))).toEqual(Array.from(idat));
+  });
+
+  it('replaces a pHYs the encoder wrote (a PNG may have only one)', () => {
+    const theirs = chunk('pHYs', [0, 0, 11, 19, 0, 0, 11, 19, 1]); // 72 DPI
+    const out = withDensity(join(header, theirs, chunk('IDAT', [9]), chunk('IEND', [])), 300);
+    expect(types(out)).toEqual(['pHYs', 'IDAT', 'IEND']);
+    expect(new DataView(out.buffer).getUint32(41)).toBe(11811);
   });
 });

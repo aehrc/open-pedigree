@@ -68,9 +68,17 @@ export class FillPatternRegistry {
     return this._idPrefix + index;
   }
 
-  /** The fill an entry's shapes take: `url(#…)` of its pattern. */
-  fillFor(key: string): string {
-    return 'url(#' + this.patternId(this.indexFor(key)) + ')';
+  /**
+   * The fill an entry's shapes take: `url(#…)` of its pattern. `rotated`: for a shape drawn turned
+   * -45° (an unknown-sex diamond), the pattern turned back, so it reads as its legend swatch.
+   */
+  fillFor(key: string, rotated = false): string {
+    return 'url(#' + this.patternId(this.indexFor(key)) + (rotated ? ROTATED_SUFFIX : '') + ')';
+  }
+
+  /** Whether an entry's pattern is the solid one (marks drawn over it need to be white). */
+  isSolid(key: string): boolean {
+    return this.indexFor(key) === 0;
   }
 
   /** Adds every pattern to the SVG's <defs> (making one if needed), once. */
@@ -85,6 +93,7 @@ export class FillPatternRegistry {
     }
     PATTERNS.forEach((pattern, index) => {
       defs.appendChild(patternElement(this.patternId(index), pattern));
+      defs.appendChild(patternElement(this.patternId(index) + ROTATED_SUFFIX, pattern, 45));
     });
   }
 
@@ -98,12 +107,16 @@ export class FillPatternRegistry {
   }
 }
 
-function patternMarkup(id: string, pattern: FillPattern): string {
-  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${pattern.size}" height="${pattern.size}">`
+// The variant of a pattern for shapes drawn turned -45° (unknown-sex diamonds): turned back +45°.
+const ROTATED_SUFFIX = '-r';
+
+function patternMarkup(id: string, pattern: FillPattern, rotate = 0): string {
+  const transform = rotate ? ` patternTransform="rotate(${rotate})"` : '';
+  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${pattern.size}" height="${pattern.size}"${transform}>`
     + `<rect width="${pattern.size}" height="${pattern.size}" fill="${WHITE}"/>${pattern.content}</pattern>`;
 }
 
-function patternElement(id: string, pattern: FillPattern): Element {
-  const parsed = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}">${patternMarkup(id, pattern)}</svg>`, 'image/svg+xml');
+function patternElement(id: string, pattern: FillPattern, rotate = 0): Element {
+  const parsed = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}">${patternMarkup(id, pattern, rotate)}</svg>`, 'image/svg+xml');
   return document.importNode(parsed.documentElement.firstElementChild, true);
 }

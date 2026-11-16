@@ -59,7 +59,12 @@ function applySelectizeSwatches(container: any, legend: any): void {
       colorBubble.className = 'disorder-color';
       item.prepend(colorBubble);
     }
-    colorBubble.style.background = legend.getObjectColor(value);
+    // (its colour, or its pattern with the Patterns toggle on, as the legend shows it)
+    if (typeof legend.drawSwatch === 'function') {
+      legend.drawSwatch(colorBubble, value);
+    } else {
+      colorBubble.style.background = legend.getObjectColor(value);
+    }
   });
 }
 
@@ -238,7 +243,7 @@ export default class NodeMenu {
           colorBubble.className = 'disorder-color';
           item.prepend(colorBubble);
         }
-        colorBubble.style.background = color;
+        editor.getDisorderLegend().drawSwatch(colorBubble, id);
       });
     }.bind(this);
     document.addEventListener('disorder:color', function(event: any) {
@@ -260,7 +265,7 @@ export default class NodeMenu {
           colorBubble.className = 'disorder-color';
           item.prepend(colorBubble);
         }
-        colorBubble.style.background = color;
+        editor.getGeneLegend().drawSwatch(colorBubble, id);
       });
     }.bind(this);
     document.addEventListener('gene:color', function(event: any) {

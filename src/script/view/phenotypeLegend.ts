@@ -14,6 +14,11 @@ export default class PhenotypeLegend extends Legend {
     super('Phenotypes', terminology, 'hpo');
   }
 
+  /** Phenotypes don't fill a symbol, so they keep their swatch whatever the Patterns toggle. */
+  fillsSymbols(): boolean {
+    return false;
+  }
+
   /**
    * Retrieve the color associated with the given object
    *

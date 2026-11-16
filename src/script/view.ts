@@ -8,6 +8,15 @@ import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { drawCornerCurve, drawLevelChangeCurve } from 'pedigree/view/graphicHelpers';
 import { FillPatternRegistry } from 'pedigree/view/fillPatterns';
 
+// A toolbar toggle button showing its state.
+function syncToggleButton(id: string, on: boolean): void {
+  var button = document.getElementById(id);
+  if (button) {
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', String(on));
+  }
+}
+
 export default class View {
   _nodeMap: any;
   // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
@@ -40,6 +49,12 @@ export default class View {
     this._generationNumerals = null;
     this._fillPatterns = false;
     this._fillPatternRegistry = new FillPatternRegistry();
+    // A pedigree loaded with patterns on takes them afresh, its first entry solid.
+    document.addEventListener('pedigree:load:finish', () => {
+      if (this._fillPatterns) {
+        this.setFillPatterns(true);
+      }
+    });
     this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
@@ -316,11 +331,7 @@ export default class View {
     this._generationNumbering = !!on;
     this.updateGenerationNumbering();
     // (the toolbar's Numbers toggle shows the state, however it was set)
-    var button = document.getElementById('action-numbering');
-    if (button) {
-      button.classList.toggle('active', this._generationNumbering);
-      button.setAttribute('aria-pressed', String(this._generationNumbering));
-    }
+    syncToggleButton('action-numbering', this._generationNumbering);
   }
 
   /**
@@ -348,11 +359,7 @@ export default class View {
     }
     this._redrawFills();
     // (the toolbar's Patterns toggle shows the state, however it was set)
-    var button = document.getElementById('action-patterns');
-    if (button) {
-      button.classList.toggle('active', this._fillPatterns);
-      button.setAttribute('aria-pressed', String(this._fillPatterns));
-    }
+    syncToggleButton('action-patterns', this._fillPatterns);
   }
 
   /**

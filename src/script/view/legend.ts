@@ -111,9 +111,38 @@ export default class Legend {
     return (this._idPrefix || this._getPrefix()) + ':' + id;
   }
 
-  /** This legend's entries' IDs, in legend order. */
+  /** Whether this legend's entries fill a person's symbol (so the Patterns toggle applies to them). */
+  fillsSymbols(): boolean {
+    return true;
+  }
+
+  /**
+   * This legend's entries' IDs, in the order the legend shows them (not Object.keys order, which puts
+   * numeric IDs, e.g. OMIM numbers, first).
+   */
   getObjectIDs(): string[] {
-    return Object.keys(this._affectedNodes);
+    const shown: string[] = [];
+    const items = this._list ? Array.from(this._list.children) as HTMLElement[] : [];
+    const prefix = this._getPrefix() + '-';
+    items.forEach((item) => {
+      const id = item.id && item.id.indexOf(prefix) === 0 ? item.id.substring(prefix.length) : null;
+      if (id !== null && Object.prototype.hasOwnProperty.call(this._affectedNodes, id)) {
+        shown.push(id);
+      }
+    });
+    // (any not in the list yet, after)
+    Object.keys(this._affectedNodes).forEach((id) => {
+      if (shown.indexOf(id) === -1) {
+        shown.push(id);
+      }
+    });
+    return shown;
+  }
+
+  // Whether this legend draws patterns now.
+  _patternsOn(): boolean {
+    const view = editor.getView && editor.getView();
+    return this.fillsSymbols() && !!(view && view.isFillPatternsOn && view.isFillPatternsOn());
   }
 
   /**
@@ -121,10 +150,9 @@ export default class Legend {
    * (pedigree-patterns-and-png-export), else its colour. `data-fill-pattern` says which pattern,
    * for the PDF export's legend.
    */
-  _drawSwatch(bubble: HTMLElement, id: any): void {
-    const view = editor.getView && editor.getView();
-    if (view && view.isFillPatternsOn && view.isFillPatternsOn()) {
-      const registry = view.getFillPatternRegistry();
+  drawSwatch(bubble: HTMLElement, id: any): void {
+    if (this._patternsOn()) {
+      const registry = editor.getView().getFillPatternRegistry();
       const index = registry.indexFor(this.fillKey(id));
       bubble.style.backgroundColor = '';
       bubble.innerHTML = registry.swatchSVG(index);
@@ -142,7 +170,7 @@ export default class Legend {
       const item = this._getListElementForObjectWithID(id);
       const bubble = item && item.querySelector('.disorder-color');
       if (bubble) {
-        this._drawSwatch(bubble as HTMLElement, id);
+        this.drawSwatch(bubble as HTMLElement, id);
       }
     });
   }
@@ -343,7 +371,7 @@ export default class Legend {
     item.appendChild(nameSpan);
     const bubble = document.createElement('span');
     bubble.className = 'disorder-color';
-    this._drawSwatch(bubble, id);
+    this.drawSwatch(bubble, id);
     item.prepend(bubble);
     const countLabel = document.createElement('span');
     countLabel.className = 'disorder-cases';
@@ -357,7 +385,8 @@ export default class Legend {
     const me = this;
     item.addEventListener('mouseover', function() {
       var nameEl = item.querySelector('.disorder-name') as HTMLElement;
-      if (nameEl) { nameEl.style.background = color; nameEl.style.cursor = 'default'; }
+      // (a light grey with the Patterns toggle on: no colour shows anywhere then)
+      if (nameEl) { nameEl.style.background = me._patternsOn() ? '#E6E6E6' : color; nameEl.style.cursor = 'default'; }
       me._affectedNodes[id] && me._affectedNodes[id].forEach(function(nodeID: any) {
         const node = editor.getNode(nodeID);
         node && node.getGraphics().highlight();

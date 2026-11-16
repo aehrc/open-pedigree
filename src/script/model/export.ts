@@ -325,7 +325,12 @@ function canvasAsSVG() {
 (PedigreeExport as any).exportAsPNG = function(pedigree, privacySetting = 'all', dpi = 300): Promise<Blob> {
   const svg = (PedigreeExport as any).exportAsSVG(pedigree, privacySetting);
   const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-  const size = pngSize(parseFloat(root.getAttribute('width')), parseFloat(root.getAttribute('height')), dpi);
+  const width = parseFloat(root.getAttribute('width'));
+  const height = parseFloat(root.getAttribute('height'));
+  if (!(width > 0) || !(height > 0)) {
+    return Promise.reject(new Error('The pedigree drawing has no size to draw (is it empty?).'));
+  }
+  const size = pngSize(width, height, dpi);
   const tooLarge = () => new Error('The pedigree is too large to draw as a ' + dpi + ' DPI PNG ('
     + size.width + ' x ' + size.height + ' pixels): choose a lower resolution.');
   if (!fitsCanvas(size)) {
@@ -335,6 +340,14 @@ function canvasAsSVG() {
     const image = new Image();
     image.onerror = () => reject(new Error('The pedigree drawing could not be read as an image.'));
     image.onload = () => {
+      // (anything thrown here, e.g. a canvas the browser won't read back, must still settle the export)
+      try {
+        draw();
+      } catch (err) {
+        reject(new Error('The pedigree drawing could not be turned into a PNG: ' + ((err && err.message) || err)));
+      }
+    };
+    const draw = () => {
       const canvas = document.createElement('canvas');
       canvas.width = size.width;
       canvas.height = size.height;
