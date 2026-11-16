@@ -209,7 +209,8 @@ export default class Workspace {
       }, {
         name : 'view',
         items: [
-          { key : 'numbering', label : 'Numbers', icon : 'list-ol', toggle : true}
+          { key : 'numbering', label : 'Numbers', icon : 'list-ol', toggle : true},
+          { key : 'patterns', label : 'Patterns', icon : 'th', toggle : true}
         ]
       }, {
         name : 'output',

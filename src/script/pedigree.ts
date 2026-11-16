@@ -268,6 +268,22 @@ export default class PedigreeEditor {
       }
     });
 
+    // black-and-white fill patterns: view state only, as numbering
+    var patternsButton = document.getElementById('action-patterns');
+    var togglePatterns = function() {
+      editor.getView().setFillPatterns(!editor.getView().isFillPatternsOn());
+    };
+    patternsButton && patternsButton.addEventListener('click', togglePatterns);
+    patternsButton && patternsButton.addEventListener('keydown', function(event: any) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (event.repeat) {
+          return;
+        }
+        togglePatterns();
+      }
+    });
+
     var exportButton = document.getElementById('action-export');
     exportButton && exportButton.addEventListener('click', function(event: any) {
       editor.getExportSelector().show();

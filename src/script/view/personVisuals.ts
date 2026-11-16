@@ -273,10 +273,24 @@ export default class PersonVisuals extends AbstractPersonVisuals {
    */
   updateDisorderShapes(): any {
     this._disorderShapes && this._disorderShapes.remove();
-    var colors = this.getNode().getAllNodeColors();
+    var fills = this.getNode().getAllNodeFills();
+    var colors = fills.map(function(f: any) { return f.color; });
     if (colors.length == 0) {
       return;
     }
+    // With the Patterns toggle on, each sector takes its entry's pattern instead of its colour
+    // (pedigree-patterns-and-png-export): set on the element, as Raphael has no pattern fills.
+    var view = editor.getView();
+    var patterns = view && view.isFillPatternsOn && view.isFillPatternsOn() ? view.getFillPatternRegistry() : null;
+    var applyFill = function(shape: any, index: number) {
+      if (patterns) {
+        var nodes = shape.type === 'set' ? shape.items : [shape];
+        nodes.forEach(function(el: any) {
+          el.node && el.node.setAttribute('fill', patterns.fillFor(fills[index].key));
+        });
+      }
+      return shape;
+    };
 
     var gradient = function(color: any, angle: any) {
       var hsb = Raphael.rgb2hsb(color),
@@ -307,7 +321,7 @@ export default class PersonVisuals extends AbstractPersonVisuals {
         }
         var slice = editor.getPaper().path(['M', x1, y1, corner,'L', x2, y2, 'L',this.getX(), this.getY(),'z']);
         color = gradient(colors[k], 70);
-        disorderShapes.push(slice.attr({fill: color, 'stroke-width':.5, stroke: 'none' }));
+        disorderShapes.push(applyFill(slice.attr({fill: color, 'stroke-width':.5, stroke: 'none' }), k));
         x1 = x2;
         y1 = y2;
       }
@@ -328,8 +342,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
 
       for(var i = 0; i < colors.length; i++) {
         color = gradient(colors[i], (i * disorderAngle)+delta);
-        disorderShapes.push(sector(editor.getPaper(), this.getX(), this.getY(), radius,
-          this.getNode().getGender(), i * disorderAngle, (i+1) * disorderAngle, color));
+        disorderShapes.push(applyFill(sector(editor.getPaper(), this.getX(), this.getY(), radius,
+          this.getNode().getGender(), i * disorderAngle, (i+1) * disorderAngle, color), i));
       }
 
       (disorderShapes.length < 2) ? disorderShapes.attr('stroke', 'none') : disorderShapes.attr({stroke: '#595959', 'stroke-width':.03});

@@ -724,13 +724,25 @@ export default class Person extends AbstractPerson {
    * @return {[String]}
    */
   getAllNodeColors(): any {
+    return this.getAllNodeFills().map(function(fill: any) { return fill.color; });
+  }
+
+  /**
+   * The same, with each entry's key in the fill-pattern registry (for the Patterns toggle):
+   * `[{ key, color }]`, in drawing order.
+   * @method getAllNodeFills
+   */
+  getAllNodeFills(): { key: string, color: string }[] {
     let i;
     const result: any[] = [];
+    const entry = function(legend: any, id: any): any {
+      return { key: legend.fillKey(id), color: legend.getObjectColor(id) };
+    };
     for (i = 0; i < this.getDisorders().length; i++) {
-      result.push(editor.getDisorderLegend().getObjectColor(this.getDisorders()[i]));
+      result.push(entry(editor.getDisorderLegend(), this.getDisorders()[i]));
     }
     for (i = 0; i < this.getGenes().length; i++) {
-      result.push(editor.getGeneLegend().getObjectColor(this.getGenes()[i]));
+      result.push(entry(editor.getGeneLegend(), this.getGenes()[i]));
     }
     var config = editor.getQuestionnaireConfig && editor.getQuestionnaireConfig();
     if (config && config.items) {
@@ -745,7 +757,7 @@ export default class Person extends AbstractPerson {
         var answer = _this.getQuestionnaireAnswer(item.linkId) || [];
         var legend = editor.getQuestionnaireLegend(item.linkId);
         answer.forEach(function(v: any) {
-          result.push(legend.getObjectColor(v.code));
+          result.push(entry(legend, v.code));
         });
       });
     }

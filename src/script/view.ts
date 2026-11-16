@@ -6,11 +6,16 @@ import PersonGroup from 'pedigree/view/personGroup';
 import LineSet from 'pedigree/view/lineSet';
 import PedigreeEditorParameters from 'pedigree/pedigreeEditorParameters';
 import { drawCornerCurve, drawLevelChangeCurve } from 'pedigree/view/graphicHelpers';
+import { FillPatternRegistry } from 'pedigree/view/fillPatterns';
 
 export default class View {
   _nodeMap: any;
   // generation numbering (II-3): the toolbar toggle, and the numerals drawn at the left of each row
   _generationNumbering: boolean;
+  // black-and-white fill patterns (pedigree-patterns-and-png-export): the toolbar toggle, and which
+  // pattern each legend entry has
+  _fillPatterns: boolean;
+  _fillPatternRegistry: FillPatternRegistry;
   _generationNumerals: any;
   // while a de-identified export is drawn: 'nopersonal' or 'minimal' (see withDeidentifiedRendering)
   _deidentified: any;
@@ -33,6 +38,8 @@ export default class View {
     this._nodeMap = {};
     this._generationNumbering = false;
     this._generationNumerals = null;
+    this._fillPatterns = false;
+    this._fillPatternRegistry = new FillPatternRegistry();
     this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
@@ -313,6 +320,82 @@ export default class View {
     if (button) {
       button.classList.toggle('active', this._generationNumbering);
       button.setAttribute('aria-pressed', String(this._generationNumbering));
+    }
+  }
+
+  /**
+   * Whether fills are drawn as black-and-white patterns instead of colours: view state only, off
+   * when the editor opens, never saved or undone (as numbering).
+   */
+  isFillPatternsOn(): boolean {
+    return this._fillPatterns;
+  }
+
+  getFillPatternRegistry(): FillPatternRegistry {
+    return this._fillPatternRegistry;
+  }
+
+  setFillPatterns(on: boolean): void {
+    this._fillPatterns = !!on;
+    if (this._fillPatterns) {
+      // patterns afresh, the legends' own entries first, in order: disorders, genes, custom legends
+      this._fillPatternRegistry.reset();
+      this._fillPatternLegends().forEach((legend: any) => {
+        legend.getObjectIDs().forEach((id: string) => this._fillPatternRegistry.indexFor(legend.fillKey(id)));
+      });
+      var paper = editor.getPaper && editor.getPaper();
+      paper && this._fillPatternRegistry.ensureDefinitions(paper.canvas);
+    }
+    this._redrawFills();
+    // (the toolbar's Patterns toggle shows the state, however it was set)
+    var button = document.getElementById('action-patterns');
+    if (button) {
+      button.classList.toggle('active', this._fillPatterns);
+      button.setAttribute('aria-pressed', String(this._fillPatterns));
+    }
+  }
+
+  /**
+   * Runs `draw` with colour fills, for the diagram image saved with a pedigree: patterns are view
+   * state, so what's saved never depends on them. Returns what `draw` returns.
+   */
+  withoutPatterns(draw: () => any): any {
+    if (!this._fillPatterns) {
+      return draw();
+    }
+    this._fillPatterns = false;
+    try {
+      this._redrawFills(false);
+      return draw();
+    } finally {
+      this._fillPatterns = true;
+      this._redrawFills(false);
+    }
+  }
+
+  // The legends whose entries fill a symbol: disorders, genes, then custom legend items.
+  _fillPatternLegends(): any[] {
+    var legends: any[] = [editor.getDisorderLegend(), editor.getGeneLegend()];
+    var custom = editor._questionnaireLegends || {};
+    Object.keys(custom).forEach(function(linkId) {
+      legends.push(custom[linkId]);
+    });
+    return legends.filter(Boolean);
+  }
+
+  // Redraws every person's fills (and, unless just for a moment, the legends' swatches).
+  _redrawFills(swatches: boolean = true): void {
+    var map = this.getNodeMap();
+    Object.keys(map).forEach(function(id) {
+      var graphics = map[id] && map[id].getGraphics && map[id].getGraphics();
+      if (graphics && typeof graphics.updateDisorderShapes === 'function') {
+        graphics.updateDisorderShapes();
+      }
+    });
+    if (swatches) {
+      this._fillPatternLegends().forEach(function(legend: any) {
+        legend.refreshSwatches && legend.refreshSwatches();
+      });
     }
   }
 

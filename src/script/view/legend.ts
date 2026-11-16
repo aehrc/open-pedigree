@@ -106,6 +106,47 @@ export default class Legend {
     }
   }
 
+  /** The key this legend's entry has in the fill-pattern registry (View.getFillPatternRegistry). */
+  fillKey(id: any): string {
+    return (this._idPrefix || this._getPrefix()) + ':' + id;
+  }
+
+  /** This legend's entries' IDs, in legend order. */
+  getObjectIDs(): string[] {
+    return Object.keys(this._affectedNodes);
+  }
+
+  /**
+   * Draws an entry's swatch as the drawing shows it: its pattern with the Patterns toggle on
+   * (pedigree-patterns-and-png-export), else its colour. `data-fill-pattern` says which pattern,
+   * for the PDF export's legend.
+   */
+  _drawSwatch(bubble: HTMLElement, id: any): void {
+    const view = editor.getView && editor.getView();
+    if (view && view.isFillPatternsOn && view.isFillPatternsOn()) {
+      const registry = view.getFillPatternRegistry();
+      const index = registry.indexFor(this.fillKey(id));
+      bubble.style.backgroundColor = '';
+      bubble.innerHTML = registry.swatchSVG(index);
+      bubble.dataset.fillPattern = String(index);
+    } else {
+      bubble.innerHTML = '';
+      bubble.style.backgroundColor = this.getObjectColor(id);
+      delete bubble.dataset.fillPattern;
+    }
+  }
+
+  /** Redraws every entry's swatch (after the Patterns toggle changes). */
+  refreshSwatches(): void {
+    this.getObjectIDs().forEach((id) => {
+      const item = this._getListElementForObjectWithID(id);
+      const bubble = item && item.querySelector('.disorder-color');
+      if (bubble) {
+        this._drawSwatch(bubble as HTMLElement, id);
+      }
+    });
+  }
+
   getCurrentTerms(): any[] {
     const currentTerms: any[] = [];
     for (const id in this._affectedNodes) {
@@ -302,7 +343,7 @@ export default class Legend {
     item.appendChild(nameSpan);
     const bubble = document.createElement('span');
     bubble.className = 'disorder-color';
-    bubble.style.backgroundColor = color;
+    this._drawSwatch(bubble, id);
     item.prepend(bubble);
     const countLabel = document.createElement('span');
     countLabel.className = 'disorder-cases';
