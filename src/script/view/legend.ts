@@ -278,6 +278,10 @@ export default class Legend {
         if(Object.keys(this._affectedNodes).length === 0) {
           this._legendBox.style.display = 'none';
         }
+        // (with patterns on, the entries listed after it move up a pattern)
+        if (this._patternsOn()) {
+          editor.getView().scheduleFillRedraw();
+        }
       } else {
         this._updateCaseNumbersForObject(id);
       }

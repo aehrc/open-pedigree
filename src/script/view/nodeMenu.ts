@@ -287,7 +287,8 @@ export default class NodeMenu {
           colorBubble.className = 'disorder-color';
           item.prepend(colorBubble);
         }
-        editor.getQuestionnaireLegend(fieldLinkId).drawSwatch(colorBubble, id);
+        var legend = editor.getQuestionnaireLegend(fieldLinkId);
+        legend && legend.drawSwatch(colorBubble, id);
       });
     }.bind(this);
     document.addEventListener('questionnaire-legend:color', function(event: any) {

@@ -2,33 +2,37 @@ import { describe, it, expect } from 'vitest';
 import { FillPatternRegistry, PATTERNS } from 'pedigree/view/fillPatterns';
 
 describe('FillPatternRegistry', () => {
-  it('gives entries patterns in the order they\'re first asked for, the first solid black', () => {
-    const registry = new FillPatternRegistry();
+  // A registry over a given legend order.
+  const over = (order) => new FillPatternRegistry(() => order);
+
+  it('gives each entry the pattern for its place in the legends\' order, the first solid black', () => {
+    const registry = over(['disorder:D1', 'gene:BRCA1']);
     expect(PATTERNS[0].name).toBe('solid');
     expect(registry.indexFor('disorder:D1')).toBe(0);
     expect(registry.indexFor('gene:BRCA1')).toBe(1);
-    expect(registry.indexFor('disorder:D1')).toBe(0);
     expect(PATTERNS.map((p) => p.name)).toEqual(['solid', 'diagonal /', 'diagonal \\', 'cross-hatch', 'dots',
       'horizontal', 'vertical', 'grid', 'sparse dots', 'dense diagonal']);
   });
 
   it('repeats past the last pattern', () => {
-    const registry = new FillPatternRegistry();
-    for (let i = 0; i < PATTERNS.length; i++) {
-      registry.indexFor('disorder:' + i);
-    }
-    expect(registry.indexFor('disorder:extra')).toBe(0);
+    const order = Array.from({ length: PATTERNS.length + 1 }, (_, i) => 'disorder:' + i);
+    expect(over(order).indexFor('disorder:' + PATTERNS.length)).toBe(0);
   });
 
-  it('starts again after a reset', () => {
-    const registry = new FillPatternRegistry();
-    registry.indexFor('disorder:A');
-    registry.reset();
-    expect(registry.indexFor('gene:B')).toBe(0);
+  it('follows the order as it changes: an entry gone moves the later ones up', () => {
+    const order = ['disorder:A', 'disorder:B'];
+    const registry = over(order);
+    expect(registry.indexFor('disorder:B')).toBe(1);
+    order.shift();
+    expect(registry.indexFor('disorder:B')).toBe(0);
+  });
+
+  it('gives an entry no legend lists yet the next place', () => {
+    expect(over(['disorder:A']).indexFor('gene:new')).toBe(1);
   });
 
   it('has its own pattern ids, so two editors on a page don\'t share them', () => {
-    const a = new FillPatternRegistry();
+    const a = new FillPatternRegistry(() => ['disorder:D1']);
     const b = new FillPatternRegistry();
     expect(a.patternId(0)).not.toBe(b.patternId(0));
     expect(a.fillFor('disorder:D1')).toBe('url(#' + a.patternId(0) + ')');
@@ -51,17 +55,10 @@ describe('FillPatternRegistry', () => {
   });
 
   it('names the turned variant for a diamond, and knows the solid one', () => {
-    const registry = new FillPatternRegistry();
+    const registry = new FillPatternRegistry(() => ['disorder:A', 'gene:B']);
     expect(registry.fillFor('disorder:A', true)).toBe('url(#' + registry.patternId(0) + '-r)');
     expect(registry.isSolid('disorder:A')).toBe(true);
     expect(registry.isSolid('gene:B')).toBe(false);
-  });
-
-  it('only looks when asked whether an entry is solid: it assigns nothing', () => {
-    const registry = new FillPatternRegistry();
-    expect(registry.isSolid('disorder:A')).toBe(false);
-    // (so the next entry asked for is still the first)
-    expect(registry.indexFor('gene:B')).toBe(0);
   });
 
   it('draws a legend swatch of a pattern', () => {

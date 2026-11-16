@@ -4,9 +4,9 @@
  * exports.
  *
  * One registry for every legend that fills a symbol, since a person's disorder and gene share it
- * and must differ: entries take patterns in order of first use (the legends' own entries first,
- * see View.setFillPatterns), the first solid black as classic pedigree shading, then hatchings,
- * dots and lines. Past PATTERNS.length they repeat.
+ * and must differ: entries take patterns in the order the legends list them (disorders, genes, then
+ * custom legends), the first solid black as classic pedigree shading, then hatchings, dots and lines.
+ * Past PATTERNS.length they repeat.
  *
  * Patterns are SVG <pattern> elements in the canvas's <defs> (Raphael has no pattern fills), so
  * SVG export keeps them and the PDF export (svg-to-pdfkit) draws them.
@@ -39,28 +39,30 @@ export const PATTERNS: FillPattern[] = [
 
 let registries = 0;
 
-/** Which pattern each entry has, by `<legend prefix>:<entry id>`; one per editor. */
+/**
+ * Which pattern each entry has, by `<legend prefix>:<entry id>`; one per editor. An entry's pattern
+ * is its place in the order the legends list their entries (`order`, given by the view): nothing is
+ * kept, so loads, undo and redo always show what the legends show - the first entry listed solid.
+ */
 export class FillPatternRegistry {
   _idPrefix: string;
-  _indexOf: Map<string, number> = new Map();
+  _order: () => string[];
 
-  constructor() {
+  constructor(order: () => string[] = () => []) {
     registries += 1;
     // (unique per editor: tests, and some hosts, build more than one on a page)
     this._idPrefix = 'op-fill-' + registries + '-';
+    this._order = order;
   }
 
-  /** Forgets every assignment (entries then take patterns afresh, in the order they're asked for). */
-  reset(): void {
-    this._indexOf.clear();
-  }
-
-  /** The pattern index for an entry, assigning the next one on first use (repeating past the list's end). */
+  /**
+   * The pattern index for an entry: its place in the legends' order (repeating past the list's end).
+   * An entry no legend lists yet takes the next place.
+   */
   indexFor(key: string): number {
-    if (!this._indexOf.has(key)) {
-      this._indexOf.set(key, this._indexOf.size);
-    }
-    return this._indexOf.get(key) % PATTERNS.length;
+    const order = this._order();
+    const place = order.indexOf(key);
+    return (place === -1 ? order.length : place) % PATTERNS.length;
   }
 
   /** The `<pattern>` element id for a pattern index. */
@@ -76,9 +78,9 @@ export class FillPatternRegistry {
     return 'url(#' + this.patternId(this.indexFor(key)) + (rotated ? ROTATED_SUFFIX : '') + ')';
   }
 
-  /** Whether an entry's pattern is the solid one (marks drawn over it need to stand out); assigns none. */
+  /** Whether an entry's pattern is the solid one (marks drawn over it need to stand out). */
   isSolid(key: string): boolean {
-    return this._indexOf.has(key) && this._indexOf.get(key) % PATTERNS.length === 0;
+    return this.indexFor(key) === 0;
   }
 
   /** Adds every pattern to the SVG's <defs> (making one if needed), once. */

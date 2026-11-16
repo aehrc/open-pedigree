@@ -288,26 +288,6 @@ test('a pedigree loaded with patterns on takes them afresh, its first entry soli
   expect(await sectorFills(page, loadedFather)).toEqual([await fillPatternId(page, 0)]);
 });
 
-test('an undo through a state with no fills keeps what each entry has', async ({ page }) => {
-  await open(page);
-  // entries added against node order (the last-drawn person first), so a reload that lists them in
-  // node order would list them the other way round
-  const ids = (await people(page)).sort((x, y) => x - y);
-  const father = ids[0];
-  const child = ids[ids.length - 1];
-  await setProperties(page, child, { setDisorders: ['A'] });
-  await setProperties(page, father, { setDisorders: ['B'] });
-  await toggle(page);
-  const solid = await fillPatternId(page, 0);
-  const hatched = await fillPatternId(page, 1);
-  await setProperties(page, child, { setDisorders: [] });
-  await setProperties(page, father, { setDisorders: [] });
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
-  expect(await sectorFills(page, child)).toEqual([solid]);
-  expect(await sectorFills(page, father)).toEqual([hatched]);
-});
-
 test('marks are left as drawn while patterns have never been on', async ({ page }) => {
   await open(page);
   const [father] = await people(page);
@@ -345,22 +325,6 @@ test('an undo keeps what each entry has, so the shading never changes meaning', 
   expect(await sectorFills(page, father)).toEqual([hatched]);
 });
 
-test('a reload that lists the entries in another order keeps what each has', async ({ page }) => {
-  await open(page);
-  const [father, , child] = await people(page);
-  await setProperties(page, child, { setDisorders: ['A'] });
-  await setProperties(page, father, { setDisorders: ['B'] });
-  await toggle(page);
-  const solid = await fillPatternId(page, 0);
-  // the legend now lists B first (as a reload in another node order would), then a load finishes
-  await page.evaluate(() => {
-    const list = document.querySelector('#legend-box li[id="disorder-B"]').parentElement;
-    list.insertBefore(document.querySelector('#legend-box li[id="disorder-B"]'), list.firstChild);
-    document.dispatchEvent(new CustomEvent('pedigree:load:finish'));
-  });
-  expect(await sectorFills(page, child)).toEqual([solid]);
-});
-
 test('a mark goes back to black when the person\'s last fill goes, whatever else redraws', async ({ page }) => {
   await open(page);
   const [, , child] = await people(page);
@@ -374,4 +338,38 @@ test('a mark goes back to black when the person\'s last fill goes, whatever else
     return String(node.getGraphics().getUnbornShape().attr('fill')).toUpperCase();
   }, child);
   expect(fill).toMatch(/^#000(000)?$/);
+});
+
+test('an entry removed moves the ones listed after it up a pattern, in the drawing and the legend', async ({ page }) => {
+  await open(page);
+  const [father, , child] = await people(page);
+  await setProperties(page, child, { setDisorders: ['A'] });
+  await setProperties(page, father, { setDisorders: ['B'] });
+  await toggle(page);
+  expect(await sectorFills(page, father)).toEqual([await fillPatternId(page, 1)]);
+  await setProperties(page, child, { setDisorders: [] });
+  const solid = await fillPatternId(page, 0);
+  await expect.poll(() => sectorFills(page, father)).toEqual([solid]);
+  expect(await swatchPatterns(page)).toEqual(['pattern:0']);
+});
+
+test('after an undo or redo the shading is what the legend lists, its first entry solid', async ({ page }) => {
+  await open(page);
+  const ids = (await people(page)).sort((x, y) => x - y);
+  const [father, child] = [ids[0], ids[ids.length - 1]];
+  await setProperties(page, child, { setDisorders: ['A'] });
+  await setProperties(page, father, { setDisorders: ['B'] });
+  await toggle(page);
+  await setProperties(page, child, { setDisorders: [] });
+  await setProperties(page, father, { setDisorders: [] });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('pedigree:undo')));
+  // whichever the legend now lists first is solid, and the drawing agrees with each swatch
+  const listed = await page.evaluate(() => Array.from(document.querySelectorAll('#legend-box li[id^="disorder-"]'))
+    .map((li) => ({ id: li.id.replace('disorder-', ''), pattern: li.querySelector('.disorder-color').dataset.fillPattern })));
+  expect(listed.map((e) => e.pattern)).toEqual(['0', '1']);
+  const personWith = { A: child, B: father };
+  for (const entry of listed) {
+    await expect.poll(() => sectorFills(page, personWith[entry.id])).toEqual([await fillPatternId(page, Number(entry.pattern))]);
+  }
 });

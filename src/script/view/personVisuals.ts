@@ -45,6 +45,8 @@ export default class PersonVisuals extends AbstractPersonVisuals {
   _isSelected: any;
   _carrierGraphic: any;
   _evalLabel: any;
+  // whether the marks inside the symbol were made to stand out on a solid pattern fill
+  _marksStandOut: boolean;
   _linkedRecordChangedMark: any;
 
   constructor(node: any, x: any, y: any) {
@@ -369,10 +371,10 @@ export default class PersonVisuals extends AbstractPersonVisuals {
     var node = this.getNode();
     var onSolid = !!registry && node.getAllNodeFills().some(function(f: any) { return registry.isSolid(f.key); });
     // (marks are only touched when they stand out now, or did: otherwise they're as drawn)
-    if (!onSolid && !(this as any)._marksStandOut) {
+    if (!onSolid && !this._marksStandOut) {
       return;
     }
-    (this as any)._marksStandOut = onSolid;
+    this._marksStandOut = onSolid;
     var recolour = function(shape: any, usual: any) {
       if (!shape) {
         return;
@@ -383,11 +385,12 @@ export default class PersonVisuals extends AbstractPersonVisuals {
       });
     };
     var attributes = (PedigreeEditorParameters as any).attributes;
-    recolour(this._unbornShape, { fill: '#000000', stroke: 'none' });
+    // (put back as drawn: text in the default black, no outline)
+    recolour(this._unbornShape, { fill: '#000', stroke: 'none' });
     recolour(this._carrierGraphic, node.getCarrierStatus && node.getCarrierStatus() == 'presymptomatic'
       ? { fill: attributes.presymptomaticShape.fill, stroke: attributes.presymptomaticShape.stroke, 'stroke-width': 1 }
       : { fill: attributes.carrierShape.fill, stroke: '#000000', 'stroke-width': 1 });
-    recolour((this as any)._label, { fill: '#000000', stroke: 'none' });
+    recolour((this as any)._label, { fill: '#000', stroke: 'none' });
   }
 
   /**

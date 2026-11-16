@@ -25,6 +25,7 @@ export default class View {
   // pattern each legend entry has
   _fillPatterns: boolean;
   _fillPatternRegistry: FillPatternRegistry;
+  _fillRedrawScheduled: boolean;
   _generationNumerals: any;
   // while a de-identified export is drawn: 'nopersonal' or 'minimal' (see withDeidentifiedRendering)
   _deidentified: any;
@@ -48,24 +49,9 @@ export default class View {
     this._generationNumbering = false;
     this._generationNumerals = null;
     this._fillPatterns = false;
-    this._fillPatternRegistry = new FillPatternRegistry();
-    // A pedigree loaded with patterns on takes them afresh, its first entry solid: reset as the load
-    // starts (before its people are drawn), reseeded in legend order once it's done. An undo or redo
-    // (a restoring load) keeps what each entry has, so the shading never changes meaning.
-    var reseedOnFinish = false;
-    document.addEventListener('pedigree:load:start', (event: any) => {
-      if (!this._fillPatterns || editor.getView() !== this || (event.detail && event.detail.restoring)) {
-        return;
-      }
-      this._fillPatternRegistry.reset();
-      reseedOnFinish = true;
-    });
-    document.addEventListener('pedigree:load:finish', () => {
-      if (reseedOnFinish && this._fillPatterns && editor.getView() === this) {
-        this.setFillPatterns(true);
-      }
-      reseedOnFinish = false;
-    });
+    // (an entry's pattern is its place in the legends' order: see FillPatternRegistry)
+    this._fillPatternRegistry = new FillPatternRegistry(() => this._fillKeyOrder());
+    this._fillRedrawScheduled = false;
     this._deidentified = null;
 
     this.hoverModeZones = editor.getPaper().set();
@@ -360,11 +346,6 @@ export default class View {
   setFillPatterns(on: boolean): void {
     this._fillPatterns = !!on;
     if (this._fillPatterns) {
-      // patterns afresh, the legends' own entries first, in order: disorders, genes, custom legends
-      this._fillPatternRegistry.reset();
-      this._fillPatternLegends().forEach((legend: any) => {
-        legend.getObjectIDs().forEach((id: string) => this._fillPatternRegistry.indexFor(legend.fillKey(id)));
-      });
       var paper = editor.getPaper && editor.getPaper();
       paper && this._fillPatternRegistry.ensureDefinitions(paper.canvas);
     }
@@ -389,6 +370,34 @@ export default class View {
       this._fillPatterns = true;
       this._redrawFills(false);
     }
+  }
+
+  // Every fill-producing legend's entries, in the order the legends list them (the patterns' order).
+  _fillKeyOrder(): string[] {
+    var order: string[] = [];
+    this._fillPatternLegends().forEach(function(legend: any) {
+      legend.getObjectIDs().forEach(function(id: string) {
+        order.push(legend.fillKey(id));
+      });
+    });
+    return order;
+  }
+
+  /**
+   * Redraws the fills once, soon: after a legend entry goes, the later entries move up a pattern.
+   * (One redraw however many entries go at once, e.g. while a pedigree is reloaded.)
+   */
+  scheduleFillRedraw(): void {
+    if (!this._fillPatterns || this._fillRedrawScheduled) {
+      return;
+    }
+    this._fillRedrawScheduled = true;
+    Promise.resolve().then(() => {
+      this._fillRedrawScheduled = false;
+      if (this._fillPatterns) {
+        this._redrawFills();
+      }
+    });
   }
 
   // The legends whose entries fill a symbol: disorders, genes, then custom legend items.

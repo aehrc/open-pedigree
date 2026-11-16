@@ -127,9 +127,7 @@ export default class SaveLoadEngine {
   // Returns whether the pedigree loaded (false when its data couldn't be read: the graph is cleared).
   createGraphFromSerializedData(JSONString: any, noUndo?: any, centerAround0?: any): boolean {
     console.log('---- load: parsing data ----', JSONString);
-    // (restoring: an undo or redo - the only loads that keep out of the undo history - brings back a
-    // state of the same pedigree; view state such as fill patterns then stays as it is)
-    document.dispatchEvent(new CustomEvent('pedigree:load:start', { detail: { restoring: noUndo === true } }));
+    document.dispatchEvent(new CustomEvent('pedigree:load:start'));
 
     try {
       var changeSet = editor.getGraph().fromJSON(JSONString);
