@@ -27,14 +27,16 @@ export type FillPattern = {
 export const PATTERNS: FillPattern[] = [
   { name: 'solid', size: 6, content: `<rect width="6" height="6" fill="${BLACK}"/>` },
   { name: 'diagonal /', size: 6, content: `<path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="${BLACK}" stroke-width="1"/>` },
-  { name: 'diagonal \\', size: 6, content: `<path d="M0,0 L6,6 M-1,5 L1,7 M5,-1 L7,1" stroke="${BLACK}" stroke-width="1"/>` },
+  // Bold and wider apart, so it isn't read as 'diagonal /' turned round once a symbol is small.
+  { name: 'bold diagonal \\', size: 10, content: `<path d="M0,0 L10,10 M-1,9 L1,11 M9,-1 L11,1" stroke="${BLACK}" stroke-width="3.5"/>` },
   { name: 'cross-hatch', size: 6, content: `<path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5 M0,0 L6,6 M-1,5 L1,7 M5,-1 L7,1" stroke="${BLACK}" stroke-width="0.8"/>` },
   { name: 'dots', size: 5, content: `<circle cx="2.5" cy="2.5" r="1.2" fill="${BLACK}"/>` },
   { name: 'horizontal', size: 5, content: `<path d="M0,2.5 H5" stroke="${BLACK}" stroke-width="1"/>` },
   { name: 'vertical', size: 5, content: `<path d="M2.5,0 V5" stroke="${BLACK}" stroke-width="1"/>` },
   { name: 'grid', size: 6, content: `<path d="M0,3 H6 M3,0 V6" stroke="${BLACK}" stroke-width="0.8"/>` },
   { name: 'sparse dots', size: 9, content: `<circle cx="4.5" cy="4.5" r="1" fill="${BLACK}"/>` },
-  { name: 'dense diagonal', size: 3, content: `<path d="M0,3 L3,0 M-1,1 L1,-1 M2,4 L4,2" stroke="${BLACK}" stroke-width="0.7"/>` },
+  // Bold, as 'horizontal' is thin: a dense diagonal here read as 'diagonal /' when small.
+  { name: 'bold horizontal', size: 10, content: `<path d="M0,5 H10" stroke="${BLACK}" stroke-width="3.5"/>` },
 ];
 
 let registries = 0;

@@ -10,8 +10,15 @@ describe('FillPatternRegistry', () => {
     expect(PATTERNS[0].name).toBe('solid');
     expect(registry.indexFor('disorder:D1')).toBe(0);
     expect(registry.indexFor('gene:BRCA1')).toBe(1);
-    expect(PATTERNS.map((p) => p.name)).toEqual(['solid', 'diagonal /', 'diagonal \\', 'cross-hatch', 'dots',
-      'horizontal', 'vertical', 'grid', 'sparse dots', 'dense diagonal']);
+    expect(PATTERNS.map((p) => p.name)).toEqual(['solid', 'diagonal /', 'bold diagonal \\', 'cross-hatch', 'dots',
+      'horizontal', 'vertical', 'grid', 'sparse dots', 'bold horizontal']);
+  });
+
+  it('draws look-alike line patterns at different weights, so they stay apart when a symbol is small', () => {
+    const weight = (name) => Number(/stroke-width="([\d.]+)"/.exec(PATTERNS.find((p) => p.name === name).content)[1]);
+    // the two diagonals differ by more than direction (thin lines read alike once a symbol is small)
+    expect(weight('bold diagonal \\')).toBeGreaterThanOrEqual(3 * weight('diagonal /'));
+    expect(weight('bold horizontal')).toBeGreaterThanOrEqual(3 * weight('horizontal'));
   });
 
   it('repeats past the last pattern', () => {
