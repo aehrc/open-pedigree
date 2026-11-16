@@ -171,9 +171,14 @@
 
       console.log("creating editor");
 
+      // An example opened from the website (examples/<name>/) is a copy under its own key, so the
+      // visitor's own pedigree (pedigreeData) is never touched; anything but a plain name is ignored.
+      var example = getParameterByName('example');
+      var storageKey = (example && /^[a-z0-9-]+$/.test(example)) ? 'example-' + example : 'pedigreeData';
+
       var editorOptions = {
         // patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true' + (qData?('&qData='+qData):''),
-        patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true',
+        patientDataUrl: 'local:' + storageKey + '?format='+format+'&closeOnSave=true',
         returnUrl: '#CloseWindow',
         backend: OpenPedigree.localStorageBackend,
         ...terminologyOptions};
