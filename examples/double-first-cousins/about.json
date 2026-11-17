@@ -1,6 +1,7 @@
 {
   "title": "Double first cousins",
   "kind": "classic",
+  "order": 4,
   "summary": "Two brothers marry two sisters: their children are cousins through both parents.",
   "shows": [
     "Two brothers (II-1 and II-2) have children with two sisters (II-3 and II-4). Their children (III-1 and III-2) are first cousins through their fathers and again through their mothers, and share all four grandparents.",

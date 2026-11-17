@@ -1,6 +1,7 @@
 {
   "title": "Half-sibling mating",
   "kind": "classic",
+  "order": 2,
   "summary": "Two half-siblings, who share a father, have a child: the half-sib triangle.",
   "shows": [
     "A man (I-1) has a son with one partner (I-2) and a daughter with another (I-3). The half-siblings (II-1 and II-2) have a child (III-1), whose inbreeding coefficient is 1/8.",

@@ -42,6 +42,7 @@ Partnerships are the couples who have a child together; there are no others.
 {
   "title": "Queen Victoria and haemophilia B",
   "kind": "historic",
+  "order": 12,
   "summary": "One sentence for the landing page.",
   "shows": ["What the drawing shows, a paragraph each."],
   "hard": ["Why it is hard to draw, a paragraph each."],
@@ -50,4 +51,4 @@ Partnerships are the couples who have a child together; there are no others.
 }
 ```
 
-`kind` is `classic` (no `source` or `simplified`) or `historic` (both required). Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
+`kind` is `classic` (no `source` or `simplified`) or `historic` (both required). `order` places it in its list on the landing page. Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
