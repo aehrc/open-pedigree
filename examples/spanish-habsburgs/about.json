@@ -1,0 +1,23 @@
+{
+  "title": "The Spanish Habsburgs and Charles II",
+  "kind": "historic",
+  "summary": "Six generations of uncle-niece and cousin marriages down to Charles II, the last Spanish Habsburg king.",
+  "shows": [
+    "The Spanish Habsburg kings, from Philip I to Charles II, and the marriages that joined their line again and again to its own relatives: Philip II married his niece Anna of Austria, and Philip IV his niece Mariana of Austria, Charles II's mother.",
+    "Alvarez, Ceballos and Quinteiro calculated an inbreeding coefficient of 0.254 for Charles II, close to that expected for the child of a brother-sister or parent-child union. No children were born from his two marriages. The authors proposed that two recessive disorders, combined pituitary hormone deficiency and distal renal tubular acidosis, could explain most of his complex clinical profile; they call this speculative. Both are shown here on Charles II, as proposed."
+  ],
+  "hard": [
+    "The same ancestors are reached by several paths, so the drawing has many nested loops: Joanna I and Philip I, for example, appear in Charles II's ancestry through his father and again through his mother. Every consanguineous marriage has to be found and drawn, and the generations kept level, while partners from different branches sit side by side."
+  ],
+  "source": {
+    "citation": "Alvarez G, Ceballos FC, Quinteiro C (2009) The role of inbreeding in the extinction of a European royal dynasty. PLoS ONE 4(4): e5174.",
+    "doi": "10.1371/journal.pone.0005174",
+    "figure": "Figure 1"
+  },
+  "simplified": [
+    "The figure is a partial pedigree, drawn as chains of descent: only the people in it are shown.",
+    "Two people have only one parent in the figure: Mary, daughter of Anna, and Ferdinand III. Each is given an unnamed other parent, as the editor needs both.",
+    "The figure gives no years, so none are shown. Everyone is shown as deceased.",
+    "The paper gives the pituitary disorder as \"OMIM 26260\"; it is shown as OMIM 262600, combined pituitary hormone deficiency 2, the entry that number abbreviates. The renal disorder is OMIM 602722 as the paper gives it."
+  ]
+}

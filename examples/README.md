@@ -24,12 +24,12 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 }
 ```
 
-- `id`: unique in the example; shown as the person's external ID (e.g. `II-3`). Letters, digits and dashes.
+- `id`: unique in the example. Letters, digits and dashes. Shown as the person's label (e.g. `II-3`) only when they have neither a `name` nor a `comment`.
 - `proband`: `true` for the proband (at most one; the arrow). Without one, the first person listed is the proband.
 - `sex`: `M`, `F` or `U`.
 - `father`, `mother`: ids of people in the example, or absent for someone whose parents aren't drawn. A person has both parents or neither.
 - `name`: a first name (optional); `surname` (optional).
-- `comment`: shown under the symbol. Years go here (`1819-1901`), since the editor's dates are full dates.
+- `comment`: shown under the symbol; `\n` starts a new line. Years go here (`1819-1901`), since the editor's dates are full dates.
 - `status`: `alive` (default), `deceased`, `stillborn`, `miscarriage`, `aborted` or `unborn`.
 - `disorders`: OMIM codes, as the demo's terminology codes them, each with the name to show.
 - `carrier`: `carrier`, `affected` or `presymptomatic`. An affected person with disorders needs none.

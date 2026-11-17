@@ -125,6 +125,8 @@ async function draw(browser, base, example) {
         set.setDisorders = p.disorders.map((d) => d.id);
       }
       if (p.carrier) set.setCarrierStatus = p.carrier;
+      // the id is only a label for someone with neither a name nor a comment (II-3 in a textbook figure)
+      if (p.name || p.comment) set.setExternalID = '';
       if (Object.keys(set).length) {
         document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: nodes[p.id], properties: set } }));
       }

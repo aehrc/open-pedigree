@@ -1,0 +1,277 @@
+{
+  "people": [
+    {
+      "id": "ferdinand-of-aragon",
+      "sex": "M",
+      "name": "Ferdinand of Aragon",
+      "status": "deceased"
+    },
+    {
+      "id": "elizabeth-of-castile",
+      "sex": "F",
+      "name": "Elizabeth of Castile",
+      "status": "deceased"
+    },
+    {
+      "id": "maximilian-i",
+      "sex": "M",
+      "name": "Maximilian I",
+      "comment": "Holy Roman Emperor",
+      "status": "deceased"
+    },
+    {
+      "id": "mary-of-burgundy",
+      "sex": "F",
+      "name": "Mary of Burgundy",
+      "status": "deceased"
+    },
+    {
+      "id": "manuel-i",
+      "sex": "M",
+      "name": "Manuel I",
+      "comment": "King of Portugal",
+      "status": "deceased"
+    },
+    {
+      "id": "mary-of-aragon",
+      "sex": "F",
+      "name": "Mary of Aragon",
+      "father": "ferdinand-of-aragon",
+      "mother": "elizabeth-of-castile",
+      "status": "deceased"
+    },
+    {
+      "id": "joanna-i",
+      "sex": "F",
+      "name": "Joanna I",
+      "father": "ferdinand-of-aragon",
+      "mother": "elizabeth-of-castile",
+      "comment": "Queen of Castile and Aragon",
+      "status": "deceased"
+    },
+    {
+      "id": "philip-i",
+      "sex": "M",
+      "name": "Philip I",
+      "father": "maximilian-i",
+      "mother": "mary-of-burgundy",
+      "comment": "Spanish Habsburg king",
+      "status": "deceased"
+    },
+    {
+      "id": "john-iii",
+      "sex": "M",
+      "name": "John III",
+      "father": "manuel-i",
+      "mother": "mary-of-aragon",
+      "comment": "King of Portugal",
+      "status": "deceased"
+    },
+    {
+      "id": "isabella-of-portugal",
+      "sex": "F",
+      "name": "Isabella of Portugal",
+      "father": "manuel-i",
+      "mother": "mary-of-aragon",
+      "status": "deceased"
+    },
+    {
+      "id": "catherine",
+      "sex": "F",
+      "name": "Catherine",
+      "father": "philip-i",
+      "mother": "joanna-i",
+      "status": "deceased"
+    },
+    {
+      "id": "charles-i",
+      "sex": "M",
+      "name": "Charles I",
+      "father": "philip-i",
+      "mother": "joanna-i",
+      "comment": "Spanish Habsburg king\nHoly Roman Emperor (Charles V)",
+      "status": "deceased"
+    },
+    {
+      "id": "ferdinand-i",
+      "sex": "M",
+      "name": "Ferdinand I",
+      "father": "philip-i",
+      "mother": "joanna-i",
+      "comment": "Holy Roman Emperor",
+      "status": "deceased"
+    },
+    {
+      "id": "anna-of-hungary",
+      "sex": "F",
+      "name": "Anna of Hungary",
+      "status": "deceased"
+    },
+    {
+      "id": "mary-of-portugal",
+      "sex": "F",
+      "name": "Mary of Portugal",
+      "father": "john-iii",
+      "mother": "catherine",
+      "status": "deceased"
+    },
+    {
+      "id": "philip-ii",
+      "sex": "M",
+      "name": "Philip II",
+      "father": "charles-i",
+      "mother": "isabella-of-portugal",
+      "comment": "Spanish Habsburg king",
+      "status": "deceased"
+    },
+    {
+      "id": "maria",
+      "sex": "F",
+      "name": "Maria",
+      "father": "charles-i",
+      "mother": "isabella-of-portugal",
+      "status": "deceased"
+    },
+    {
+      "id": "maximilian-ii",
+      "sex": "M",
+      "name": "Maximilian II",
+      "father": "ferdinand-i",
+      "mother": "anna-of-hungary",
+      "comment": "Holy Roman Emperor",
+      "status": "deceased"
+    },
+    {
+      "id": "archduke-charles-ii",
+      "sex": "M",
+      "name": "Archduke Charles II of Austria",
+      "father": "ferdinand-i",
+      "mother": "anna-of-hungary",
+      "status": "deceased"
+    },
+    {
+      "id": "anna",
+      "sex": "F",
+      "name": "Anna",
+      "father": "ferdinand-i",
+      "mother": "anna-of-hungary",
+      "status": "deceased"
+    },
+    {
+      "id": "mary-father",
+      "sex": "M",
+      "comment": "Not named in the figure",
+      "status": "deceased"
+    },
+    {
+      "id": "don-carlos",
+      "sex": "M",
+      "name": "Charles (Don Carlos)",
+      "father": "philip-ii",
+      "mother": "mary-of-portugal",
+      "status": "deceased"
+    },
+    {
+      "id": "anna-of-austria",
+      "sex": "F",
+      "name": "Anna of Austria",
+      "father": "maximilian-ii",
+      "mother": "maria",
+      "status": "deceased"
+    },
+    {
+      "id": "mary",
+      "sex": "F",
+      "name": "Mary",
+      "father": "mary-father",
+      "mother": "anna",
+      "status": "deceased"
+    },
+    {
+      "id": "philip-iii",
+      "sex": "M",
+      "name": "Philip III",
+      "father": "philip-ii",
+      "mother": "anna-of-austria",
+      "comment": "Spanish Habsburg king",
+      "status": "deceased"
+    },
+    {
+      "id": "margaret-of-austria",
+      "sex": "F",
+      "name": "Margaret of Austria",
+      "father": "archduke-charles-ii",
+      "mother": "mary",
+      "status": "deceased"
+    },
+    {
+      "id": "ferdinand-ii",
+      "sex": "M",
+      "name": "Ferdinand II",
+      "father": "archduke-charles-ii",
+      "mother": "mary",
+      "comment": "Holy Roman Emperor",
+      "status": "deceased"
+    },
+    {
+      "id": "ferdinand-iii-mother",
+      "sex": "F",
+      "comment": "Not named in the figure",
+      "status": "deceased"
+    },
+    {
+      "id": "philip-iv",
+      "sex": "M",
+      "name": "Philip IV",
+      "father": "philip-iii",
+      "mother": "margaret-of-austria",
+      "comment": "Spanish Habsburg king",
+      "status": "deceased"
+    },
+    {
+      "id": "maria-anna-of-austria",
+      "sex": "F",
+      "name": "Maria Anna of Austria",
+      "father": "philip-iii",
+      "mother": "margaret-of-austria",
+      "status": "deceased"
+    },
+    {
+      "id": "ferdinand-iii",
+      "sex": "M",
+      "name": "Ferdinand III",
+      "father": "ferdinand-ii",
+      "mother": "ferdinand-iii-mother",
+      "comment": "Holy Roman Emperor",
+      "status": "deceased"
+    },
+    {
+      "id": "mariana-of-austria",
+      "sex": "F",
+      "name": "Mariana of Austria",
+      "father": "ferdinand-iii",
+      "mother": "maria-anna-of-austria",
+      "status": "deceased"
+    },
+    {
+      "id": "charles-ii",
+      "sex": "M",
+      "name": "Charles II",
+      "father": "philip-iv",
+      "mother": "mariana-of-austria",
+      "comment": "Spanish Habsburg king",
+      "status": "deceased",
+      "proband": true,
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/262600",
+          "name": "Pituitary hormone deficiency, combined, 2"
+        },
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/602722",
+          "name": "Renal tubular acidosis, distal, 3, with or without sensorineural hearing loss"
+        }
+      ]
+    }
+  ]
+}
