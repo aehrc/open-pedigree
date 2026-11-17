@@ -24,7 +24,7 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 }
 ```
 
-- `id`: unique in the example. Letters, digits and dashes. Shown as the person's label (e.g. `II-3`) only when they have neither a `name` nor a `comment`.
+- `id`: unique in the example. Letters, digits and dashes. Not shown, unless the example sets `"idLabels": true` (beside `people`): then it is the label (e.g. `II-3`) of anyone with neither a `name` nor a `comment`.
 - `proband`: `true` for the proband (at most one; the arrow). Without one, the first person listed is the proband.
 - `sex`: `M`, `F` or `U`.
 - `father`, `mother`: ids of people in the example, or absent for someone whose parents aren't drawn. A person has both parents or neither.

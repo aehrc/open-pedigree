@@ -16,12 +16,12 @@ const names = fs.readdirSync(EXAMPLES, { withFileTypes: true })
 // Checks known to fail on today's layout: { '<example>': { '<check>': 'the problem' } }.
 const KNOWN_PROBLEMS = {};
 
-// A person's label, as both the source and the drawing give it: name, else comment, else id.
-const labelOf = (p) => p.name || p.comment || p.id;
-
-// The example's source: each person's label, and the [child, father, mother] triples.
+// The example's source: each person's label, and the [child, father, mother] triples. A label is
+// what the drawing shows: name, else comment, else (in an example with id labels) the id, else '?'.
 function sourceOf(name) {
-  const people = JSON.parse(fs.readFileSync(path.join(EXAMPLES, name, 'example.json'), 'utf8')).people;
+  const example = JSON.parse(fs.readFileSync(path.join(EXAMPLES, name, 'example.json'), 'utf8'));
+  const people = example.people;
+  const labelOf = (p) => p.name || p.comment || (example.idLabels ? p.id : '?');
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
   const triples = people.filter((p) => p.father)
     .map((p) => [labelOf(p), labelOf(byId[p.father]), labelOf(byId[p.mother])].join(' | ')).sort();
@@ -76,7 +76,7 @@ const drawing = (page) => page.evaluate(() => {
       const props = GG.properties[v];
       const box = view.getNode(v).getGraphics().getGenderShape().getBBox();
       people[v] = {
-        label: props.fName || props.comments || props.externalID,
+        label: props.fName || props.comments || props.externalID || '?',
         rank: DG.ranks[v],
         y: view.getNode(v).getY(),
         box: { x: box.x, y: box.y, x2: box.x2, y2: box.y2 },

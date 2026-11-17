@@ -91,6 +91,8 @@ test('the visitor\'s own pedigree survives an example, and opening the example a
   // an example opened, edited and saved
   await page.goto(BASE + 'examples/full-sib-mating/');
   await page.getByRole('button', { name: 'Open in the editor' }).click();
+  // (the page fetches the example before it goes to the editor)
+  await page.waitForURL(BASE + 'editor/?example=full-sib-mating');
   await editorReady(page);
   await expect.poll(() => personCount(page)).toBe(peopleIn('full-sib-mating'));
   await page.evaluate(() => {
@@ -108,6 +110,8 @@ test('the visitor\'s own pedigree survives an example, and opening the example a
   // the example again, from its page: as published
   await page.goto(BASE + 'examples/full-sib-mating/');
   await page.getByRole('button', { name: 'Open in the editor' }).click();
+  // (the page fetches the example before it goes to the editor)
+  await page.waitForURL(BASE + 'editor/?example=full-sib-mating');
   await editorReady(page);
   await expect.poll(() => personCount(page)).toBe(peopleIn('full-sib-mating'));
   expect(await page.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).map((p) => p.fName))).not.toContain('Edited');
