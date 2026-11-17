@@ -1,0 +1,41 @@
+{
+  "people": [
+    {
+      "id": "I-1",
+      "sex": "M"
+    },
+    {
+      "id": "I-2",
+      "sex": "F"
+    },
+    {
+      "id": "II-1",
+      "sex": "M",
+      "father": "I-1",
+      "mother": "I-2"
+    },
+    {
+      "id": "II-2",
+      "sex": "F",
+      "father": "I-1",
+      "mother": "I-2"
+    },
+    {
+      "id": "II-3",
+      "sex": "M"
+    },
+    {
+      "id": "III-1",
+      "sex": "F",
+      "father": "II-3",
+      "mother": "II-2"
+    },
+    {
+      "id": "IV-1",
+      "sex": "U",
+      "father": "II-1",
+      "mother": "III-1",
+      "proband": true
+    }
+  ]
+}

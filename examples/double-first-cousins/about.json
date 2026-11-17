@@ -1,0 +1,12 @@
+{
+  "title": "Double first cousins",
+  "kind": "classic",
+  "summary": "Two brothers marry two sisters: their children are cousins through both parents.",
+  "shows": [
+    "Two brothers (II-1 and II-2) have children with two sisters (II-3 and II-4). Their children (III-1 and III-2) are first cousins through their fathers and again through their mothers, and share all four grandparents.",
+    "Double first cousins share on average a quarter of their genes, as half-siblings do. Should they have a child together, its inbreeding coefficient would be 1/8, twice that of a first-cousin union's child."
+  ],
+  "hard": [
+    "The two families are joined twice in one generation, which closes a loop: each family's sibship has to sit next to the other's twice over, with both couples' lines kept clear of the other couple's symbols."
+  ]
+}

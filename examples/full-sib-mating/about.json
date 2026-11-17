@@ -1,0 +1,12 @@
+{
+  "title": "Full-sibling mating",
+  "kind": "classic",
+  "summary": "A brother and sister have a child: the closest consanguineous union.",
+  "shows": [
+    "A brother (II-1) and sister (II-2) have a child (III-1). The child's parents share both of their own parents, so the child has two grandparents rather than four, and its two copies of any gene are as likely to be identical by descent as in any human union (inbreeding coefficient 1/4).",
+    "The union is drawn with a double line, the standard mark of a consanguineous relationship."
+  ],
+  "hard": [
+    "The couple are also siblings: the drawing has to show their sibship line and their partnership line between the same two people without one hiding the other, and keep their child centred below them."
+  ]
+}

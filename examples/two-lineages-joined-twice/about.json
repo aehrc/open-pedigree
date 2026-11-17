@@ -1,0 +1,12 @@
+{
+  "title": "Two lineages joined twice",
+  "kind": "classic",
+  "summary": "Two families are joined by marriage, then joined again a generation later, with no blood relationship between the second couple.",
+  "shows": [
+    "The first family's son (II-1) has a child with the second family's daughter (II-3). A generation later, the first family's grandson (III-2, through a daughter) has a child with the second family's granddaughter (III-3, through a son).",
+    "III-2 and III-3 are not related by blood, so their union is not consanguineous and isn't drawn with a double line, although the drawing has a loop."
+  ],
+  "hard": [
+    "The two families meet twice, in different generations. Both meetings have to be drawn side by side without crossing lines, and the second couple must not be drawn as consanguineous just because their families form a loop."
+  ]
+}
