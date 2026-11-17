@@ -27,5 +27,7 @@ jobs:
       # the built dist/ served statically (the config's dev server reloads on test output)
       - run: |
           python3 -m http.server 9000 --bind 127.0.0.1 >/dev/null 2>&1 &
+          # (up before Playwright looks, or it would start the config's dev server instead)
+          for i in $(seq 1 50); do curl -s -o /dev/null http://127.0.0.1:9000/ && break; sleep 0.2; done
           npx playwright test tests/e2e/example-layouts.spec.js tests/e2e/site.spec.js tests/e2e/example-key.spec.js
       - run: npm test
