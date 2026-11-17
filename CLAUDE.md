@@ -60,6 +60,14 @@ npm run typecheck    # tsc --noEmit (has known pre-existing errors; compare befo
 npx eslint src/      # Lint
 ```
 
+```bash
+npm run examples:build   # (after npm run build) redraw examples/<name>/pedigree.json + pedigree.svg from example.json
+npm run examples:check   # fail if a committed example no longer matches its source (CI runs this)
+node scripts/build-site.js _site   # the website: landing page, editor/ (from localEditor.html), examples/
+```
+
+The GitHub Pages website (`deploy-pages.yml`, every push to `main`) is the landing page, the demo editor at `/editor/` (`localEditor.html`; `?example=<name>` opens the `example-<name>` storage key instead of `pedigreeData`), the example pages (`examples/`, see `examples/README.md`; historic families only from their cited figure) and the FHIR definitions at `/fhir/`. The examples are also e2e layout tests (`tests/e2e/example-layouts.spec.js`).
+
 e2e tests that build their own editor over `localEditor.html`'s must call `retireAutoCreatedEditor(page)` (`tests/e2e/helpers/singleEditor.js`) first, or the page's original Controller also handles every property change.
 
 ## Architecture

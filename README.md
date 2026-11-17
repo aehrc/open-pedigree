@@ -18,7 +18,7 @@
 
 ## A free and open-source pedigree tool powered by PhenoTips®
 
-**[Try the live demo](https://aehrc.github.io/open-pedigree/)**
+**[Website](https://aehrc.github.io/open-pedigree/): [try the editor](https://aehrc.github.io/open-pedigree/editor/), and explore [example pedigrees](https://aehrc.github.io/open-pedigree/#examples) from classic textbook structures to the Spanish Habsburgs.**
 
 Open Pedigree is a robust browser-based genomic pedigree drawing solution using [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) and [PhenoTips](https://phenotips.org).
 
@@ -36,6 +36,8 @@ Open Pedigree is a robust browser-based genomic pedigree drawing solution using 
 ✔ Automatic consanguinity detection
 
 ✔ Import from PED, LINKAGE, GEDCOM (Cyrillic), BOADICEA, or GA4GH Pedigree (FHIR)
+
+✔ [Example pedigrees](https://aehrc.github.io/open-pedigree/#examples) of hard-to-draw families, each with its story and source (built from `examples/`, see [examples/README.md](examples/README.md)); they double as layout tests
 
 ✔ Configurable per-person fields via a FHIR Questionnaire, with answers round-tripped through GA4GH FHIR export/import
 

@@ -19,4 +19,8 @@ jobs:
       - run: npm run build
       # (the FHIR definitions the Pages deploy publishes still build)
       - run: node scripts/build-fhir-site.js "$RUNNER_TEMP/fhir-site"
+      # (the website builds, and each published example still matches its source, drawn by this build)
+      - run: node scripts/build-site.js "$RUNNER_TEMP/site"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run examples:check
       - run: npm test
