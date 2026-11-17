@@ -10,7 +10,7 @@
  *   <out>/examples/<name>/pedigree.svg    its picture
  * "Open in the editor" stores the example under its own key (example-<name>) and opens the editor
  * on it (editor/?example=<name>), so the visitor's own pedigree is never touched.
- * Usage: node scripts/build-site.js <out dir>   (default _site)
+ * Usage (after npm run build): node scripts/build-site.js <out dir>   (default _site)
  */
 const fs = require('fs');
 const path = require('path');
@@ -74,12 +74,50 @@ ${body}
 `;
 }
 
-/** Every example: its name and about.json, classic ones first, each kind in a fixed order. */
+// An example's folder name: what localEditor.html accepts in ?example= (else it opens pedigreeData).
+const NAME = /^[a-z0-9-]+$/;
+const FILES = ['example.json', 'about.json', 'pedigree.json', 'pedigree.svg'];
+
+/** The problems with an about.json, as examples/README.md describes it. */
+function aboutProblems(about) {
+  const problems = [];
+  const text = (v) => typeof v === 'string' && v.trim() !== '';
+  const paragraphs = (v) => Array.isArray(v) && v.length > 0 && v.every(text);
+  ['title', 'summary'].forEach((k) => text(about[k]) || problems.push(`${k} must be text`));
+  ['shows', 'hard'].forEach((k) => paragraphs(about[k]) || problems.push(`${k} must be a list of paragraphs`));
+  if (typeof about.order !== 'number') problems.push('order must be a number');
+  if (about.kind === 'historic') {
+    const source = about.source || {};
+    ['citation', 'doi', 'figure'].forEach((k) => text(source[k]) || problems.push(`a historic example needs source.${k}`));
+    paragraphs(about.simplified) || problems.push('a historic example needs simplified: a list of what was left out or left open');
+  } else if (about.kind !== 'classic') {
+    problems.push('kind must be classic or historic');
+  }
+  return problems;
+}
+
+/**
+ * Every example: its name and about.json, ordered by `order`. Every folder in examples/ must be a
+ * complete example (its sources and its generated files) with a valid name and about.json.
+ */
 function examples() {
-  return fs.readdirSync(EXAMPLES, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && fs.existsSync(path.join(EXAMPLES, d.name, 'about.json')))
-    .map((d) => ({ name: d.name, about: JSON.parse(fs.readFileSync(path.join(EXAMPLES, d.name, 'about.json'), 'utf8')) }))
-    .sort((a, b) => (a.about.order || 0) - (b.about.order || 0) || a.name.localeCompare(b.name));
+  const problems = [];
+  const all = fs.readdirSync(EXAMPLES, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => {
+    const dir = path.join(EXAMPLES, d.name);
+    if (!NAME.test(d.name)) problems.push(`examples/${d.name}: the folder name must be lower-case letters, digits and dashes`);
+    const missing = FILES.filter((f) => !fs.existsSync(path.join(dir, f)));
+    if (missing.length) {
+      problems.push(`examples/${d.name}: missing ${missing.join(', ')}` + (missing.some((f) => f.startsWith('pedigree')) ? ' (run npm run examples:build)' : ''));
+      return null;
+    }
+    const about = JSON.parse(fs.readFileSync(path.join(dir, 'about.json'), 'utf8'));
+    aboutProblems(about).forEach((problem) => problems.push(`examples/${d.name}/about.json: ${problem}`));
+    return { name: d.name, about };
+  });
+  if (problems.length) {
+    throw new Error(problems.join('\n'));
+  }
+  return all.sort((a, b) => a.about.order - b.about.order || a.name.localeCompare(b.name));
 }
 
 function card(example) {
@@ -144,6 +182,10 @@ ${paragraphs(about.hard)}${source}${simplified}
         return response.text();
       })
       .then(function (text) {
+        // (only one example copy is kept: the large ones would soon fill the browser's storage,
+        // which every aehrc.github.io site shares, and the visitor's own pedigree then couldn't be saved)
+        Object.keys(localStorage).filter(function (key) { return key.indexOf('example-') === 0; })
+          .forEach(function (key) { localStorage.removeItem(key); });
         localStorage.setItem(${JSON.stringify('example-' + name)}, JSON.stringify({ value: text, svg: null, context: null }));
         window.location.href = ${JSON.stringify('../../editor/?example=' + name)};
       })
@@ -174,24 +216,30 @@ function build(out) {
   };
   write(path.join(out, 'index.html'), landing(all));
   write(path.join(out, 'editor', 'index.html'), editorPage());
+  // The bundle asks for its assets (the menu's icon) at dist/assets/, relative to the page
+  // (webpack's asset publicPath), which from editor/ is editor/dist/assets/: put them there too.
+  const assets = path.join(ROOT, 'dist', 'assets');
+  if (!fs.existsSync(assets)) {
+    throw new Error('dist/assets is missing: run npm run build first');
+  }
+  fs.cpSync(assets, path.join(out, 'editor', 'dist', 'assets'), { recursive: true });
   all.forEach((example) => {
     const dir = path.join(out, 'examples', example.name);
     write(path.join(dir, 'index.html'), examplePage(example));
-    ['pedigree.json', 'pedigree.svg'].forEach((file) => {
-      const from = path.join(EXAMPLES, example.name, file);
-      if (!fs.existsSync(from)) {
-        throw new Error(`examples/${example.name}/${file} is missing (run npm run examples:build)`);
-      }
-      fs.copyFileSync(from, path.join(dir, file));
-    });
+    ['pedigree.json', 'pedigree.svg'].forEach((file) => fs.copyFileSync(path.join(EXAMPLES, example.name, file), path.join(dir, file)));
   });
   return all.map((e) => e.name);
 }
 
 if (require.main === module) {
   const out = path.resolve(process.argv[2] || path.join(ROOT, '_site'));
-  const names = build(out);
-  console.log(`site built in ${out}: landing page, editor, ${names.length} examples`);
+  try {
+    const names = build(out);
+    console.log(`site built in ${out}: landing page, editor, ${names.length} examples`);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 }
 
-module.exports = { build };
+module.exports = { build, aboutProblems };

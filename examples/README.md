@@ -16,10 +16,11 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 ```json
 {
   "people": [
-    { "id": "victoria", "sex": "F", "father": "edward", "mother": "victoria-saxe", "name": "Victoria",
-      "comment": "1819-1901", "status": "deceased", "carrier": "carrier" },
-    { "id": "leopold", "sex": "M", "father": "albert", "mother": "victoria", "name": "Leopold",
-      "comment": "1853-1884", "status": "deceased", "disorders": [{ "id": "306900", "name": "Hemophilia B" }] }
+    { "id": "mother", "sex": "F", "name": "Ada", "comment": "1850-1921", "status": "deceased", "carrier": "carrier",
+      "disorders": [{ "id": "http://purl.bioontology.org/ontology/OMIM/306900", "name": "Hemophilia B" }] },
+    { "id": "father", "sex": "M", "name": "Tom", "status": "deceased" },
+    { "id": "son", "sex": "M", "father": "father", "mother": "mother", "name": "Leo", "proband": true,
+      "disorders": [{ "id": "http://purl.bioontology.org/ontology/OMIM/306900", "name": "Hemophilia B" }] }
   ]
 }
 ```
@@ -31,8 +32,8 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 - `name`: a first name (optional); `surname` (optional).
 - `comment`: shown under the symbol; `\n` starts a new line. Years go here (`1819-1901`), since the editor's dates are full dates.
 - `status`: `alive` (default), `deceased`, `stillborn`, `miscarriage`, `aborted` or `unborn`.
-- `disorders`: OMIM codes, as the demo's terminology codes them, each with the name to show.
-- `carrier`: `carrier`, `affected` or `presymptomatic`. An affected person with disorders needs none.
+- `disorders`: each disorder's code as the demo's terminology gives it (OMIM, as `http://purl.bioontology.org/ontology/OMIM/<number>` - look it up in the `http://www.omim.org/vs` value set on `tx.ontoserver.csiro.au`), with the name to show.
+- `carrier`: `carrier` or `presymptomatic` for a person with `disorders` who isn't affected by them (a carrier is drawn with the disorder's colour and a dot). An affected person needs none.
 
 Partnerships are the couples who have a child together; there are no others.
 

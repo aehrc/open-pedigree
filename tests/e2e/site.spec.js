@@ -51,6 +51,9 @@ const personCount = (page) => page.evaluate(() => {
 
 test('the landing page opens the editor and lists every example', async ({ page }) => {
   await serveSite(page);
+  // (everything the site's pages ask for is there: the editor's own assets included)
+  const missing = [];
+  page.on('response', (response) => response.url().startsWith(BASE) && response.status() === 404 && missing.push(response.url()));
   await page.goto(BASE);
   for (const name of exampleNames()) {
     await expect(page.locator(`a[href="examples/${name}/"]`)).toBeVisible();
@@ -60,6 +63,8 @@ test('the landing page opens the editor and lists every example', async ({ page 
   await expect(page).toHaveURL(BASE + 'editor/');
   await expect(page.locator('#canvas svg')).toBeVisible({ timeout: 10000 });
   await editorReady(page);
+  await page.waitForLoadState('networkidle');
+  expect(missing).toEqual([]);
 });
 
 for (const name of exampleNames()) {
@@ -115,6 +120,20 @@ test('the visitor\'s own pedigree survives an example, and opening the example a
   await editorReady(page);
   await expect.poll(() => personCount(page)).toBe(peopleIn('full-sib-mating'));
   expect(await page.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).map((p) => p.fName))).not.toContain('Edited');
+});
+
+test('opening an example clears any other example\'s copy, so the large ones can\'t fill the browser\'s storage', async ({ page }) => {
+  await serveSite(page);
+  await page.goto(BASE + 'examples/full-sib-mating/');
+  await page.evaluate(() => {
+    localStorage.setItem('example-queen-victoria', JSON.stringify({ value: '{"edited":true}' }));
+    localStorage.setItem('pedigreeData', JSON.stringify({ value: 'mine' }));
+  });
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=full-sib-mating');
+  const keys = await page.evaluate(() => Object.keys(localStorage).sort());
+  expect(keys.filter((k) => k.startsWith('example-'))).toEqual(['example-full-sib-mating']);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('pedigreeData')).value)).toBe('mine');
 });
 
 test('an example whose file can\'t be loaded says so and stays on its page', async ({ page }) => {

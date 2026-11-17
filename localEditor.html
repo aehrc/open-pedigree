@@ -174,7 +174,12 @@
       // An example opened from the website (examples/<name>/) is a copy under its own key, so the
       // visitor's own pedigree (pedigreeData) is never touched; anything but a plain name is ignored.
       var example = getParameterByName('example');
-      var storageKey = (example && /^[a-z0-9-]+$/.test(example)) ? 'example-' + example : 'pedigreeData';
+      var isExample = !!example && /^[a-z0-9-]+$/.test(example);
+      var storageKey = isExample ? 'example-' + example : 'pedigreeData';
+      // (an example is stored as GA4GH FHIR, whatever ?format says)
+      if (isExample) {
+        format = 'fhir';
+      }
 
       var editorOptions = {
         // patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true' + (qData?('&qData='+qData):''),

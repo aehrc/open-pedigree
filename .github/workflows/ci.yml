@@ -23,4 +23,9 @@ jobs:
       - run: node scripts/build-site.js "$RUNNER_TEMP/site"
       - run: npx playwright install --with-deps chromium
       - run: npm run examples:check
+      # the examples as layout tests, the website's hand-off, and the editor's ?example key, against
+      # the built dist/ served statically (the config's dev server reloads on test output)
+      - run: |
+          python3 -m http.server 9000 --bind 127.0.0.1 >/dev/null 2>&1 &
+          npx playwright test tests/e2e/example-layouts.spec.js tests/e2e/site.spec.js tests/e2e/example-key.spec.js
       - run: npm test

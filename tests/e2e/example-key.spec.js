@@ -86,3 +86,9 @@ for (const value of ['../pedigreeData', 'Three-People', 'three people', 'three_p
     await expect.poll(() => people(page)).toEqual(['Own']);
   });
 }
+
+test('?example opens the copy as GA4GH FHIR, whatever ?format says', async ({ page, browser }) => {
+  const example = await ga4ghOf(browser, FAMILY);
+  await openWith(page, '?example=three-people&format=PED', { 'example-three-people': example });
+  await expect.poll(() => people(page)).toEqual(['Anna', 'Ben', 'Cara']);
+});

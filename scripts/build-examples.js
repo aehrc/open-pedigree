@@ -26,11 +26,19 @@ const ID = /^[A-Za-z0-9-]+$/;
 // the storage key the drawing is saved under (localEditor.html's `example` parameter)
 const KEY = 'example-build';
 
-/** The example names: every examples/<name>/ with an example.json. */
+/**
+ * The example names: every examples/<name>/ with an example.json. A name must be what
+ * localEditor.html accepts in ?example= (else the site would open the visitor's own pedigree).
+ */
 function exampleNames() {
-  return fs.readdirSync(EXAMPLES, { withFileTypes: true })
+  const names = fs.readdirSync(EXAMPLES, { withFileTypes: true })
     .filter((d) => d.isDirectory() && fs.existsSync(path.join(EXAMPLES, d.name, 'example.json')))
     .map((d) => d.name).sort();
+  const bad = names.filter((n) => !/^[a-z0-9-]+$/.test(n));
+  if (bad.length) {
+    throw new Error('example folder names must be lower-case letters, digits and dashes: ' + bad.join(', '));
+  }
+  return names;
 }
 
 /** example.json, checked: every problem is reported, by person. */
@@ -148,9 +156,9 @@ async function draw(browser, base, example) {
 
 /**
  * A GA4GH pedigree without what changes on every save, for comparing: the bundle's timestamp and
- * the Composition's date, the embedded picture (an attachment's base64 `data`; the picture is
- * regenerated with the file), and the resources' urn:uuid ids (fresh on each save, so numbered in
- * order of first appearance).
+ * the Composition's date, the embedded picture (an attachment's base64 `data`; the picture itself
+ * is compared as pedigree.svg), and the resources' urn:uuid ids (fresh on each save, so numbered
+ * in order of first appearance).
  */
 function normalised(text) {
   const uuids = new Map();
@@ -159,6 +167,15 @@ function normalised(text) {
     return uuids.get(uuid);
   });
   return JSON.stringify(JSON.parse(renumbered), (key, value) => (key === 'timestamp' || key === 'date' || (key === 'data' && typeof value === 'string') ? undefined : value), 2);
+}
+
+/** A picture without what changes on every drawing: Raphael's random gradient ids, renumbered. */
+function normalisedSvg(text) {
+  const ids = new Map();
+  return text.replace(/\b[a-z0-9]+(?=-_[0-9A-Fa-f]{6}:)/g, (id) => {
+    if (!ids.has(id)) ids.set(id, 'g' + (ids.size + 1));
+    return ids.get(id);
+  });
 }
 
 async function main() {
@@ -179,9 +196,13 @@ async function main() {
       const drawn = await draw(browser, base, readExample(name));
       const dir = path.join(EXAMPLES, name);
       if (check) {
-        const file = path.join(dir, 'pedigree.json');
-        if (!fs.existsSync(file) || normalised(fs.readFileSync(file, 'utf8')) !== normalised(drawn.pedigree)) {
-          stale.push(name);
+        // the pedigree, and the picture (a layout change redraws it without changing the pedigree)
+        const json = path.join(dir, 'pedigree.json');
+        const svg = path.join(dir, 'pedigree.svg');
+        if (!fs.existsSync(json) || normalised(fs.readFileSync(json, 'utf8')) !== normalised(drawn.pedigree)) {
+          stale.push(name + ' (pedigree.json)');
+        } else if (!fs.existsSync(svg) || normalisedSvg(fs.readFileSync(svg, 'utf8')) !== normalisedSvg(drawn.svg)) {
+          stale.push(name + ' (pedigree.svg)');
         }
       } else {
         fs.writeFileSync(path.join(dir, 'pedigree.json'), drawn.pedigree);
@@ -194,7 +215,7 @@ async function main() {
     server.close();
   }
   if (stale.length) {
-    console.error('pedigree.json no longer matches example.json (run `npm run examples:build`): ' + stale.join(', '));
+    console.error('no longer drawn as committed (run `npm run examples:build`): ' + stale.join(', '));
     process.exit(1);
   }
   if (check) {
@@ -209,4 +230,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { readExample, pedOf, normalised };
+module.exports = { readExample, pedOf, normalised, normalisedSvg };
