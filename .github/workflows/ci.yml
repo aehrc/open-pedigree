@@ -8,7 +8,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # (24.04, not ubuntu-latest: Playwright 1.60 can't install Chromium on ubuntu-latest's 26.04,
+    # and this job runs the example e2e specs; move on once Playwright supports it)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
