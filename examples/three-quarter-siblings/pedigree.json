@@ -1,0 +1,1127 @@
+{
+  "resourceType": "Bundle",
+  "identifier": {
+    "system": "http://purl.org/ga4gh/pedigree-fhir-ig",
+    "value": "urn:uuid:49258ccc-2a66-43d3-8fb1-79f56d428831"
+  },
+  "type": "document",
+  "timestamp": "2026-11-17T10:56:38+10:00",
+  "entry": [
+    {
+      "link": [
+        {
+          "relation": "item",
+          "url": "urn:uuid:cea8732c-c011-4a22-b5e5-772c3b79c92b"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:d1b1efd9-638a-446d-b5b9-db8f2a2c6c9a"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:f692147c-6bde-46a3-b1ed-7d2db0fc87c2"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:7e413235-2118-4375-b684-a320da8f5b0b"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:4715b7df-a6aa-4878-b3b0-46290b002387"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:5ce8c5f5-07b7-4670-8164-0886ec2af5ba"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:6a00b867-70e8-4660-ab1d-642b45ac8cb1"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:58ee408a-2dc5-4a72-bda1-d4f5ed5a7de2"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:3d0b6ace-0c15-4c17-931c-11232a82fc4a"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:3e53bb70-8935-4094-ae7f-7ac602f3287e"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:eb9cb2ee-66bb-499c-a05f-feb1cfd470ba"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:3404c372-7682-4a6d-b4d1-2b118553a72f"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:b852cebe-e0ec-49f1-bbbd-ee7e2842ff49"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:c3d1e4e1-6f4b-469a-ad7e-e554ed01f6f2"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:fb55ad1c-83dd-43be-915d-abf288827fbe"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:05714279-6523-46cb-bd8a-0b38dad8eb58"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:64db87ac-6b85-4414-99a8-e75e73051845"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:99319f14-c270-4b56-b354-8a947e809877"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:59d64a05-8336-451f-81d6-f60cd98964d3"
+        },
+        {
+          "relation": "item",
+          "url": "urn:uuid:81cddb9f-069a-4239-8978-289afe916e13"
+        }
+      ],
+      "fullUrl": "urn:uuid:613f64a8-dabe-4a66-9381-006c53966227",
+      "resource": {
+        "resourceType": "Composition",
+        "id": "urn:uuid:613f64a8-dabe-4a66-9381-006c53966227",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/Pedigree"
+          ]
+        },
+        "status": "final",
+        "type": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "422432008"
+            }
+          ]
+        },
+        "subject": {
+          "type": "Patient",
+          "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        "date": "2026-11-17T10:56:38+10:00",
+        "author": {
+          "type": "Organization",
+          "reference": "urn:uuid:cea8732c-c011-4a22-b5e5-772c3b79c92b"
+        },
+        "title": "Pedigree",
+        "section": [
+          {
+            "title": "Proband",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "proband"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+              }
+            ]
+          },
+          {
+            "title": "Reason",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "reason"
+                }
+              ]
+            },
+            "entry": []
+          },
+          {
+            "title": "Individuals",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "individuals"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+              },
+              {
+                "type": "Patient",
+                "reference": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717"
+              }
+            ]
+          },
+          {
+            "title": "Relationships",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "relationships"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:d1b1efd9-638a-446d-b5b9-db8f2a2c6c9a"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:f692147c-6bde-46a3-b1ed-7d2db0fc87c2"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:7e413235-2118-4375-b684-a320da8f5b0b"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:4715b7df-a6aa-4878-b3b0-46290b002387"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:5ce8c5f5-07b7-4670-8164-0886ec2af5ba"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:6a00b867-70e8-4660-ab1d-642b45ac8cb1"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:58ee408a-2dc5-4a72-bda1-d4f5ed5a7de2"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:3d0b6ace-0c15-4c17-931c-11232a82fc4a"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:3e53bb70-8935-4094-ae7f-7ac602f3287e"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:eb9cb2ee-66bb-499c-a05f-feb1cfd470ba"
+              },
+              {
+                "type": "FamilyMemberHistory",
+                "reference": "urn:uuid:3404c372-7682-4a6d-b4d1-2b118553a72f"
+              }
+            ]
+          },
+          {
+            "title": "Other",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "other"
+                }
+              ]
+            },
+            "entry": []
+          },
+          {
+            "title": "Questionnaire Responses",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "questionnaire-responses"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:b852cebe-e0ec-49f1-bbbd-ee7e2842ff49"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:c3d1e4e1-6f4b-469a-ad7e-e554ed01f6f2"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:fb55ad1c-83dd-43be-915d-abf288827fbe"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:05714279-6523-46cb-bd8a-0b38dad8eb58"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:64db87ac-6b85-4414-99a8-e75e73051845"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:99319f14-c270-4b56-b354-8a947e809877"
+              },
+              {
+                "type": "QuestionnaireResponse",
+                "reference": "urn:uuid:59d64a05-8336-451f-81d6-f60cd98964d3"
+              }
+            ]
+          },
+          {
+            "title": "Pedigree Diagram",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://purl.org/ga4gh/pedigree-fhir-ig/CodeSystem/SectionType",
+                  "code": "pedigreeImage"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "type": "DocumentReference",
+                "reference": "urn:uuid:81cddb9f-069a-4239-8978-289afe916e13"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:cea8732c-c011-4a22-b5e5-772c3b79c92b",
+      "resource": {
+        "resourceType": "Organization",
+        "id": "urn:uuid:cea8732c-c011-4a22-b5e5-772c3b79c92b",
+        "name": "open-pedigree unknown author"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe",
+      "resource": {
+        "id": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "unknown",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "III-1"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81",
+      "resource": {
+        "id": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "male",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "I-1"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2",
+      "resource": {
+        "id": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "female",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "I-2"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083",
+      "resource": {
+        "id": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "male",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "II-1"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1",
+      "resource": {
+        "id": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "male",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "II-2"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:52248971-8e71-4627-a025-62002f95016a",
+      "resource": {
+        "id": "urn:uuid:52248971-8e71-4627-a025-62002f95016a",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "female",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "II-3"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717",
+      "resource": {
+        "id": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717",
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeIndividual"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/patient-unborn",
+            "valueBoolean": false
+          }
+        ],
+        "gender": "unknown",
+        "identifier": [
+          {
+            "system": "https://github.com/aehrc/open-pedigree?externalID",
+            "value": "III-2"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d1b1efd9-638a-446d-b5b9-db8f2a2c6c9a",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:d1b1efd9-638a-446d-b5b9-db8f2a2c6c9a",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:026",
+              "display": "isPartner"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f692147c-6bde-46a3-b1ed-7d2db0fc87c2",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:f692147c-6bde-46a3-b1ed-7d2db0fc87c2",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:028",
+              "display": "isBiologicalFather"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7e413235-2118-4375-b684-a320da8f5b0b",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:7e413235-2118-4375-b684-a320da8f5b0b",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:027",
+              "display": "isBiologicalMother"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:4715b7df-a6aa-4878-b3b0-46290b002387",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:4715b7df-a6aa-4878-b3b0-46290b002387",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:028",
+              "display": "isBiologicalFather"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:5ce8c5f5-07b7-4670-8164-0886ec2af5ba",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:5ce8c5f5-07b7-4670-8164-0886ec2af5ba",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:027",
+              "display": "isBiologicalMother"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:6a00b867-70e8-4660-ab1d-642b45ac8cb1",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:6a00b867-70e8-4660-ab1d-642b45ac8cb1",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:026",
+              "display": "isPartner"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:58ee408a-2dc5-4a72-bda1-d4f5ed5a7de2",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:58ee408a-2dc5-4a72-bda1-d4f5ed5a7de2",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:026",
+              "display": "isPartner"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3d0b6ace-0c15-4c17-931c-11232a82fc4a",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:3d0b6ace-0c15-4c17-931c-11232a82fc4a",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:028",
+              "display": "isBiologicalFather"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3e53bb70-8935-4094-ae7f-7ac602f3287e",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:3e53bb70-8935-4094-ae7f-7ac602f3287e",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:027",
+              "display": "isBiologicalMother"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:eb9cb2ee-66bb-499c-a05f-feb1cfd470ba",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:eb9cb2ee-66bb-499c-a05f-feb1cfd470ba",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:028",
+              "display": "isBiologicalFather"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3404c372-7682-4a6d-b4d1-2b118553a72f",
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "id": "urn:uuid:3404c372-7682-4a6d-b4d1-2b118553a72f",
+        "meta": {
+          "profile": [
+            "http://purl.org/ga4gh/pedigree-fhir-ig/StructureDefinition/PedigreeRelationship"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+            "valueReference": {
+              "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+            }
+          }
+        ],
+        "status": "completed",
+        "patient": {
+          "reference": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717"
+        },
+        "relationship": {
+          "coding": [
+            {
+              "system": "http://purl.org/ga4gh/kin.fhir",
+              "code": "KIN:027",
+              "display": "isBiologicalMother"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b852cebe-e0ec-49f1-bbbd-ee7e2842ff49",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:b852cebe-e0ec-49f1-bbbd-ee7e2842ff49",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "U"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "III-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c3d1e4e1-6f4b-469a-ad7e-e554ed01f6f2",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:c3d1e4e1-6f4b-469a-ad7e-e554ed01f6f2",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:e93c127f-7acc-46ed-8285-42202c4c6083"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "M"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "II-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fb55ad1c-83dd-43be-915d-abf288827fbe",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:fb55ad1c-83dd-43be-915d-abf288827fbe",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:e38c3626-b937-45af-939f-4e456b7d3f81"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "M"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "I-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:05714279-6523-46cb-bd8a-0b38dad8eb58",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:05714279-6523-46cb-bd8a-0b38dad8eb58",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:3d282741-33de-4808-ae17-f8fdebbe56e2"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "F"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "I-2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:64db87ac-6b85-4414-99a8-e75e73051845",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:64db87ac-6b85-4414-99a8-e75e73051845",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:52248971-8e71-4627-a025-62002f95016a"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "F"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "II-3"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:99319f14-c270-4b56-b354-8a947e809877",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:99319f14-c270-4b56-b354-8a947e809877",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:504d5e1d-6fef-4470-8e11-0193342f69e1"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "M"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "II-2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:59d64a05-8336-451f-81d6-f60cd98964d3",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "urn:uuid:59d64a05-8336-451f-81d6-f60cd98964d3",
+        "status": "completed",
+        "questionnaire": "https://aehrc.github.io/open-pedigree/fhir/Questionnaire/default|1.0",
+        "subject": {
+          "reference": "urn:uuid:0abf9d71-207d-42ca-8e7b-6becd666c717"
+        },
+        "item": [
+          {
+            "linkId": "gender",
+            "answer": [
+              {
+                "valueString": "U"
+              }
+            ]
+          },
+          {
+            "linkId": "external_id",
+            "answer": [
+              {
+                "valueString": "III-2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:81cddb9f-069a-4239-8978-289afe916e13",
+      "resource": {
+        "id": "urn:uuid:81cddb9f-069a-4239-8978-289afe916e13",
+        "resourceType": "DocumentReference",
+        "status": "current",
+        "docStatus": "preliminary",
+        "subject": {
+          "type": "Patient",
+          "reference": "urn:uuid:7ef70694-8bf8-4626-8c58-d110a06cdabe"
+        },
+        "description": "Pedigree Diagram of Family in SVG format",
+        "content": {
+          "attachment": {
+            "contentType": "image/svg+xml",
+            "data": "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHN0eWxlPSJvdmVyZmxvdzogaGlkZGVuOyBwb3NpdGlvbjogcmVsYXRpdmU7IHRvcDogLTAuMTg3NXB4OyIgdmlld0JveD0iLTMwIC05MCA3NTYgNzI0IiB3aWR0aD0iNzU2IiBoZWlnaHQ9IjcyNCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1pbllNaW4iPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTQ5MiwyNzJMNDkyLDQwMCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTQ5Miw0MDBMNDkyLDQwMCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTQ5Miw0MDBMNDkyLDU0NCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTM0OCwyNzJMNDkyLDI3MiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTQ5MiwyNzJMNjM2LDI3MiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTM0OCwwTDM0OCwxNjAiIHN0cm9rZS13aWR0aD0iMyIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMzMzMiIGQ9Ik02MCwxNjBMNjM2LDE2MCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTYzNiwxNjBMNjM2LDI3MiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTYwLDE2MEw2MCwyNzIiIHN0cm9rZS13aWR0aD0iMyIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMzMzMiIGQ9Ik0zNDgsMEw0OTIsMCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMzMzMyIgZD0iTTIwNCwwTDM0OCwwIiBzdHJva2Utd2lkdGg9IjMiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzMzMzIiBkPSJNMjA0LDI3MkwyMDQsNDAwIiBzdHJva2Utd2lkdGg9IjMiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzMzMzIiBkPSJNMjA0LDQwMEwyMDQsNDAwIiBzdHJva2Utd2lkdGg9IjMiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzMzMzIiBkPSJNMjA0LDQwMEwyMDQsNTQ0IiBzdHJva2Utd2lkdGg9IjMiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzMzMzIiBkPSJNMjA0LDI3MkwzNDgsMjcyIiBzdHJva2Utd2lkdGg9IjMiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzMzMzIiBkPSJNNjAsMjcyTDIwNCwyNzIiIHN0cm9rZS13aWR0aD0iMyIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48ZGVzYyBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+Q3JlYXRlZCB3aXRoIFJhcGhhw6tsIDIuMy4wPC9kZXNjPjxkZWZzIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij48bGluZWFyR3JhZGllbnQgaWQ9IjViZG56NDUtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAuOTk5OTk5OTk5OTk5OTk5OCIgeDI9IjEiIHkyPSIwIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiOGI4YjgiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0icXBhNGQ0NS1fZmZmZmZmOjAtX0I4QjhCODoxMDAiIHgxPSIwIiB5MT0iMC45OTk5OTk5OTk5OTk5OTk4IiB4Mj0iMSIgeTI9IjAiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2I4YjhiOCIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJod2t5ejAtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCIgZ3JhZGllbnRUcmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjYjhiOGI4IiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9IjF6eWYwMC1fZmZmZmZmOjAtX0I4QjhCODoxMDAiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIwIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiOGI4YjgiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0ia241bTAwLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjAiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2I4YjhiOCIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJyaHRycTAtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCIgZ3JhZGllbnRUcmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjYjhiOGI4IiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9Ijc0MjNqMC1fZmZmZmZmOjAtX0I4QjhCODoxMDAiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIwIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiOGI4YjgiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0ieGIxdWswLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjAiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2I4YjhiOCIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJvNGFjcjAtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCIgZ3JhZGllbnRUcmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjYjhiOGI4IiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9InAwdnQxMC1fZmZmZmZmOjAtX0I4QjhCODoxMDAiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIwIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiOGI4YjgiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0ic3c4YzAwLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjAiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2I4YjhiOCIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSIwdTdybjAtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCIgZ3JhZGllbnRUcmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjYjhiOGI4IiBzdG9wLW9wYWNpdHk9IjEiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9InNtdzJxNDUtX2ZmZmZmZjowLV9COEI4Qjg6MTAwIiB4MT0iMCIgeTE9IjAuOTk5OTk5OTk5OTk5OTk5OCIgeDI9IjEiIHkyPSIwIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiOGI4YjgiIHN0b3Atb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0iZGhnMjY0NS1fZmZmZmZmOjAtX0I4QjhCODoxMDAiIHgxPSIwIiB5MT0iMC45OTk5OTk5OTk5OTk5OTk4IiB4Mj0iMSIgeTI9IjAiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2I4YjhiOCIgc3RvcC1vcGFjaXR5PSIxIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHg9IjExNCIgeT0iNDU0IiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjUiIHJ5PSI1IiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjE3Mi44ODczMDE2Mjc3OTE5IiB5PSI1MTIuODg3MzAxNjI3NzkxOSIgd2lkdGg9IjYyLjIyNTM5Njc0NDQxNjE4IiBoZWlnaHQ9IjYyLjIyNTM5Njc0NDQxNjE4IiByeD0iMCIgcnk9IjAiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMC4zIiBmaWxsLW9wYWNpdHk9IjEiIHN0cm9rZS13aWR0aD0iMyIgdHJhbnNmb3JtPSJtYXRyaXgoMC43MDcxLDAuNzA3MSwtMC43MDcxLDAuNzA3MSw0NDQuNDE2MywxOS4zMjY4KSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMC4zOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHJlY3QgeD0iMTcyLjg4NzMwMTYyNzc5MTkiIHk9IjUxMi44ODczMDE2Mjc3OTE5IiB3aWR0aD0iNjIuMjI1Mzk2NzQ0NDE2MTgiIGhlaWdodD0iNjIuMjI1Mzk2NzQ0NDE2MTgiIHJ4PSIwIiByeT0iMCIgZmlsbD0idXJsKCcjNWJkbno0NS1fZmZmZmZmOjAtX0I4QjhCODoxMDAnKSIgc3Ryb2tlPSIjMzMzMzMzIiBvcGFjaXR5PSIxIiBmaWxsLW9wYWNpdHk9IjEiIHN0cm9rZS13aWR0aD0iNS4wOTI1OTI1OTI1OTI1OTMiIHRyYW5zZm9ybT0ibWF0cml4KDAuNzYzNywwLjc2MzcsLTAuNzYzNywwLjc2MzcsNDYzLjY0OTYsLTI3LjIyOTEpIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHBhdGggZmlsbD0iIzU5NTk1OSIgc3Ryb2tlPSJub25lIiBkPSJNOS4xODI4MDAwMDAwMDAwMDIsMjUuMzMxOUM5LjE4MjgwMDAwMDAwMDAwMiwyNS4zMzE5LDAuODcwMTAwMDAwMDAwMDAwMSwzMy42NDI0LDAuODcwMTAwMDAwMDAwMDAwMSwzMy42NDI0QzAuODcwMTAwMDAwMDAwMDAwMSwzMy42NDI0LDMuODY2NTAwMDAwMDAwMDAwMywzNi42Mzg4LDMuODY2NTAwMDAwMDAwMDAwMywzNi42Mzg4QzMuODY2NTAwMDAwMDAwMDAwMywzNi42Mzg4LDEyLjE3NzAwMDAwMDAwMDAwMSwyOC4zMjcyLDEyLjE3NzQ0LDI4LjMyNzJDMTIuMTc3MDAwMDAwMDAwMDAxLDI4LjMyNzIsMTQuNDI1NDAwMDAwMDAwMDAyLDMwLjU3NDUwMDAwMDAwMDAwNCwxNC40MjU0MDAwMDAwMDAwMDIsMzAuNTc0NTAwMDAwMDAwMDA0QzE0LjQyNTQwMDAwMDAwMDAwMiwzMC41NzQ1MDAwMDAwMDAwMDQsMTcuMTU3OCwyMC4zNzY0MDAwMDAwMDAwMDQsMTcuMTU3OCwyMC4zNzY0MDAwMDAwMDAwMDRDMTcuMTU3OCwyMC4zNzY0MDAwMDAwMDAwMDQsNi45NTk3MDAwMDAwMDAwMDEsMjMuMTA4ODAwMDAwMDAwMDAyLDYuOTU5NzAwMDAwMDAwMDAxLDIzLjEwODgwMDAwMDAwMDAwMkM2Ljk1OTcwMDAwMDAwMDAwMSwyMy4xMDg4MDAwMDAwMDAwMDIsOS4xODI4MDAwMDAwMDAwMDIsMjUuMzMxOSw5LjE4MjgwMDAwMDAwMDAwMiwyNS4zMzEzNTAwMDAwMDAwMDRDOS4xODI4MDAwMDAwMDAwMDIsMjUuMzMxOSw5LjE4MjgwMDAwMDAwMDAwMiwyNS4zMzE5LDkuMTgyODAwMDAwMDAwMDAyLDI1LjMzMTkiIG9wYWNpdHk9IjEiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMTQ2Ljg4NzMsNTYzLjExMjcpIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyIvPjx0ZXh0IHg9IjIwNCIgeT0iNjE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMThweCIgc3Ryb2tlPSJub25lIiBmaWxsPSIjMDAwMDAwIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyBmb250LWZhbWlseTogQXJpYWw7IGZvbnQtc2l6ZTogMThweDsiPjx0c3BhbiBkeT0iNiIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPltJSUktMV08L3RzcGFuPjwvdGV4dD48cmVjdCB4PSIxMTQiIHk9IjQ1NCIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzAwODAwMCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjExNCIgeT0iLTkwIiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjUiIHJ5PSI1IiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjE2NCIgeT0iLTQwIiB3aWR0aD0iODAiIGhlaWdodD0iODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzgwODA4MCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwLjMiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDMsMykiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDAuMzsgZmlsbC1vcGFjaXR5OiAxOyIvPjxyZWN0IHg9IjE2NCIgeT0iLTQwIiB3aWR0aD0iODAiIGhlaWdodD0iODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0idXJsKCcjaHdreXowLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCcpIiBzdHJva2U9IiMzMzMzMzMiIG9wYWNpdHk9IjEiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHRleHQgeD0iMjA0IiB5PSI3MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4cHgiIHN0cm9rZT0ibm9uZSIgZmlsbD0iIzAwMDAwMCIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgdGV4dC1hbmNob3I6IG1pZGRsZTsgZm9udC1mYW1pbHk6IEFyaWFsOyBmb250LXNpemU6IDE4cHg7Ij48dHNwYW4gZHk9IjYiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij5bSS0xXTwvdHNwYW4+PC90ZXh0PjxyZWN0IHg9IjExNCIgeT0iLTkwIiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjAiIHJ5PSIwIiBmaWxsPSIjMDA4MDAwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PHJlY3QgeD0iNDAyIiB5PSItOTAiIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiByeD0iNSIgcnk9IjUiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMCIgZmlsbC1vcGFjaXR5PSIwLjM1IiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PGNpcmNsZSBjeD0iNDkyIiBjeT0iMCIgcj0iNDAiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMC4zIiBmaWxsLW9wYWNpdHk9IjEiIHN0cm9rZS13aWR0aD0iMyIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwzLDMpIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwLjM7IGZpbGwtb3BhY2l0eTogMTsiLz48Y2lyY2xlIGN4PSI0OTIiIGN5PSIwIiByPSI0MCIgZmlsbD0idXJsKCcja241bTAwLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCcpIiBzdHJva2U9IiMzMzMzMzMiIG9wYWNpdHk9IjEiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHRleHQgeD0iNDkyIiB5PSI3MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4cHgiIHN0cm9rZT0ibm9uZSIgZmlsbD0iIzAwMDAwMCIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgdGV4dC1hbmNob3I6IG1pZGRsZTsgZm9udC1mYW1pbHk6IEFyaWFsOyBmb250LXNpemU6IDE4cHg7Ij48dHNwYW4gZHk9IjYiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij5bSS0yXTwvdHNwYW4+PC90ZXh0PjxyZWN0IHg9IjQwMiIgeT0iLTkwIiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjAiIHJ5PSIwIiBmaWxsPSIjMDA4MDAwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PHJlY3QgeD0iLTMwIiB5PSIxODIiIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiByeD0iNSIgcnk9IjUiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMCIgZmlsbC1vcGFjaXR5PSIwLjM1IiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PHJlY3QgeD0iMjAiIHk9IjIzMiIgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMCIgcnk9IjAiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMC4zIiBmaWxsLW9wYWNpdHk9IjEiIHN0cm9rZS13aWR0aD0iMyIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwzLDMpIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwLjM7IGZpbGwtb3BhY2l0eTogMTsiLz48cmVjdCB4PSIyMCIgeT0iMjMyIiB3aWR0aD0iODAiIGhlaWdodD0iODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0idXJsKCcjNzQyM2owLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCcpIiBzdHJva2U9IiMzMzMzMzMiIG9wYWNpdHk9IjEiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHRleHQgeD0iNjAiIHk9IjM0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4cHgiIHN0cm9rZT0ibm9uZSIgZmlsbD0iIzAwMDAwMCIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgdGV4dC1hbmNob3I6IG1pZGRsZTsgZm9udC1mYW1pbHk6IEFyaWFsOyBmb250LXNpemU6IDE4cHg7Ij48dHNwYW4gZHk9IjYiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ij5bSUktMV08L3RzcGFuPjwvdGV4dD48cmVjdCB4PSItMzAiIHk9IjE4MiIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzAwODAwMCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjU0NiIgeT0iMTgyIiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjUiIHJ5PSI1IiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjU5NiIgeT0iMjMyIiB3aWR0aD0iODAiIGhlaWdodD0iODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzgwODA4MCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwLjMiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDMsMykiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDAuMzsgZmlsbC1vcGFjaXR5OiAxOyIvPjxyZWN0IHg9IjU5NiIgeT0iMjMyIiB3aWR0aD0iODAiIGhlaWdodD0iODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0idXJsKCcjbzRhY3IwLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCcpIiBzdHJva2U9IiMzMzMzMzMiIG9wYWNpdHk9IjEiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHRleHQgeD0iNjM2IiB5PSIzNDQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOHB4IiBzdHJva2U9Im5vbmUiIGZpbGw9IiMwMDAwMDAiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IHRleHQtYW5jaG9yOiBtaWRkbGU7IGZvbnQtZmFtaWx5OiBBcmlhbDsgZm9udC1zaXplOiAxOHB4OyI+PHRzcGFuIGR5PSI2IiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+W0lJLTJdPC90c3Bhbj48L3RleHQ+PHJlY3QgeD0iNTQ2IiB5PSIxODIiIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiByeD0iMCIgcnk9IjAiIGZpbGw9IiMwMDgwMDAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMCIgZmlsbC1vcGFjaXR5PSIwLjM1IiB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDA7IGZpbGwtb3BhY2l0eTogMC4zNTsiLz48cmVjdCB4PSIyNTgiIHk9IjE4MiIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHJ4PSI1IiByeT0iNSIgZmlsbD0iIzgwODA4MCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDA7IGZpbGwtb3BhY2l0eTogMC4zNTsiLz48Y2lyY2xlIGN4PSIzNDgiIGN5PSIyNzIiIHI9IjQwIiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAuMyIgZmlsbC1vcGFjaXR5PSIxIiBzdHJva2Utd2lkdGg9IjMiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMywzKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMC4zOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PGNpcmNsZSBjeD0iMzQ4IiBjeT0iMjcyIiByPSI0MCIgZmlsbD0idXJsKCcjc3c4YzAwLV9mZmZmZmY6MC1fQjhCOEI4OjEwMCcpIiBzdHJva2U9IiMzMzMzMzMiIG9wYWNpdHk9IjEiIGZpbGwtb3BhY2l0eT0iMSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAxOyBmaWxsLW9wYWNpdHk6IDE7Ii8+PHRleHQgeD0iMzQ4IiB5PSIzNDQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOHB4IiBzdHJva2U9Im5vbmUiIGZpbGw9IiMwMDAwMDAiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IHRleHQtYW5jaG9yOiBtaWRkbGU7IGZvbnQtZmFtaWx5OiBBcmlhbDsgZm9udC1zaXplOiAxOHB4OyI+PHRzcGFuIGR5PSI2IiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyI+W0lJLTNdPC90c3Bhbj48L3RleHQ+PHJlY3QgeD0iMjU4IiB5PSIxODIiIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiByeD0iMCIgcnk9IjAiIGZpbGw9IiMwMDgwMDAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMCIgZmlsbC1vcGFjaXR5PSIwLjM1IiB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDAsMCkiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDA7IGZpbGwtb3BhY2l0eTogMC4zNTsiLz48cmVjdCB4PSI0MDIiIHk9IjQ1NCIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHJ4PSI1IiByeT0iNSIgZmlsbD0iIzgwODA4MCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDA7IGZpbGwtb3BhY2l0eTogMC4zNTsiLz48cmVjdCB4PSI0NjAuODg3MzAxNjI3NzkxOSIgeT0iNTEyLjg4NzMwMTYyNzc5MTkiIHdpZHRoPSI2Mi4yMjUzOTY3NDQ0MTYxOCIgaGVpZ2h0PSI2Mi4yMjUzOTY3NDQ0MTYxOCIgcng9IjAiIHJ5PSIwIiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAuMyIgZmlsbC1vcGFjaXR5PSIxIiBzdHJva2Utd2lkdGg9IjMiIHRyYW5zZm9ybT0ibWF0cml4KDAuNzA3MSwwLjcwNzEsLTAuNzA3MSwwLjcwNzEsNTI4Ljc2OTYsLTE4NC4zMikiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDAuMzsgZmlsbC1vcGFjaXR5OiAxOyIvPjxyZWN0IHg9IjQ2MC44ODczMDE2Mjc3OTE5IiB5PSI1MTIuODg3MzAxNjI3NzkxOSIgd2lkdGg9IjYyLjIyNTM5Njc0NDQxNjE4IiBoZWlnaHQ9IjYyLjIyNTM5Njc0NDQxNjE4IiByeD0iMCIgcnk9IjAiIGZpbGw9InVybCgnI3NtdzJxNDUtX2ZmZmZmZjowLV9COEI4Qjg6MTAwJykiIHN0cm9rZT0iIzMzMzMzMyIgb3BhY2l0eT0iMSIgZmlsbC1vcGFjaXR5PSIxIiBzdHJva2Utd2lkdGg9IjMiIHRyYW5zZm9ybT0ibWF0cml4KDAuNzA3MSwwLjcwNzEsLTAuNzA3MSwwLjcwNzEsNTI4Ljc2OTYsLTE4OC41NjI2KSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMTsgZmlsbC1vcGFjaXR5OiAxOyIvPjx0ZXh0IHg9IjQ5MiIgeT0iNjE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMThweCIgc3Ryb2tlPSJub25lIiBmaWxsPSIjMDAwMDAwIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyBmb250LWZhbWlseTogQXJpYWw7IGZvbnQtc2l6ZTogMThweDsiPjx0c3BhbiBkeT0iNiIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiPltJSUktMl08L3RzcGFuPjwvdGV4dD48cmVjdCB4PSI0MDIiIHk9IjQ1NCIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzAwODAwMCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxyZWN0IHg9IjE3OCIgeT0iMjQwIiB3aWR0aD0iNTIiIGhlaWdodD0iOTIiIHJ4PSI1IiByeT0iNSIgZmlsbD0iIzgwODA4MCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7IG9wYWNpdHk6IDA7IGZpbGwtb3BhY2l0eTogMC4zNTsiLz48Y2lyY2xlIGN4PSIyMDQiIGN5PSIyNzIiIHI9IjYuNSIgZmlsbD0iI2RjNzg2OCIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHRleHQgeD0iMjA0IiB5PSIyNTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJUYWhvbWEiIGZvbnQtc2l6ZT0iMTRweCIgc3Ryb2tlPSJub25lIiBmaWxsPSIjMDAwMDAwIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyBmb250LWZhbWlseTogVGFob21hOyBmb250LXNpemU6IDE0cHg7Ij48dHNwYW4gZHk9IjI1MiIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L3RleHQ+PHJlY3QgeD0iMTc4IiB5PSIyNDAiIHdpZHRoPSI1MiIgaGVpZ2h0PSI5MiIgcng9IjAiIHJ5PSIwIiBmaWxsPSIjMDA4MDAwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PHJlY3QgeD0iMzIyIiB5PSItMzIiIHdpZHRoPSI1MiIgaGVpZ2h0PSI5MiIgcng9IjUiIHJ5PSI1IiBmaWxsPSIjODA4MDgwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjxjaXJjbGUgY3g9IjM0OCIgY3k9IjAiIHI9IjYuNSIgZmlsbD0iI2RjNzg2OCIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PHRleHQgeD0iMzQ4IiB5PSItMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJUYWhvbWEiIGZvbnQtc2l6ZT0iMTRweCIgc3Ryb2tlPSJub25lIiBmaWxsPSIjMDAwMDAwIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyBmb250LWZhbWlseTogVGFob21hOyBmb250LXNpemU6IDE0cHg7Ij48dHNwYW4gZHk9Ii0yMCIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsiLz48L3RleHQ+PHJlY3QgeD0iMzIyIiB5PSItMzIiIHdpZHRoPSI1MiIgaGVpZ2h0PSI5MiIgcng9IjAiIHJ5PSIwIiBmaWxsPSIjMDA4MDAwIiBzdHJva2U9Im5vbmUiIG9wYWNpdHk9IjAiIGZpbGwtb3BhY2l0eT0iMC4zNSIgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwwLDApIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PGNpcmNsZSBjeD0iMzQ4IiBjeT0iMTYwIiByPSIzLjI1IiBmaWxsPSIjNjY2NjY2IiBzdHJva2U9IiM4ODg4ODgiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMTsiLz48cmVjdCB4PSI0NjYiIHk9IjI0MCIgd2lkdGg9IjUyIiBoZWlnaHQ9IjkyIiByeD0iNSIgcnk9IjUiIGZpbGw9IiM4MDgwODAiIHN0cm9rZT0ibm9uZSIgb3BhY2l0eT0iMCIgZmlsbC1vcGFjaXR5PSIwLjM1IiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyBvcGFjaXR5OiAwOyBmaWxsLW9wYWNpdHk6IDAuMzU7Ii8+PGNpcmNsZSBjeD0iNDkyIiBjeT0iMjcyIiByPSI2LjUiIGZpbGw9IiNkYzc4NjgiIHN0cm9rZT0iIzAwMDAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHlsZT0iLXdlYmtpdC10YXAtaGlnaGxpZ2h0LWNvbG9yOiByZ2JhKDAsIDAsIDAsIDApOyIvPjx0ZXh0IHg9IjQ5MiIgeT0iMjUyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iVGFob21hIiBmb250LXNpemU9IjE0cHgiIHN0cm9rZT0ibm9uZSIgZmlsbD0iIzAwMDAwMCIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgdGV4dC1hbmNob3I6IG1pZGRsZTsgZm9udC1mYW1pbHk6IFRhaG9tYTsgZm9udC1zaXplOiAxNHB4OyI+PHRzcGFuIGR5PSIyNTIiIHN0eWxlPSItd2Via2l0LXRhcC1oaWdobGlnaHQtY29sb3I6IHJnYmEoMCwgMCwgMCwgMCk7Ii8+PC90ZXh0PjxyZWN0IHg9IjQ2NiIgeT0iMjQwIiB3aWR0aD0iNTIiIGhlaWdodD0iOTIiIHJ4PSIwIiByeT0iMCIgZmlsbD0iIzAwODAwMCIgc3Ryb2tlPSJub25lIiBvcGFjaXR5PSIwIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsMCwwKSIgc3R5bGU9Ii13ZWJraXQtdGFwLWhpZ2hsaWdodC1jb2xvcjogcmdiYSgwLCAwLCAwLCAwKTsgb3BhY2l0eTogMDsgZmlsbC1vcGFjaXR5OiAwLjM1OyIvPjwvc3ZnPg=="
+          }
+        }
+      }
+    }
+  ]
+}

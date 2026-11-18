@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "examples:build": "node scripts/build-examples.js",
+    "examples:check": "node scripts/build-examples.js --check"
   },
   "repository": {
     "type": "git",

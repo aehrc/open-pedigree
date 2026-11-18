@@ -1,0 +1,533 @@
+{
+  "people": [
+    {
+      "id": "albert",
+      "sex": "M",
+      "name": "Albert of Saxe-Coburg-Gotha",
+      "status": "deceased"
+    },
+    {
+      "id": "victoria",
+      "sex": "F",
+      "name": "Queen Victoria",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier",
+      "comment": "1819-1901"
+    },
+    {
+      "id": "ii-1",
+      "sex": "F",
+      "father": "albert",
+      "mother": "victoria",
+      "status": "deceased"
+    },
+    {
+      "id": "edward-vii",
+      "sex": "M",
+      "father": "albert",
+      "mother": "victoria",
+      "name": "Edward VII",
+      "status": "deceased"
+    },
+    {
+      "id": "alice-husband",
+      "sex": "M",
+      "status": "deceased"
+    },
+    {
+      "id": "alice",
+      "sex": "F",
+      "father": "albert",
+      "mother": "victoria",
+      "name": "Alice",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "ii-4",
+      "sex": "M",
+      "father": "albert",
+      "mother": "victoria",
+      "status": "deceased"
+    },
+    {
+      "id": "ii-5",
+      "sex": "F",
+      "father": "albert",
+      "mother": "victoria",
+      "status": "deceased"
+    },
+    {
+      "id": "ii-6",
+      "sex": "F",
+      "father": "albert",
+      "mother": "victoria",
+      "status": "deceased"
+    },
+    {
+      "id": "ii-7",
+      "sex": "M",
+      "father": "albert",
+      "mother": "victoria",
+      "status": "deceased"
+    },
+    {
+      "id": "leopold",
+      "sex": "M",
+      "father": "albert",
+      "mother": "victoria",
+      "name": "Leopold",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "leopold-wife",
+      "sex": "F",
+      "status": "deceased"
+    },
+    {
+      "id": "beatrice-husband",
+      "sex": "M",
+      "status": "deceased"
+    },
+    {
+      "id": "beatrice",
+      "sex": "F",
+      "father": "albert",
+      "mother": "victoria",
+      "name": "Beatrice",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "alice-1",
+      "sex": "F",
+      "father": "alice-husband",
+      "mother": "alice",
+      "status": "deceased"
+    },
+    {
+      "id": "alice-2",
+      "sex": "F",
+      "father": "alice-husband",
+      "mother": "alice",
+      "status": "deceased"
+    },
+    {
+      "id": "irene",
+      "sex": "F",
+      "father": "alice-husband",
+      "mother": "alice",
+      "name": "Irene",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "irene-husband",
+      "sex": "M",
+      "status": "deceased"
+    },
+    {
+      "id": "alice-4",
+      "sex": "M",
+      "father": "alice-husband",
+      "mother": "alice",
+      "status": "deceased"
+    },
+    {
+      "id": "friedrich",
+      "sex": "M",
+      "father": "alice-husband",
+      "mother": "alice",
+      "name": "Friedrich",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "nicholas-ii",
+      "sex": "M",
+      "name": "Tsar Nicholas II",
+      "status": "deceased"
+    },
+    {
+      "id": "alexandra",
+      "sex": "F",
+      "father": "alice-husband",
+      "mother": "alice",
+      "name": "Tsarina Alexandra",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "alice-7",
+      "sex": "F",
+      "father": "alice-husband",
+      "mother": "alice",
+      "status": "deceased"
+    },
+    {
+      "id": "waldemar",
+      "sex": "M",
+      "father": "irene-husband",
+      "mother": "irene",
+      "name": "Waldemar",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "irene-2",
+      "sex": "M",
+      "father": "irene-husband",
+      "mother": "irene",
+      "status": "deceased"
+    },
+    {
+      "id": "heinrich",
+      "sex": "M",
+      "father": "irene-husband",
+      "mother": "irene",
+      "name": "Heinrich",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "olga",
+      "sex": "F",
+      "father": "nicholas-ii",
+      "mother": "alexandra",
+      "name": "Olga",
+      "status": "deceased"
+    },
+    {
+      "id": "tatiana",
+      "sex": "F",
+      "father": "nicholas-ii",
+      "mother": "alexandra",
+      "name": "Tatiana",
+      "status": "deceased"
+    },
+    {
+      "id": "maria",
+      "sex": "F",
+      "father": "nicholas-ii",
+      "mother": "alexandra",
+      "name": "Maria",
+      "status": "deceased"
+    },
+    {
+      "id": "anastasia",
+      "sex": "F",
+      "father": "nicholas-ii",
+      "mother": "alexandra",
+      "name": "Anastasia",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "alexei",
+      "sex": "M",
+      "father": "nicholas-ii",
+      "mother": "alexandra",
+      "name": "Alexei",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "proband": true
+    },
+    {
+      "id": "alice-of-albany-husband",
+      "sex": "M",
+      "status": "deceased"
+    },
+    {
+      "id": "alice-of-albany",
+      "sex": "F",
+      "father": "leopold",
+      "mother": "leopold-wife",
+      "name": "Alice",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "leopold-2",
+      "sex": "M",
+      "father": "leopold",
+      "mother": "leopold-wife",
+      "status": "deceased"
+    },
+    {
+      "id": "alice-of-albany-1",
+      "sex": "F",
+      "father": "alice-of-albany-husband",
+      "mother": "alice-of-albany",
+      "status": "deceased"
+    },
+    {
+      "id": "rupert",
+      "sex": "M",
+      "father": "alice-of-albany-husband",
+      "mother": "alice-of-albany",
+      "name": "Rupert",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "alice-of-albany-3",
+      "sex": "M",
+      "father": "alice-of-albany-husband",
+      "mother": "alice-of-albany",
+      "status": "deceased"
+    },
+    {
+      "id": "beatrice-1",
+      "sex": "M",
+      "father": "beatrice-husband",
+      "mother": "beatrice",
+      "status": "deceased"
+    },
+    {
+      "id": "victoria-eugenie",
+      "sex": "F",
+      "father": "beatrice-husband",
+      "mother": "beatrice",
+      "name": "Victoria Eugenie",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ],
+      "carrier": "carrier"
+    },
+    {
+      "id": "alfonso-xiii",
+      "sex": "M",
+      "name": "Alfonso XIII",
+      "status": "deceased"
+    },
+    {
+      "id": "leopold-b",
+      "sex": "M",
+      "father": "beatrice-husband",
+      "mother": "beatrice",
+      "name": "Leopold",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "maurice",
+      "sex": "M",
+      "father": "beatrice-husband",
+      "mother": "beatrice",
+      "name": "Maurice",
+      "status": "deceased",
+      "comment": "? in the figure"
+    },
+    {
+      "id": "alfonso",
+      "sex": "M",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "name": "Alfonso",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "ve-2",
+      "sex": "M",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "status": "deceased"
+    },
+    {
+      "id": "beatrice-ve",
+      "sex": "F",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "name": "Beatrice",
+      "status": "deceased"
+    },
+    {
+      "id": "beatrice-ve-husband",
+      "sex": "M",
+      "status": "deceased"
+    },
+    {
+      "id": "ve-4",
+      "sex": "F",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "status": "deceased"
+    },
+    {
+      "id": "ve-5",
+      "sex": "M",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "status": "deceased"
+    },
+    {
+      "id": "gonzalo",
+      "sex": "M",
+      "father": "alfonso-xiii",
+      "mother": "victoria-eugenie",
+      "name": "Gonzalo",
+      "status": "deceased",
+      "disorders": [
+        {
+          "id": "http://purl.bioontology.org/ontology/OMIM/306900",
+          "name": "Hemophilia B"
+        }
+      ]
+    },
+    {
+      "id": "bv-1",
+      "sex": "F",
+      "father": "beatrice-ve-husband",
+      "mother": "beatrice-ve"
+    },
+    {
+      "id": "bv-2",
+      "sex": "M",
+      "father": "beatrice-ve-husband",
+      "mother": "beatrice-ve"
+    },
+    {
+      "id": "bv-3",
+      "sex": "M",
+      "father": "beatrice-ve-husband",
+      "mother": "beatrice-ve",
+      "status": "deceased"
+    },
+    {
+      "id": "bv-4",
+      "sex": "F",
+      "father": "beatrice-ve-husband",
+      "mother": "beatrice-ve"
+    },
+    {
+      "id": "bv-4-husband",
+      "sex": "M"
+    },
+    {
+      "id": "bv4-1",
+      "sex": "F",
+      "father": "bv-4-husband",
+      "mother": "bv-4"
+    },
+    {
+      "id": "bv4-2",
+      "sex": "F",
+      "father": "bv-4-husband",
+      "mother": "bv-4"
+    },
+    {
+      "id": "bv4-3",
+      "sex": "M",
+      "father": "bv-4-husband",
+      "mother": "bv-4",
+      "status": "deceased"
+    },
+    {
+      "id": "bv4-4",
+      "sex": "F",
+      "father": "bv-4-husband",
+      "mother": "bv-4",
+      "status": "deceased"
+    },
+    {
+      "id": "bv4-5",
+      "sex": "F",
+      "father": "bv-4-husband",
+      "mother": "bv-4"
+    },
+    {
+      "id": "bv4-6",
+      "sex": "F",
+      "father": "bv-4-husband",
+      "mother": "bv-4"
+    }
+  ]
+}

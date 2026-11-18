@@ -1,0 +1,58 @@
+{
+  "idLabels": true,
+  "people": [
+    {
+      "id": "I-1",
+      "sex": "M"
+    },
+    {
+      "id": "I-2",
+      "sex": "F"
+    },
+    {
+      "id": "I-3",
+      "sex": "M"
+    },
+    {
+      "id": "I-4",
+      "sex": "F"
+    },
+    {
+      "id": "II-1",
+      "sex": "M",
+      "father": "I-1",
+      "mother": "I-2"
+    },
+    {
+      "id": "II-2",
+      "sex": "M",
+      "father": "I-1",
+      "mother": "I-2"
+    },
+    {
+      "id": "II-3",
+      "sex": "F",
+      "father": "I-3",
+      "mother": "I-4"
+    },
+    {
+      "id": "II-4",
+      "sex": "F",
+      "father": "I-3",
+      "mother": "I-4"
+    },
+    {
+      "id": "III-1",
+      "sex": "U",
+      "father": "II-1",
+      "mother": "II-3",
+      "proband": true
+    },
+    {
+      "id": "III-2",
+      "sex": "U",
+      "father": "II-2",
+      "mother": "II-4"
+    }
+  ]
+}

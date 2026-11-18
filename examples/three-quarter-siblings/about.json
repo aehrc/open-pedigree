@@ -1,0 +1,13 @@
+{
+  "title": "Three-quarter siblings",
+  "kind": "classic",
+  "order": 3,
+  "summary": "Two brothers each have a child with the same woman: the children share more than half-siblings do.",
+  "shows": [
+    "Two brothers (II-1 and II-2) each have a child with the same woman (II-3). Their children (III-1 and III-2) share a mother, and their fathers are brothers, so on average they share three-eighths of their genes: more than half-siblings (a quarter), less than full siblings (a half).",
+    "No union here is consanguineous: the woman isn't related to the brothers."
+  ],
+  "hard": [
+    "The woman has two partners who are themselves siblings. She has to sit between them, with each child below its own couple, and the brothers' sibship line has to pass her without running through her symbol."
+  ]
+}

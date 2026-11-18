@@ -34,8 +34,8 @@ jobs:
 
       - name: Prepare Pages artifact
         run: |
-          mkdir _site
-          cp localEditor.html _site/index.html
+          # the landing page, the demo editor at editor/, and the example pages (examples/)
+          node scripts/build-site.js _site
           cp -r dist _site/dist
           # open-pedigree's FHIR definitions, at their canonical URLs (fhirUrls.ts, fhir/)
           node scripts/build-fhir-site.js _site/fhir
@@ -48,6 +48,28 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deployment
+
+      # The website: fail the run if the landing page, the editor, or any example's page or files
+      # don't resolve once deployed. Pages can take a moment.
+      - name: Check the site resolves
+        run: |
+          base=https://aehrc.github.io/open-pedigree
+          check() {
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -s -L -o /dev/null -w '%{http_code}' "$1")
+              [ "$code" = 200 ] && { echo "200 $1"; return 0; }
+              [ "$attempt" = 6 ] || sleep 10
+            done
+            echo "$code $1"; return 1
+          }
+          check "$base/" && check "$base/editor/" && check "$base/dist/pedigree.min.js" || exit 1
+          examples=$(cd _site/examples && ls -d */ | tr -d /)
+          [ -n "$examples" ] || { echo "no examples built"; exit 1; }
+          for name in $examples; do
+            for file in "" pedigree.json pedigree.svg; do
+              check "$base/examples/$name/$file" || exit 1
+            done
+          done
 
       # The definitions' canonical URLs are written into saved pedigrees: fail the run if any built
       # definition doesn't resolve once deployed (its page and its JSON). Pages can take a moment.

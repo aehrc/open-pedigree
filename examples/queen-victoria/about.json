@@ -1,0 +1,25 @@
+{
+  "title": "Queen Victoria and haemophilia B",
+  "kind": "historic",
+  "order": 12,
+  "summary": "The \"royal disease\": haemophilia B, carried by Queen Victoria into European royal families.",
+  "shows": [
+    "The royal disease, a severe bleeding disorder, passed from Queen Victoria (1819-1901) through two of her daughters and her son Leopold to royal families across Europe. In 2009 Rogaev and colleagues analysed DNA from the remains of the Russian imperial family and concluded that it was a severe form of haemophilia B, caused by a mutation (IVS3-3A>G) that creates an abnormal splice site in the F9 gene on the X chromosome. Tsarevich Alexei carried the mutation on his only X chromosome; his mother, Tsarina Alexandra, and one of his sisters, putatively Anastasia, were heterozygous carriers.",
+    "It is the classic example of X-linked recessive inheritance: sons of a carrier mother are affected or not, daughters become carriers or not, and the disorder can pass silently through several generations of women. Leopold, himself affected, could pass the X chromosome carrying it only to his daughters, so his daughter Alice was an obligate carrier and her son Rupert was affected. Affected people are filled; carriers are filled with a dot in the centre, the editor's mark for a carrier of the disorder shown."
+  ],
+  "hard": [
+    "The pedigree is wide rather than deep: nine children of Victoria and Albert, six generations, and spouses from other royal houses joining at every level, so each sibship has to be spread out without its lines running into the next. Sixty people, most of them unnamed in the source, have to stay in their generations."
+  ],
+  "source": {
+    "citation": "Rogaev EI, Grigorenko AP, Faskhutdinova G, Kittler ELW, Moliaka YK (2009) Genotype analysis identifies the cause of the \"royal disease\". Science 326(5954): 817.",
+    "doi": "10.1126/science.1180660",
+    "figure": "Supporting Online Material, Figure S1"
+  },
+  "simplified": [
+    "The figure shows the branches through which the disease passed, not the whole family: only the people in it are shown, unnamed where it leaves them unnamed (most spouses, and the brothers and sisters of the people it names).",
+    "Carriers and affected people are as the figure marks them. Maurice is marked with a question mark in the figure: his status is left open here.",
+    "The editor orders brothers and sisters itself, to keep lines from crossing, so their order can differ from the figure's.",
+    "Only Queen Victoria's years are given, from the article's text; the figure gives none. Who is living or deceased is as the figure draws it.",
+    "Haemophilia B is coded as OMIM 306900."
+  ]
+}

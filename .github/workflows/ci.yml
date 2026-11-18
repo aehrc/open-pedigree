@@ -8,7 +8,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # (24.04, not ubuntu-latest: Playwright 1.60 can't install Chromium on ubuntu-latest's 26.04,
+    # and this job runs the example e2e specs; move on once Playwright supports it)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,4 +21,15 @@ jobs:
       - run: npm run build
       # (the FHIR definitions the Pages deploy publishes still build)
       - run: node scripts/build-fhir-site.js "$RUNNER_TEMP/fhir-site"
+      # (the website builds, and each published example still matches its source, drawn by this build)
+      - run: node scripts/build-site.js "$RUNNER_TEMP/site"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run examples:check
+      # the examples as layout tests, the website's hand-off, and the editor's ?example key, against
+      # the built dist/ served statically (the config's dev server reloads on test output)
+      - run: |
+          python3 -m http.server 9000 --bind 127.0.0.1 >/dev/null 2>&1 &
+          # (up before Playwright looks, or it would start the config's dev server instead)
+          for i in $(seq 1 50); do curl -s -o /dev/null http://127.0.0.1:9000/ && break; sleep 0.2; done
+          npx playwright test tests/e2e/example-layouts.spec.js tests/e2e/site.spec.js tests/e2e/example-key.spec.js
       - run: npm test

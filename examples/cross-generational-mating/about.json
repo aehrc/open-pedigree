@@ -1,0 +1,13 @@
+{
+  "title": "Uncle-niece mating",
+  "kind": "classic",
+  "order": 5,
+  "summary": "A man has a child with his sister's daughter: a union across generations.",
+  "shows": [
+    "A man (II-1) has a child (IV-1) with his niece (III-1), his sister's daughter. They are related as half-siblings are, so the child's inbreeding coefficient is 1/8.",
+    "Uncle-niece marriages recur in the Spanish Habsburgs, another example on this site."
+  ],
+  "hard": [
+    "The partners belong to different generations. The partnership has to join a person in one generation's row to a person in the next, without its line or the child's line running through anyone between them."
+  ]
+}
