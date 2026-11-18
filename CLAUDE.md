@@ -66,7 +66,7 @@ npm run examples:check   # fail if a committed example no longer matches its sou
 node scripts/build-site.js _site   # the website: landing page, editor/ (from localEditor.html), examples/
 ```
 
-The GitHub Pages website (`deploy-pages.yml`, every push to `main`) is the landing page, the demo editor at `/editor/` (`localEditor.html`; `?example=<name>` opens the `example-<name>` storage key instead of `pedigreeData`), the example pages (`examples/`, see `examples/README.md`; historic families only from their cited figure) and the FHIR definitions at `/fhir/`. The examples are also e2e layout tests (`tests/e2e/example-layouts.spec.js`).
+The GitHub Pages website (`deploy-pages.yml`, every push to `main`) is the landing page, the demo editor at `/editor/` (`localEditor.html`; `?example=<name>` opens the `example-<name>` storage key instead of `pedigreeData`), the example pages (`examples/`, see `examples/README.md`; historic families only from their cited figure; *form* examples carry their own `questionnaire.json`, stored as `questionnaire-<name>` and passed to the editor as `questionnaireLocal`), *Try your own form* at `/try/` (`OpenPedigree.checkQuestionnaire`, then the editor under the name `try`) and the FHIR definitions at `/fhir/`. The examples are also e2e layout tests (`tests/e2e/example-layouts.spec.js`).
 
 e2e tests that build their own editor over `localEditor.html`'s must call `retireAutoCreatedEditor(page)` (`tests/e2e/helpers/singleEditor.js`) first, or the page's original Controller also handles every property change.
 

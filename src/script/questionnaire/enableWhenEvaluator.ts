@@ -1,6 +1,11 @@
 import { evaluateGraphPredicate } from 'pedigree/questionnaire/graphPredicateEvaluator';
 import { dateAnswer } from 'pedigree/model/localDate';
 
+// The comparison operators and answer[x] keys evaluateCondition understands (checkQuestionnaire
+// reports others); keep these in step with extractAnswerValue and matches below.
+export const CONDITION_OPERATORS = ['exists', '=', '!=', '>', '<', '>=', '<='];
+export const ANSWER_VALUE_KEYS = ['answerBoolean', 'answerString', 'answerInteger', 'answerDecimal', 'answerDate', 'answerCoding'];
+
 function extractAnswerValue(condition: any): any {
   if (condition.hasOwnProperty('answerBoolean')) {
     return condition.answerBoolean;

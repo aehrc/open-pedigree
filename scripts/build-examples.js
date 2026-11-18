@@ -34,9 +34,9 @@ function exampleNames() {
   const names = fs.readdirSync(EXAMPLES, { withFileTypes: true })
     .filter((d) => d.isDirectory() && fs.existsSync(path.join(EXAMPLES, d.name, 'example.json')))
     .map((d) => d.name).sort();
-  const bad = names.filter((n) => !/^[a-z0-9-]+$/.test(n));
+  const bad = names.filter((n) => !/^[a-z0-9-]+$/.test(n) || ['try', 'build', 'builtin', 'own'].includes(n));
   if (bad.length) {
-    throw new Error('example folder names must be lower-case letters, digits and dashes: ' + bad.join(', '));
+    throw new Error('example folder names must be lower-case letters, digits and dashes, and not try, build, builtin or own (the site uses those): ' + bad.join(', '));
   }
   return names;
 }
@@ -67,6 +67,27 @@ function readExample(name) {
   });
   if (!people.length) problems.push('no people');
   if (people.filter((p) => p.proband).length > 1) problems.push('only one person can be the proband');
+  // an example with its own form: questionnaire.json beside it, and answers by linkId
+  const formFile = path.join(EXAMPLES, name, 'questionnaire.json');
+  if (fs.existsSync(formFile)) {
+    example.questionnaire = JSON.parse(fs.readFileSync(formFile, 'utf8'));
+  }
+  const linkIds = new Set();
+  const collect = (items) => (Array.isArray(items) ? items : []).forEach((item) => {
+    if (item && typeof item === 'object') {
+      linkIds.add(item.linkId);
+      collect(item.item);
+    }
+  });
+  collect(example.questionnaire && example.questionnaire.item);
+  people.filter((p) => p.answers).forEach((p) => {
+    if (!example.questionnaire) {
+      problems.push(`"${p.id}": answers need a questionnaire.json beside example.json`);
+      return;
+    }
+    Object.keys(p.answers).filter((linkId) => !linkIds.has(linkId))
+      .forEach((linkId) => problems.push(`"${p.id}": no item in questionnaire.json has the linkId ${linkId}`));
+  });
   if (problems.length) {
     throw new Error(`examples/${name}/example.json:\n  ` + problems.join('\n  '));
   }
@@ -105,11 +126,34 @@ async function draw(browser, base, example) {
   // no terminology server: the names come from the example
   await page.route(/ontoserver|\/fhir\//, (route) => route.abort());
   page.on('dialog', (dialog) => dialog.dismiss());
-  await page.addInitScript((key) => localStorage.removeItem(key), KEY);
+  // (an example's own form is given to the editor as the website gives it: questionnaire-<name>)
+  await page.addInitScript(({ key, form }) => {
+    localStorage.removeItem(key);
+    if (form) {
+      localStorage.setItem('questionnaire-build', form);
+    } else {
+      localStorage.removeItem('questionnaire-build');
+    }
+  }, { key: KEY, form: example.questionnaire ? JSON.stringify(example.questionnaire) : null });
   await page.goto(`${base}/localEditor.html?example=build`);
   await page.waitForFunction(() => window.editor && !window.editor.isAwaitingFirstLoad(), null, { timeout: 20000 });
   const result = await page.evaluate(({ example, ped, key }) => {
     const editor = window.editor;
+    if (example.questionnaire) {
+      // a published form has nothing the editor would ignore
+      const checked = window.OpenPedigree.checkQuestionnaire(example.questionnaire);
+      if (checked.problems.length) {
+        return { error: 'questionnaire.json:\n' + checked.toString() };
+      }
+      // (and the editor took it as its form: every item the example answers is on it)
+      const onForm = editor.getQuestionnaireConfig().items.map((i) => i.linkId);
+      const answered = new Set();
+      example.people.forEach((p) => Object.keys(p.answers || {}).forEach((linkId) => answered.add(linkId)));
+      const missing = [...answered].filter((linkId) => onForm.indexOf(linkId) === -1);
+      if (missing.length) {
+        return { error: "the editor's form has no item " + missing.join(', ') + ': it didn\'t take questionnaire.json' };
+      }
+    }
     document.querySelectorAll('.pedigree-template-chooser').forEach((c) => (c.closest('.msdialog-modal-container') || c).remove());
     editor.getSaveLoadEngine().createGraphFromImportData(ped, 'ped', { acceptUnknownPhenotypes: true, externalIdMark: true }, false, true);
     const nodes = {};
@@ -139,6 +183,30 @@ async function draw(browser, base, example) {
       if (Object.keys(set).length) {
         document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: nodes[p.id], properties: set } }));
       }
+    });
+    // answers to the example's own form, through the form's own setters (a custom legend's answer
+    // is its terms as {code, display}, as the form gives them, so no terminology server is needed)
+    // (only items the form gives a setter: not a heading, a mapsToField item or a reserved legend,
+    // which keep their own properties - set those with the person's own fields instead)
+    const noSetter = [];
+    example.people.filter((p) => p.answers).forEach((p) => Object.keys(p.answers).forEach((linkId) => {
+      if (typeof editor.getView().getNode(nodes[p.id])['setQuestionnaireAnswer_' + linkId] !== 'function') {
+        noSetter.push(p.id + ': ' + linkId);
+      }
+    }));
+    if (noSetter.length) {
+      return { error: 'answers to items the form keeps no answers for (a heading, a mapsToField item or a reserved legend): ' + noSetter.join(', ') };
+    }
+    example.people.filter((p) => p.answers).forEach((p) => {
+      const set = {};
+      Object.entries(p.answers).forEach(([linkId, value]) => {
+        if (editor.getQuestionnaireLegend(linkId) && Array.isArray(value)) {
+          set['setQuestionnaireAnswer_' + linkId] = value.map((term) => ({ code: term.id, display: term.name }));
+        } else {
+          set['setQuestionnaireAnswer_' + linkId] = value;
+        }
+      });
+      document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: nodes[p.id], properties: set } }));
     });
     localStorage.removeItem(key);
     editor.getSaveLoadEngine().save('local:' + key + '?format=fhir');

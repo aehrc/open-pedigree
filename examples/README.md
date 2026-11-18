@@ -8,6 +8,7 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 | `about.json` | What the page says about it (below). Hand-written. |
 | `pedigree.json` | The GA4GH FHIR pedigree, as the editor saves it: the download, and what *Open in the editor* loads. Generated. |
 | `pedigree.svg` | The picture on the page, as the editor draws it. Generated. |
+| `questionnaire.json` | Only for a *form* example: its own FHIR Questionnaire, the node form it is drawn and opened with. Hand-written. |
 
 `npm run build` and then `npm run examples:build` regenerate every example's `pedigree.json` and `pedigree.svg` by drawing its `example.json` in the built editor. `npm run examples:check` (in CI) fails if a committed `pedigree.json` no longer matches its source.
 
@@ -35,6 +36,8 @@ The pedigrees on open-pedigree's website (`https://aehrc.github.io/open-pedigree
 - `disorders`: each disorder's code as the demo's terminology gives it (OMIM, as `http://purl.bioontology.org/ontology/OMIM/<number>` - look it up in the `http://www.omim.org/vs` value set on `tx.ontoserver.csiro.au`), with the name to show.
 - `carrier`: `carrier` or `presymptomatic` for a person with `disorders` who isn't affected by them (a carrier is drawn with the disorder's colour and a dot). An affected person needs none.
 
+- `answers`: only in a *form* example, the person's answers to its own form, by linkId: a value as the form stores it (`true`, a number, text, or a choice's code such as `"LA6576-8"`), or for a custom legend item a list of `{ "id": <code>, "name": <display> }` like `disorders`. Every linkId must be an item of `questionnaire.json`.
+
 Partnerships are the couples who have a child together; there are no others.
 
 ## `about.json`
@@ -52,4 +55,8 @@ Partnerships are the couples who have a child together; there are no others.
 }
 ```
 
-`kind` is `classic` (no `source` or `simplified`) or `historic` (both required). `order` places it in its list on the landing page. Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
+`kind` is `classic` (no `source` or `simplified`), `historic` (both required) or `form`. `order` places it in its list on the landing page.
+
+Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
+
+A `form` example has a `questionnaire.json`, and `about.json` adds `"questionnaire": [{ "linkId": ..., "what": ... }]`: the notable items, each shown on the page with what it does. Its form must pass `OpenPedigree.checkQuestionnaire` with no problems (the build refuses it otherwise). Start it from `dist/defaultQuestionnaire.json` and add a tab, so the rest of the form stays as the editor's own.

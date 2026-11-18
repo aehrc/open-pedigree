@@ -1,0 +1,70 @@
+{
+  "people": [
+    {
+      "id": "grandfather",
+      "sex": "M",
+      "name": "George",
+      "status": "deceased"
+    },
+    {
+      "id": "grandmother",
+      "sex": "F",
+      "name": "Mary"
+    },
+    {
+      "id": "father",
+      "sex": "M",
+      "father": "grandfather",
+      "mother": "grandmother",
+      "name": "David",
+      "answers": {
+        "tested": true,
+        "interpretation": "LA6576-8",
+        "result_shared": true
+      }
+    },
+    {
+      "id": "mother",
+      "sex": "F",
+      "name": "Anna",
+      "answers": {
+        "tested": true,
+        "interpretation": "LA6577-6",
+        "result_shared": true
+      }
+    },
+    {
+      "id": "uncle",
+      "sex": "M",
+      "father": "grandfather",
+      "mother": "grandmother",
+      "name": "Paul",
+      "answers": {
+        "tested": false,
+        "not_tested_reason": "Declined"
+      }
+    },
+    {
+      "id": "daughter",
+      "sex": "F",
+      "father": "father",
+      "mother": "mother",
+      "name": "Emma",
+      "proband": true,
+      "answers": {
+        "tested": true,
+        "interpretation": "LA9663-1"
+      }
+    },
+    {
+      "id": "pregnancy",
+      "sex": "U",
+      "father": "father",
+      "mother": "mother",
+      "status": "unborn",
+      "answers": {
+        "fetal_findings": "Echogenic bowel at 20 weeks"
+      }
+    }
+  ]
+}

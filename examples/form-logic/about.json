@@ -1,0 +1,31 @@
+{
+  "title": "Form logic and a coded result",
+  "kind": "form",
+  "order": 22,
+  "summary": "A form that changes with the answers and the person - and a test result saved as a coded FHIR Observation.",
+  "shows": [
+    "A family drawn with a form that has a Genetic testing tab added to open-pedigree's built-in form. Open a person's form to see it change: Overall interpretation and Result shared with the family appear only for people tested, and Why not tested only for people who weren't; Result shared stays greyed out until there is a result; and Prenatal ultrasound findings appears only for the pregnancy, a predicate on the person rather than on another answer.",
+    "Overall interpretation is saved as a FHIR Observation coded LOINC 51968-6, with LOINC's own answers (Positive, Negative, Inconclusive, Failure), so another FHIR system reads David's positive result as a coded Observation, not as text. The built-in form's Sex item shows one more kind of logic: an option a person can't have, such as a sex that contradicts their partnerships, is disabled by a per-option predicate."
+  ],
+  "hard": [
+    "A form like this has to be evaluated for each person as their answers and their place in the pedigree change, and what it records has to come back intact: every answer here survives a GA4GH FHIR save and load."
+  ],
+  "questionnaire": [
+    {
+      "linkId": "interpretation",
+      "what": "Shown only when Genetic test done is yes (enableWhen), and saved as an Observation with a fixed LOINC code (mapsToObservation, item.code 51968-6) and LOINC answer codes."
+    },
+    {
+      "linkId": "result_shared",
+      "what": "Shown for people tested, but disabled (greyed out, not hidden) while Overall interpretation has no answer (disabledWhen)."
+    },
+    {
+      "linkId": "not_tested_reason",
+      "what": "Shown only when Genetic test done is no."
+    },
+    {
+      "linkId": "fetal_findings",
+      "what": "Shown only for a fetus: its enableWhen names the isFetus predicate (questionnaire-enable-predicate) instead of another item."
+    }
+  ]
+}

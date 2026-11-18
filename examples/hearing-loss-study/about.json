@@ -1,0 +1,27 @@
+{
+  "title": "A hearing-loss study's own legend",
+  "kind": "form",
+  "order": 21,
+  "summary": "A study's Questionnaire adds its own condition list, which fills the symbols and gets its own legend, beside disorders.",
+  "shows": [
+    "A family in a hearing-loss study, drawn with the study's own form. Its Questionnaire is open-pedigree's built-in form plus a Hearing study tab. On that tab, Hearing loss is a custom legend: its terms come from a SNOMED CT value set (hearing loss and every kind of it), they fill the symbols as disorders do, and they get a legend of their own. Lily and Ben have congenital sensorineural hearing loss; their grandmother Edith had late-onset sensorineural hearing loss, and their cousin Sam conductive hearing loss, so the legend shows three conditions.",
+    "The tab's other items show how a form can follow the answers: Age at onset appears only once a hearing loss is chosen, and Audiogram on file only for people enrolled in the study."
+  ],
+  "hard": [
+    "The study's conditions are separate from the pedigree's disorders: they have their own legend and colours, can be switched to black-and-white patterns with the rest, and travel in the GA4GH FHIR export as Conditions, so another FHIR system sees them as conditions too, not as free text."
+  ],
+  "questionnaire": [
+    {
+      "linkId": "hearing_loss",
+      "what": "A custom legend (mapsToLegendCondition): a repeating choice over a SNOMED CT value set, expanded by the terminology server. Each person's choices fill their symbol and are listed in the Hearing loss legend."
+    },
+    {
+      "linkId": "onset_age",
+      "what": "Shown only when Hearing loss has an answer (enableWhen with the exists operator)."
+    },
+    {
+      "linkId": "audiogram",
+      "what": "Shown only for people enrolled in the study (enableWhen on another item's answer)."
+    }
+  ]
+}

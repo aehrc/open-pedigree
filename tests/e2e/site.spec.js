@@ -146,3 +146,213 @@ test('an example whose file can\'t be loaded says so and stays on its page', asy
   await expect(page).toHaveURL(BASE + 'examples/full-sib-mating/');
   expect(await page.evaluate(() => localStorage.getItem('example-full-sib-mating'))).toBeNull();
 });
+
+// --- Try your own form (pedigree-questionnaire-launcher) ---
+
+const formItems = (page) => page.evaluate(() => window.editor.getQuestionnaireConfig().items.map((i) => i.linkId));
+const builtIn = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'dist', 'defaultQuestionnaire.json'), 'utf8'));
+// The built-in form with one more tab, holding `items`.
+const withTab = (items) => ({ ...builtIn(), item: [...builtIn().item, { linkId: 'mine', type: 'group', text: 'Mine', item: items }] });
+const MY_FORM = withTab([{ linkId: 'my_item', type: 'string', text: 'My item' }]);
+
+async function openTry(page) {
+  await serveSite(page);
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('#questionnaire')).not.toHaveValue('');
+}
+async function pasteOwn(page, text) {
+  await page.check('input[name=form][value=own]');
+  await page.fill('#questionnaire', typeof text === 'string' ? text : JSON.stringify(text));
+}
+async function openFromTry(page) {
+  await page.click('#open');
+  await page.waitForURL(BASE + 'editor/?example=try');
+  await editorReady(page);
+}
+
+test('try: the text area starts as the built-in form, which has nothing to report', async ({ page }) => {
+  await openTry(page);
+  expect(JSON.parse(await page.inputValue('#questionnaire'))).toEqual(builtIn());
+  await pasteOwn(page, await page.inputValue('#questionnaire'));
+  await page.click('#check');
+  await expect(page.locator('#check-summary')).toContainText('No problems');
+});
+
+test('try: a form example opens with its own form and pedigree', async ({ page }) => {
+  await openTry(page);
+  await page.check('input[name=form][value=form-logic]');
+  await expect(page.locator('#pedigree')).toHaveValue('form-logic');
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('interpretation');
+  await expect.poll(() => personCount(page)).toBe(peopleIn('form-logic'));
+});
+
+test('try: a pasted form on one of the examples', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'double-first-cousins');
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item');
+  await expect.poll(() => personCount(page)).toBe(peopleIn('double-first-cousins'));
+  await expect(page.locator('.pedigree-template-chooser:visible')).toHaveCount(0);
+});
+
+test('try: a form on a blank pedigree opens the template chooser with that form', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await openFromTry(page);
+  await expect(page.locator('.pedigree-template-chooser:visible')).toHaveCount(1);
+  expect(await formItems(page)).toContain('my_item');
+  expect(await page.evaluate(() => localStorage.getItem('example-try'))).toBeNull();
+});
+
+test('try: the built-in form on a blank pedigree stores no form', async ({ page }) => {
+  await openTry(page);
+  await openFromTry(page);
+  expect(await page.evaluate(() => localStorage.getItem('questionnaire-try'))).toBeNull();
+  expect(await formItems(page)).toContain('disorders');
+});
+
+for (const [what, text, says] of [
+  ['text that isn\'t JSON', '{"resourceType": "Questionnaire", ', 'valid JSON'],
+  ['a resource that isn\'t a Questionnaire', { resourceType: 'Patient' }, 'not a Questionnaire'],
+]) {
+  test(`try: ${what} is reported and doesn't open the editor`, async ({ page }) => {
+    await openTry(page);
+    await pasteOwn(page, text);
+    await page.click('#open');
+    await expect(page.locator('#problems li.fatal')).toContainText(says);
+    await expect(page.locator('#check-summary')).toContainText('can\'t use this form');
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL(BASE + 'try/');
+  });
+}
+
+test('try: problems the editor ignores are listed, and the editor still opens', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, withTab([{ linkId: 'my_item', type: 'string', enableWhen: [{ question: 'nope', operator: 'exists', answerBoolean: true }] }]));
+  await page.click('#check');
+  await expect(page.locator('#problems li')).toHaveCount(1);
+  await expect(page.locator('#problems li')).toContainText('"nope"');
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item');
+});
+
+test('try: a problem\'s text is shown as text, never as HTML', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, withTab([{ linkId: '<img src=x onerror="window.hacked=1">', type: 'attachment' }]));
+  await page.click('#check');
+  await expect(page.locator('#problems li')).toContainText('<img src=x');
+  expect(await page.locator('#problems img').count()).toBe(0);
+  expect(await page.evaluate(() => window.hacked)).toBeUndefined();
+});
+
+test('try: an uploaded file becomes the form', async ({ page }) => {
+  await openTry(page);
+  await page.setInputFiles('#upload', { name: 'mine.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(MY_FORM)) });
+  await expect(page.locator('input[name=form][value=own]')).toBeChecked();
+  expect(JSON.parse(await page.inputValue('#questionnaire'))).toEqual(MY_FORM);
+});
+
+test('try: a form fetched from a URL, and one that can\'t be', async ({ page }) => {
+  await openTry(page);
+  await page.route('https://forms.example.org/**', (route) => (route.request().url().endsWith('/ok.json')
+    ? route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(MY_FORM) })
+    : route.abort()));
+  await page.check('input[name=form][value=own]');
+  await page.fill('#url', 'https://forms.example.org/ok.json');
+  await page.click('#fetch');
+  await expect.poll(async () => JSON.parse(await page.inputValue('#questionnaire'))).toEqual(MY_FORM);
+  const before = await page.inputValue('#questionnaire');
+  await page.fill('#url', 'https://forms.example.org/blocked.json');
+  await page.click('#fetch');
+  await expect(page.locator('#check-summary')).toContainText('download the file and upload it');
+  expect(await page.inputValue('#questionnaire')).toBe(before);
+});
+
+test('try: the visitor\'s own pedigree survives, and earlier copies are cleared', async ({ page }) => {
+  await openTry(page);
+  await page.evaluate(() => {
+    localStorage.setItem('pedigreeData', JSON.stringify({ value: 'mine' }));
+    localStorage.setItem('example-queen-victoria', JSON.stringify({ value: '{}' }));
+    localStorage.setItem('questionnaire-hearing-loss-study', '{}');
+  });
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  const keys = await page.evaluate(() => Object.keys(localStorage).sort());
+  expect(keys).toEqual(['example-try', 'pedigreeData', 'questionnaire-try']);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('pedigreeData')).value)).toBe('mine');
+});
+
+test('a form example\'s page opens the editor with its own form', async ({ page }) => {
+  await serveSite(page);
+  await page.goto(BASE + 'examples/hearing-loss-study/');
+  await expect(page.locator('pre').first()).toContainText('mapsToLegendCondition');
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=hearing-loss-study');
+  await editorReady(page);
+  expect(await formItems(page)).toContain('hearing_loss');
+  expect(await page.evaluate(() => !!window.editor.getQuestionnaireLegend('hearing_loss'))).toBe(true);
+});
+
+test('opening clears only open-pedigree\'s own copies: other sites\' storage on the shared origin is left alone', async ({ page }) => {
+  await serveSite(page);
+  await page.goto(BASE + 'examples/full-sib-mating/');
+  await page.evaluate(() => {
+    localStorage.setItem('questionnaire-draft', 'another site');
+    localStorage.setItem('example-settings', 'another site');
+    localStorage.setItem('questionnaire-form-logic', '{}');
+  });
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=full-sib-mating');
+  expect(await page.evaluate(() => [localStorage.getItem('questionnaire-draft'), localStorage.getItem('example-settings'), localStorage.getItem('questionnaire-form-logic')]))
+    .toEqual(['another site', 'another site', null]);
+});
+
+test('try: the pedigree last opened from the page is offered first, with the visitor\'s changes', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  // a change, saved
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: 0, properties: { setFirstName: 'Changed' } } }));
+    document.getElementById('action-save').click();
+  });
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('example-try')).value)).toContain('Changed');
+
+  // back to the page, a corrected form, and open again
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('#pedigree')).toHaveValue('__last__');
+  await expect(page.locator('#last-hint')).toBeVisible();
+  await pasteOwn(page, withTab([{ linkId: 'my_item_2', type: 'string' }]));
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item_2');
+  expect(await page.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).map((p) => p.fName))).toContain('Changed');
+});
+
+test('try: the form last opened from the page comes back too, as Your own, and opening keeps it', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('input[name=form][value=own]')).toBeChecked();
+  expect(JSON.parse(await page.inputValue('#questionnaire'))).toEqual(MY_FORM);
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item');
+});
+
+test('opening an example from its page leaves the Try page\'s copy for it to offer back', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  await page.goto(BASE + 'examples/half-sib-mating/');
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=half-sib-mating');
+  expect(await page.evaluate(() => [!!localStorage.getItem('example-try'), !!localStorage.getItem('questionnaire-try')])).toEqual([true, true]);
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('#pedigree')).toHaveValue('__last__');
+});

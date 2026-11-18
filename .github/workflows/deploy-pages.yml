@@ -62,13 +62,17 @@ jobs:
             done
             echo "$code $1"; return 1
           }
-          check "$base/" && check "$base/editor/" && check "$base/dist/pedigree.min.js" || exit 1
+          check "$base/" && check "$base/editor/" && check "$base/try/" && check "$base/dist/pedigree.min.js" || exit 1
           examples=$(cd _site/examples && ls -d */ | tr -d /)
           [ -n "$examples" ] || { echo "no examples built"; exit 1; }
           for name in $examples; do
             for file in "" pedigree.json pedigree.svg; do
               check "$base/examples/$name/$file" || exit 1
             done
+            # (a form example's own Questionnaire)
+            if [ -f "_site/examples/$name/questionnaire.json" ]; then
+              check "$base/examples/$name/questionnaire.json" || exit 1
+            fi
           done
 
       # The definitions' canonical URLs are written into saved pedigrees: fail the run if any built

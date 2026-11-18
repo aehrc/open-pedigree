@@ -18,7 +18,7 @@
 
 ## A free and open-source pedigree tool powered by PhenoTips®
 
-**[Website](https://aehrc.github.io/open-pedigree/): [try the editor](https://aehrc.github.io/open-pedigree/editor/), and explore [example pedigrees](https://aehrc.github.io/open-pedigree/#examples) from classic textbook structures to the Spanish Habsburgs.**
+**[Website](https://aehrc.github.io/open-pedigree/): [try the editor](https://aehrc.github.io/open-pedigree/editor/), [try it with your own form](https://aehrc.github.io/open-pedigree/try/) (a FHIR Questionnaire, checked first), and explore [example pedigrees](https://aehrc.github.io/open-pedigree/#examples) from classic textbook structures to the Spanish Habsburgs.**
 
 Open Pedigree is a robust browser-based genomic pedigree drawing solution using [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) and [PhenoTips](https://phenotips.org).
 
@@ -130,6 +130,23 @@ Two mapping kinds:
 Both kinds are **dual-write**: the mapped FHIR element is what a generic FHIR consumer sees and is authoritative on import; a `QuestionnaireResponse` entry is also kept alongside it as a record of what was asked/answered via the Questionnaire, but never overrides the mapped value.
 
 See [`tests/unit/fixtures/current-forms-questionnaire.json`](tests/unit/fixtures/current-forms-questionnaire.json) for a worked example: a Questionnaire that `mapsToField`-maps every eligible scalar property already on the Personal/Clinical tabs.
+
+### Checking a Questionnaire
+
+`OpenPedigree.checkQuestionnaire(questionnaire)` lists every problem the editor would meet in a Questionnaire before you give it one. It never throws. Each problem in its `problems` has the item's `linkId` (where there is one), a `message` saying what's wrong and what the editor does about it, and an `effect`:
+
+- `fatal`: the editor can't build a form from it. Extensions under their retired pre-2.0 URLs (each listed with its replacement) make it fall back to its built-in form. Something that isn't a Questionnaire, or one with no items, gives an empty form when passed as `questionnaireLocal` (as `questionnaireUrl`, a non-Questionnaire falls back to the built-in form).
+- `ignored`: the editor drops a mapping, item or extra selection and carries on, logging a warning as it always has. This also covers what it drops without a warning (an item with no linkId, and whatever sits inside a dropped item) and what it can't evaluate: an `enableWhen`/`disabledWhen` on a linkId that isn't on the form (treated as never answered), an operator it doesn't know or no answer value to compare (never met), a predicate it doesn't know (false, or true where negated), and a linkId used twice or taken by the editor's own linked-record items.
+- `moved`: a top-level item that isn't a group goes on an implicit "General" tab.
+
+`isFatal()` says whether the editor would refuse it. `toString()` gives the problems as a numbered list. The check covers the Questionnaire alone: a warning that depends on the editor's options, such as value sets without `questionnaireTerminologyBaseUrl`, isn't reported.
+
+```js
+const result = OpenPedigree.checkQuestionnaire(myQuestionnaire);
+if (result.problems.length) console.log(result.toString());
+```
+
+The website's [Try your own form](https://aehrc.github.io/open-pedigree/try/) page runs this check on a pasted, uploaded or fetched Questionnaire, then opens the editor with it. Its *Configurable forms* examples show a custom legend and form logic, each with its Questionnaire to download.
 
 ### Known limitations
 
