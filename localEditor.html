@@ -180,13 +180,30 @@
       if (isExample) {
         format = 'fhir';
       }
+      // A form stored beside it (an example with its own Questionnaire, or one the Try your own
+      // form page was given) is the node form; its value sets come from the demo's terminology server.
+      var questionnaireOptions = {};
+      if (isExample) {
+        try {
+          var storedQuestionnaire = JSON.parse(localStorage.getItem('questionnaire-' + example));
+          if (storedQuestionnaire) {
+            questionnaireOptions = {
+              questionnaireLocal: storedQuestionnaire,
+              questionnaireTerminologyBaseUrl: getParameterByName('ontologyServer') || 'https://tx.ontoserver.csiro.au/fhir/'
+            };
+          }
+        } catch (err) {
+          console.error('The stored Questionnaire for ' + example + " isn't JSON - using the built-in form", err);
+        }
+      }
 
       var editorOptions = {
         // patientDataUrl: 'local:pedigreeData?format='+format+'&closeOnSave=true' + (qData?('&qData='+qData):''),
         patientDataUrl: 'local:' + storageKey + '?format='+format+'&closeOnSave=true',
         returnUrl: '#CloseWindow',
         backend: OpenPedigree.localStorageBackend,
-        ...terminologyOptions};
+        ...terminologyOptions,
+        ...questionnaireOptions};
 
 
       editor = OpenPedigree.initialiseEditor(editorOptions);
