@@ -196,3 +196,21 @@ describe('checkQuestionnaire: what the editor drops or can never evaluate', () =
     expect(checkQuestionnaire({ resourceType: 'Bundle' }).problems[0].message).toContain('can\'t build a form from it');
   });
 });
+
+describe('checkQuestionnaire: top-level items with no linkId, and != with nothing to compare', () => {
+  it('a top-level group with no linkId is still a tab, and what\'s inside it is on the form', () => {
+    const result = checkQuestionnaire(q([{ type: 'group', text: 'Extra', item: [{ linkId: 'a', type: 'string' }, { linkId: 'b', type: 'string' }] }]));
+    expect(result.problems).toEqual([]);
+  });
+
+  it('a top-level non-group item with no linkId is reported once, as not on the form', () => {
+    quiet();
+    const result = checkQuestionnaire(q([group([{ linkId: 'x', type: 'string' }]), { type: 'string', text: 'Age', enableWhen: [{ question: 'nope', operator: '=' }] }]));
+    expect(result.problems.map((p) => p.message)).toEqual(['An item with no linkId ("Age") isn\'t on the form: every item needs a linkId.']);
+  });
+
+  it('a != condition with no value to compare with is always met', () => {
+    const result = checkQuestionnaire(q([group([{ linkId: 't', type: 'boolean' }, { linkId: 'a', type: 'string', enableWhen: [{ question: 't', operator: '!=' }] }])]));
+    expect(result.problems[0].message).toContain('so it is always met');
+  });
+});

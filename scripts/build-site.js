@@ -91,6 +91,9 @@ ${body}
 
 // An example's folder name: what localEditor.html accepts in ?example= (else it opens pedigreeData).
 const NAME = /^[a-z0-9-]+$/;
+// names the site uses itself: the Try page's storage name, build-examples' drawing key, and the
+// Try page's form choices
+const RESERVED_NAMES = ['try', 'build', 'builtin', 'own'];
 const FILES = ['example.json', 'about.json', 'pedigree.json', 'pedigree.svg'];
 
 /** The problems with an about.json, as examples/README.md describes it. */
@@ -134,6 +137,7 @@ function examples() {
   const all = fs.readdirSync(EXAMPLES, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => {
     const dir = path.join(EXAMPLES, d.name);
     if (!NAME.test(d.name)) problems.push(`examples/${d.name}: the folder name must be lower-case letters, digits and dashes`);
+    if (RESERVED_NAMES.includes(d.name)) problems.push(`examples/${d.name}: "${d.name}" is a name the site uses itself (${RESERVED_NAMES.join(', ')})`);
     const missing = FILES.filter((f) => !fs.existsSync(path.join(dir, f)));
     if (missing.length) {
       problems.push(`examples/${d.name}: missing ${missing.join(', ')}` + (missing.some((f) => f.startsWith('pedigree')) ? ' (run npm run examples:build)' : ''));
@@ -166,7 +170,8 @@ function examples() {
 // The page script both an example page and the Try page use to open the editor: fetch a file,
 // and store an example (and a form) under the name's keys. Earlier copies are cleared first (the
 // large examples would soon fill the browser's storage) - only open-pedigree's own keys, for its
-// examples and the Try page, since every aehrc.github.io site shares that storage.
+// examples (and the Try page's, when it is the one opening), since every aehrc.github.io site
+// shares that storage.
 function handoff(all) {
   const names = all.map((e) => e.name).concat(['try']);
   return `  var OPEN_PEDIGREE_NAMES = ${JSON.stringify(names)};
@@ -177,7 +182,8 @@ function handoff(all) {
     });
   }
   function openInEditor(name, pedigreeText, questionnaire, root) {
-    OPEN_PEDIGREE_NAMES.forEach(function (n) {
+    // (the Try page's own copy is kept unless the Try page is the one opening: it offers it back)
+    OPEN_PEDIGREE_NAMES.filter(function (n) { return n !== 'try' || name === 'try'; }).forEach(function (n) {
       localStorage.removeItem('example-' + n);
       localStorage.removeItem('questionnaire-' + n);
     });
@@ -228,7 +234,7 @@ function examplePage(example, all) {
   const items = isForm ? itemsByLinkId(questionnaire) : {};
   const formNotes = isForm ? `
 <h2>Its form</h2>
-<p>The built-in form with a tab added. These are its notable items, as the Questionnaire gives them:</p>
+<p>Its notable items, as its Questionnaire gives them:</p>
 ${about.questionnaire.map((n) => `<div class="note"><p><strong>${escapeHtml(items[n.linkId].text || n.linkId)}</strong> (<code>${escapeHtml(n.linkId)}</code>): ${escapeHtml(n.what)}</p>`
     + `<pre>${escapeHtml(JSON.stringify(items[n.linkId], null, 2))}</pre></div>`).join('\n')}` : '';
   const paragraphs = (items) => (items || []).map((t) => `<p>${escapeHtml(t)}</p>`).join('\n');
@@ -306,7 +312,7 @@ function tryPage(all) {
   <legend>2. The pedigree</legend>
   <label for="pedigree">Open the editor on:</label>
   <select id="pedigree"><option value="">A blank pedigree (choose a template)</option>${options}</select>
-  <p class="hint" id="last-hint" hidden>Your last pedigree from this page is kept: choose it to carry on with your changes, or another to start again.</p>
+  <p class="hint" id="last-hint" hidden>Your last pedigree and form from this page are kept: carry on with your changes, or choose another pedigree to start again.</p>
 </fieldset>
 
 <fieldset>
@@ -336,6 +342,9 @@ ${handoff(all)}
   }
   var textarea = document.getElementById('questionnaire');
   textarea.value = JSON.stringify(window.OpenPedigree.defaultQuestionnaire, null, 2);
+  // ...and the form it was opened with, as "Your own" (else answers to its items would be lost)
+  var lastForm = null;
+  try { lastForm = JSON.parse(localStorage.getItem('questionnaire-try')); } catch (err) { lastForm = null; }
   var summary = document.getElementById('check-summary');
   var list = document.getElementById('problems');
   var radios = Array.prototype.slice.call(document.querySelectorAll('input[name=form]'));
@@ -351,6 +360,11 @@ ${handoff(all)}
     list.textContent = '';
   }
   radios.forEach(function (r) { r.addEventListener('change', update); });
+  if (lastForm) {
+    textarea.value = JSON.stringify(lastForm, null, 2);
+    radios.forEach(function (r) { r.checked = r.value === 'own'; });
+    document.getElementById('own').hidden = false;
+  }
 
   function show(message, problems) {
     list.textContent = '';

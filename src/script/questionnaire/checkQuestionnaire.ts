@@ -1,6 +1,7 @@
 import { parseQuestionnaire, retiredExtensionsIn, QuestionnaireProblem, RECORD_LINK_ACTIONS, LINKED_RECORD_TAB } from 'pedigree/questionnaire/questionnaireParser';
 import { WHOLE_ITEM_PREDICATES, PER_OPTION_PREDICATES } from 'pedigree/questionnaire/graphPredicateEvaluator';
 import { PREDICATE_EXTENSION_URL } from 'pedigree/fhirUrls';
+import { CONDITION_OPERATORS, ANSWER_VALUE_KEYS } from 'pedigree/questionnaire/enableWhenEvaluator';
 
 /**
  * Every problem open-pedigree would meet in a Questionnaire, before an editor is given it
@@ -50,8 +51,6 @@ function allItems(items: any, out: any[] = []): any[] {
   return out;
 }
 
-const OPERATORS = ['exists', '=', '!=', '>', '<', '>=', '<='];
-const ANSWER_KEYS = ['answerBoolean', 'answerString', 'answerInteger', 'answerDecimal', 'answerDate', 'answerCoding'];
 // linkIds the editor gives its own items in every form (the linked-record action buttons and tab)
 const RESERVED_LINK_IDS = RECORD_LINK_ACTIONS.concat([LINKED_RECORD_TAB.key]);
 
@@ -61,12 +60,18 @@ function silentlyDropped(questionnaire: any, kept: Set<string>, reported: Set<st
   const problems: QuestionnaireProblem[] = [];
   const count = (items: any): number => (Array.isArray(items) ? items : [])
     .reduce((n: number, item: any) => n + (item && typeof item === 'object' ? 1 + count(item.item) : 0), 0);
-  const walk = (items: any, droppedParent: string | null) => {
+  const walk = (items: any, droppedParent: string | null, topLevel = false) => {
     (Array.isArray(items) ? items : []).forEach((item: any) => {
       if (!item || typeof item !== 'object') {
         return;
       }
-      if (typeof item.linkId !== 'string' || item.linkId === '') {
+      const noLinkId = typeof item.linkId !== 'string' || item.linkId === '';
+      if (noLinkId && topLevel && item.type === 'group') {
+        // (a top-level group becomes a tab whatever its linkId, and what's inside it stays)
+        walk(item.item, null);
+        return;
+      }
+      if (noLinkId) {
         const inside = count(item.item);
         problems.push({ effect: 'ignored', message: 'An item with no linkId' + (item.text ? ' ("' + item.text + '")' : '')
           + ' isn\'t on the form' + (inside ? ', nor are the ' + inside + ' items inside it' : '') + ': every item needs a linkId.' });
@@ -79,7 +84,7 @@ function silentlyDropped(questionnaire: any, kept: Set<string>, reported: Set<st
       walk(item.item, dropped ? item.linkId : droppedParent);
     });
   };
-  walk(questionnaire.item, null);
+  walk(questionnaire.item, null, true);
   return problems;
 }
 
@@ -102,7 +107,7 @@ function referenceProblems(items: any[], kept: Set<string>): QuestionnaireProble
     }
   });
   const known = (table: any) => Object.keys(table).join(', ');
-  items.forEach((item) => {
+  items.filter((item) => typeof item.linkId === 'string' && item.linkId !== '').forEach((item) => {
     ['enableWhen', 'disabledWhen'].forEach((list) => {
       (Array.isArray(item[list]) ? item[list] : []).forEach((condition: any) => {
         if (!condition || typeof condition !== 'object') {
@@ -122,10 +127,10 @@ function referenceProblems(items: any[], kept: Set<string>): QuestionnaireProble
         } else if (typeof condition.question === 'string' && !kept.has(condition.question)) {
           problems.push({ linkId: item.linkId, effect: 'ignored', message: where + ' is on ' + condition.question + ', which isn\'t on the form (the editor dropped it), so it is treated as never answered.' });
         }
-        if (OPERATORS.indexOf(condition.operator) === -1) {
-          problems.push({ linkId: item.linkId, effect: 'ignored', message: where + (condition.operator === undefined ? ' has no operator' : ' uses the operator "' + condition.operator + '", which the editor doesn\'t know') + ', so it is never met. Known operators: ' + OPERATORS.join(' ') + '.' });
-        } else if (condition.operator !== 'exists' && !ANSWER_KEYS.some((k) => Object.prototype.hasOwnProperty.call(condition, k))) {
-          problems.push({ linkId: item.linkId, effect: 'ignored', message: where + ' has no answer value (answerBoolean, answerString, ...) to compare with, so it is never met.' });
+        if (CONDITION_OPERATORS.indexOf(condition.operator) === -1) {
+          problems.push({ linkId: item.linkId, effect: 'ignored', message: where + (condition.operator === undefined ? ' has no operator' : ' uses the operator "' + condition.operator + '", which the editor doesn\'t know') + ', so it is never met. Known operators: ' + CONDITION_OPERATORS.join(' ') + '.' });
+        } else if (condition.operator !== 'exists' && !ANSWER_VALUE_KEYS.some((k) => Object.prototype.hasOwnProperty.call(condition, k))) {
+          problems.push({ linkId: item.linkId, effect: 'ignored', message: where + ' has no answer value (answerBoolean, answerString, ...) to compare with, so it is ' + (condition.operator === '!=' ? 'always' : 'never') + ' met.' });
         }
       });
     });
@@ -157,7 +162,9 @@ export function checkQuestionnaire(questionnaire: any): QuestionnaireProblems {
     // the items on the form: fields, headings and tabs (an item moved to "General" included)
     const kept = new Set<string>(parsed.items.map((i: any) => i.linkId).concat(parsed.tabs.map((t: any) => t.key)));
     const reported = new Set<string>(problems.map((p) => p.linkId).filter(Boolean) as string[]);
-    return new QuestionnaireProblems(problems
+    // (a parser problem about an item with no linkId - "Item undefined ..." - is replaced by what
+    // silentlyDropped says: such an item isn't on the form at all)
+    return new QuestionnaireProblems(problems.filter((p) => typeof p.linkId === 'string' && p.linkId !== '')
       .concat(silentlyDropped(questionnaire, kept, reported))
       .concat(referenceProblems(allItems(questionnaire.item), kept)));
   } catch (err) {

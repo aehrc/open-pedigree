@@ -34,9 +34,9 @@ function exampleNames() {
   const names = fs.readdirSync(EXAMPLES, { withFileTypes: true })
     .filter((d) => d.isDirectory() && fs.existsSync(path.join(EXAMPLES, d.name, 'example.json')))
     .map((d) => d.name).sort();
-  const bad = names.filter((n) => !/^[a-z0-9-]+$/.test(n));
+  const bad = names.filter((n) => !/^[a-z0-9-]+$/.test(n) || ['try', 'build', 'builtin', 'own'].includes(n));
   if (bad.length) {
-    throw new Error('example folder names must be lower-case letters, digits and dashes: ' + bad.join(', '));
+    throw new Error('example folder names must be lower-case letters, digits and dashes, and not try, build, builtin or own (the site uses those): ' + bad.join(', '));
   }
   return names;
 }
@@ -186,6 +186,17 @@ async function draw(browser, base, example) {
     });
     // answers to the example's own form, through the form's own setters (a custom legend's answer
     // is its terms as {code, display}, as the form gives them, so no terminology server is needed)
+    // (only items the form gives a setter: not a heading, a mapsToField item or a reserved legend,
+    // which keep their own properties - set those with the person's own fields instead)
+    const noSetter = [];
+    example.people.filter((p) => p.answers).forEach((p) => Object.keys(p.answers).forEach((linkId) => {
+      if (typeof editor.getView().getNode(nodes[p.id])['setQuestionnaireAnswer_' + linkId] !== 'function') {
+        noSetter.push(p.id + ': ' + linkId);
+      }
+    }));
+    if (noSetter.length) {
+      return { error: 'answers to items the form keeps no answers for (a heading, a mapsToField item or a reserved legend): ' + noSetter.join(', ') };
+    }
     example.people.filter((p) => p.answers).forEach((p) => {
       const set = {};
       Object.entries(p.answers).forEach(([linkId, value]) => {

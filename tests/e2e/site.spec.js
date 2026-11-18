@@ -331,3 +331,28 @@ test('try: the pedigree last opened from the page is offered first, with the vis
   expect(await formItems(page)).toContain('my_item_2');
   expect(await page.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).map((p) => p.fName))).toContain('Changed');
 });
+
+test('try: the form last opened from the page comes back too, as Your own, and opening keeps it', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('input[name=form][value=own]')).toBeChecked();
+  expect(JSON.parse(await page.inputValue('#questionnaire'))).toEqual(MY_FORM);
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item');
+});
+
+test('opening an example from its page leaves the Try page\'s copy for it to offer back', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  await page.goto(BASE + 'examples/half-sib-mating/');
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=half-sib-mating');
+  expect(await page.evaluate(() => [!!localStorage.getItem('example-try'), !!localStorage.getItem('questionnaire-try')])).toEqual([true, true]);
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('#pedigree')).toHaveValue('__last__');
+});
