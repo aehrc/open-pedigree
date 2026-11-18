@@ -91,7 +91,7 @@ function referenceProblems(items: any[], kept: Set<string>): QuestionnaireProble
   const reported = new Set<string>();
   items.forEach((item) => {
     if (typeof item.linkId === 'string') {
-      if (RESERVED_LINK_IDS.indexOf(item.linkId) !== -1) {
+      if (RESERVED_LINK_IDS.indexOf(item.linkId) !== -1 && !linkIds.has(item.linkId)) {
         problems.push({ linkId: item.linkId, effect: 'ignored', message: 'The linkId ' + item.linkId + ' is one the editor uses for its own linked-record items: answers saved under it would clash with them.' });
       }
       if (linkIds.has(item.linkId) && !reported.has(item.linkId)) {

@@ -186,6 +186,9 @@ describe('checkQuestionnaire: what the editor drops or can never evaluate', () =
     const result = checkQuestionnaire(q([group([{ linkId: 'editRecord', type: 'string' }])]));
     expect(effects(result)).toEqual([['editRecord', 'ignored']]);
     expect(result.problems[0].message).toContain('its own linked-record items');
+    // (once, however many items use it - their clash with each other is reported as a duplicate)
+    const twice = checkQuestionnaire(q([group([{ linkId: 'editRecord', type: 'string' }, { linkId: 'editRecord', type: 'string' }])]));
+    expect(twice.problems.map((p) => p.message.includes('own linked-record') ? 'reserved' : 'duplicate')).toEqual(['reserved', 'duplicate']);
   });
 
   it('says what the editor does with what it can\'t use', () => {
