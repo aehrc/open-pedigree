@@ -4,8 +4,10 @@
 // upgrade, and Dependabot raises neither an alert nor a PR for every advisory npm audit
 // reports, so it stays visible here rather than in a log nobody reads.
 //
-// An entry only applies while npm audit reports no fix for that package; once one exists the
-// advisory blocks again. It also never covers an advisory that npm audit --omit=dev reports.
+// An entry only applies while npm audit reports no non-breaking fix for that package; once one
+// exists the advisory blocks again. A fix npm can apply only as a semver-major change (`npm
+// audit fix --force`, e.g. downgrading a dev tool a major version) doesn't count: the gate says
+// what it was, and the entry's reason is why it isn't taken. It also never covers an advisory that npm audit --omit=dev reports.
 // That is only a partial check of what ships: webpack bundles some devDependencies too
 // (raphael, @fortawesome/fontawesome-free, buffer, util), so an entry's reason has to say why
 // the package doesn't reach dist/.
@@ -70,7 +72,10 @@ function audit(extraArgs) {
       const id = ghsa ? ghsa[0] : String(via.source || via.url || via.title);
       advisories.set(keyOf(id, via.name), {
         id, name: via.name, severity: via.severity, title: via.title, url: via.url,
-        fixAvailable: Boolean(vulnerability.fixAvailable),
+        // true, or {name, version, isSemVerMajor}: only a non-breaking fix counts (see above)
+        fixAvailable: Boolean(vulnerability.fixAvailable) && !(vulnerability.fixAvailable.isSemVerMajor),
+        breakingFix: vulnerability.fixAvailable && vulnerability.fixAvailable.isSemVerMajor
+          ? vulnerability.fixAvailable.name + ' ' + vulnerability.fixAvailable.version : null,
       });
     }
   }
@@ -87,7 +92,8 @@ const tolerated = [...advisories].filter(([key, a]) => isAllowed(key, a));
 const stale = [...allowed].filter(([key]) => !advisories.has(key));
 
 for (const [key, a] of tolerated) {
-  console.log(`allowed   ${a.severity} ${a.name} ${a.id}: ${allowed.get(key).reason}`);
+  const declined = a.breakingFix ? ` (npm's only fix is a breaking change, ${a.breakingFix}: not taken)` : '';
+  console.log(`allowed   ${a.severity} ${a.name} ${a.id}: ${allowed.get(key).reason}${declined}`);
 }
 for (const [key, a] of advisories) {
   if (!BLOCKING.has(a.severity) && !isAllowed(key, a)) {
