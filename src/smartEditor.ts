@@ -6,6 +6,7 @@ import LocalStorageBackend from './script/localStorageBackend';
 import { createTransportBackend } from './script/transportBackend';
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
 import { DEFAULT_QUESTIONNAIRE } from './script/questionnaire/defaultQuestionnaire';
+import { checkQuestionnaire } from './script/questionnaire/checkQuestionnaire';
 
 import '@fortawesome/fontawesome-free/js/fontawesome';
 import '@fortawesome/fontawesome-free/js/solid';
@@ -27,6 +28,8 @@ OpenPedigree.FHIRPatientProvider = FHIRPatientProvider;
 OpenPedigree.SmartFhirBackend = SmartFhirBackend;
 OpenPedigree.SmartPatientProvider = SmartPatientProvider;
 OpenPedigree.defaultQuestionnaire = DEFAULT_QUESTIONNAIRE;
+// Every problem the editor would meet in a Questionnaire (src/script/questionnaire/checkQuestionnaire.ts).
+OpenPedigree.checkQuestionnaire = checkQuestionnaire;
 
 // Expose on window so tests can override via addInitScript before DOMContentLoaded
 if (!(window as any).FHIR) {

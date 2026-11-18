@@ -163,6 +163,27 @@ function itemTypeToFieldType(item: any): any {
   }
 }
 
+/** A problem the parser finds: logged, and recorded while a checked parse collects (checkQuestionnaire). */
+export type QuestionnaireProblem = {
+  linkId?: string;
+  message: string;
+  // what the editor does: drops the mapping/item/condition, places the item elsewhere, or (only
+  // from checkQuestionnaire) can't use the Questionnaire at all
+  effect: 'ignored' | 'moved' | 'fatal';
+};
+
+// The problems of the parse in progress, while one collects (parseQuestionnaire's `problems`).
+let collecting: QuestionnaireProblem[] | null = null;
+
+// Logs a problem with an item as the parser always has ("Questionnaire item <linkId> ..."), and
+// records it while a parse collects. `rest` starts with a space.
+function warn(linkId: any, rest: string, effect: 'ignored' | 'moved'): void {
+  console.warn('Questionnaire item ' + linkId + rest);
+  if (collecting) {
+    collecting.push({ linkId: linkId, message: 'Item ' + linkId + rest + '.', effect: effect });
+  }
+}
+
 function terminalDefinitionSegment(definition: any): any {
   if (!definition) {
     return null;
@@ -187,12 +208,12 @@ function parseMappingExtension(item: any): any {
 
   if (kind === 'mapsToField') {
     if (item.type === 'group') {
-      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare mapsToField - ignoring mapping');
+      warn(item.linkId, ' is a group and cannot declare mapsToField - ignoring mapping', 'ignored');
       return null;
     }
     const target = terminalDefinitionSegment(item.definition);
     if (!target || !MAPS_TO_FIELD_TARGETS.hasOwnProperty(target)) {
-      console.warn('Questionnaire item ' + item.linkId + ' declares mapsToField but item.definition ("' + item.definition + '") does not resolve to a supported property - ignoring mapping');
+      warn(item.linkId, ' declares mapsToField but item.definition ("' + item.definition + '") does not resolve to a supported property - ignoring mapping', 'ignored');
       return null;
     }
     return { kind: 'field', field: target };
@@ -200,11 +221,11 @@ function parseMappingExtension(item: any): any {
 
   if (kind === 'mapsToCondition' || kind === 'mapsToObservation') {
     if (item.type === 'group') {
-      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare ' + kind + ' - ignoring mapping');
+      warn(item.linkId, ' is a group and cannot declare ' + kind + ' - ignoring mapping', 'ignored');
       return null;
     }
     if (!item.code || item.code.length === 0) {
-      console.warn('Questionnaire item ' + item.linkId + ' declares ' + kind + ' but has no item.code - ignoring mapping');
+      warn(item.linkId, ' declares ' + kind + ' but has no item.code - ignoring mapping', 'ignored');
       return null;
     }
     return { kind: kind === 'mapsToCondition' ? 'condition' : 'observation', code: { coding: item.code } };
@@ -212,11 +233,11 @@ function parseMappingExtension(item: any): any {
 
   if (kind === 'mapsToLegendCondition' || kind === 'mapsToLegendObservation') {
     if (item.type === 'group') {
-      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare ' + kind + ' - ignoring mapping');
+      warn(item.linkId, ' is a group and cannot declare ' + kind + ' - ignoring mapping', 'ignored');
       return null;
     }
     if (!item.repeats || (item.type !== 'choice' && item.type !== 'open-choice') || !item.answerValueSet) {
-      console.warn('Questionnaire item ' + item.linkId + ' declares ' + kind + ' but is not a repeats=true choice/open-choice item with an answerValueSet - ignoring mapping');
+      warn(item.linkId, ' declares ' + kind + ' but is not a repeats=true choice/open-choice item with an answerValueSet - ignoring mapping', 'ignored');
       return null;
     }
     return { kind: kind === 'mapsToLegendCondition' ? 'legendCondition' : 'legendObservation' };
@@ -224,19 +245,19 @@ function parseMappingExtension(item: any): any {
 
   if (kind === 'invokesAction') {
     if (item.type === 'group') {
-      console.warn('Questionnaire item ' + item.linkId + ' is a group and cannot declare invokesAction - ignoring mapping');
+      warn(item.linkId, ' is a group and cannot declare invokesAction - ignoring mapping', 'ignored');
       return null;
     }
     var actionExt = item.extension.find((ext: any) => ext.url === ACTION_EXTENSION_URL);
     var action = actionExt && actionExt.valueCode;
     if (!action || SUPPORTED_ACTIONS.indexOf(action) === -1) {
-      console.warn('Questionnaire item ' + item.linkId + ' declares invokesAction but has no recognised questionnaire-action extension - item will not be rendered');
+      warn(item.linkId, ' declares invokesAction but has no recognised questionnaire-action extension - item will not be rendered', 'ignored');
       return { kind: 'invalidAction' };
     }
     return { kind: 'action', action: action };
   }
 
-  console.warn('Questionnaire item ' + item.linkId + ' declares an unrecognised mapping kind "' + kind + '" - ignoring mapping');
+  warn(item.linkId, ' declares an unrecognised mapping kind "' + kind + '" - ignoring mapping', 'ignored');
   return null;
 }
 
@@ -299,7 +320,7 @@ function parseInitialOptions(item: any, options: any): any {
     return undefined;
   }
   if (!item.repeats && marked.length > 1) {
-    console.warn('Questionnaire item ' + item.linkId + ' marks several answerOptions initialSelected but takes one answer - using the first');
+    warn(item.linkId, ' marks several answerOptions initialSelected but takes one answer - using the first', 'ignored');
     return [marked[0]];
   }
   return marked;
@@ -329,7 +350,7 @@ function walkItems(items: any, out: any, tab: any, parentGroup: any): void {
     } else {
       fieldType = itemTypeToFieldType(item);
       if (fieldType === null) {
-        console.warn('Questionnaire item ' + item.linkId + ' has unsupported type "' + item.type + '" - skipping');
+        warn(item.linkId, ' has unsupported type "' + item.type + '" - skipping', 'ignored');
         continue;
       }
     }
@@ -387,7 +408,7 @@ function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
       if (tabOrder.indexOf(GENERAL_TAB) === -1) {
         tabOrder.push(GENERAL_TAB);
       }
-      console.warn('Questionnaire item ' + item.linkId + ' is a top-level item that is not a group - placing it on an implicit "General" tab');
+      warn(item.linkId, ' is a top-level item that is not a group - placing it on an implicit "General" tab', 'moved');
       walkItems([item], out, GENERAL_TAB, null);
     }
   }
@@ -397,34 +418,55 @@ function walkTopLevelItems(topLevelItems: any, out: any, tabOrder: any): void {
 // silently ignored. (Others, e.g. a host's own questionnaire-redcap-source, aren't read here.)
 const READ_EXTENSIONS = [MAPPING_EXTENSION_URL, PREDICATE_EXTENSION_URL, ACTION_EXTENSION_URL, LINKED_RECORD_SOURCE_EXTENSION_URL];
 
-// Throws when the Questionnaire uses one of the extensions this parser reads under the URL it had
-// before 2.0.0 (no longer read): naming it and its replacement, rather than quietly losing the
-// item's mapping.
-function refuseRetiredExtensions(node: any): void {
+// Every extension the Questionnaire uses under the URL it had before 2.0.0 (no longer read), in
+// document order, with its replacement.
+export function retiredExtensionsIn(node: any, found: { url: string; replacement: string }[] = []): { url: string; replacement: string }[] {
   if (Array.isArray(node)) {
-    node.forEach(refuseRetiredExtensions);
-    return;
+    node.forEach((child) => retiredExtensionsIn(child, found));
+    return found;
   }
   if (!node || typeof node !== 'object') {
-    return;
+    return found;
   }
   const replacement = typeof node.url === 'string' && node.url.indexOf(RETIRED_BASE) === 0 ? replacementFor(node.url) : null;
   // (compared without any |version, which a canonical may carry)
   if (replacement && READ_EXTENSIONS.indexOf(replacement.split('|')[0]) !== -1) {
-    throw new Error('The Questionnaire uses ' + node.url + ', which open-pedigree no longer reads: use ' + replacement + ' instead.');
+    found.push({ url: node.url, replacement: replacement });
   }
   for (const key in node) {
     if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'url') {
-      refuseRetiredExtensions(node[key]);
+      retiredExtensionsIn(node[key], found);
     }
+  }
+  return found;
+}
+
+// Throws when the Questionnaire uses one of the extensions this parser reads under the URL it had
+// before 2.0.0 (no longer read): naming it and its replacement, rather than quietly losing the
+// item's mapping.
+function refuseRetiredExtensions(node: any): void {
+  const first = retiredExtensionsIn(node)[0];
+  if (first) {
+    throw new Error('The Questionnaire uses ' + first.url + ', which open-pedigree no longer reads: use ' + first.replacement + ' instead.');
   }
 }
 
-export function parseQuestionnaire(questionnaire: any): any {
+/**
+ * The node form a Questionnaire describes. Problems with items are logged and the item, mapping
+ * or selection is dropped or moved, as before; given `problems`, each is also added to it
+ * (see checkQuestionnaire). Throws for retired pre-2.0 extension URLs.
+ */
+export function parseQuestionnaire(questionnaire: any, problems?: QuestionnaireProblem[]): any {
   refuseRetiredExtensions(questionnaire.item || []);
   const items: any[] = [];
   const tabs: any[] = [];
-  walkTopLevelItems(questionnaire.item || [], items, tabs);
+  const outer = collecting;
+  collecting = problems || null;
+  try {
+    walkTopLevelItems(questionnaire.item || [], items, tabs);
+  } finally {
+    collecting = outer;
+  }
 
   let canonicalUrl = questionnaire.url;
   if (canonicalUrl && questionnaire.version) {

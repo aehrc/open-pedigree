@@ -10,6 +10,7 @@ import LocalStorageBackend from "./script/localStorageBackend";
 import { createTransportBackend } from './script/transportBackend';
 import FHIRPatientProvider from './script/patientProvider/FHIRPatientProvider';
 import { DEFAULT_QUESTIONNAIRE } from './script/questionnaire/defaultQuestionnaire';
+import { checkQuestionnaire } from './script/questionnaire/checkQuestionnaire';
 
 
 const OpenPedigree: any = {};
@@ -23,5 +24,7 @@ OpenPedigree.localStorageBackend = LocalStorageBackend;
 OpenPedigree.createTransportBackend = createTransportBackend;
 OpenPedigree.FHIRPatientProvider = FHIRPatientProvider;
 OpenPedigree.defaultQuestionnaire = DEFAULT_QUESTIONNAIRE;
+// Every problem the editor would meet in a Questionnaire (src/script/questionnaire/checkQuestionnaire.ts).
+OpenPedigree.checkQuestionnaire = checkQuestionnaire;
 
 window.OpenPedigree = OpenPedigree;
