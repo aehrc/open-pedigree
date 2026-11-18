@@ -1,0 +1,121 @@
+{
+  "people": [
+    {
+      "id": "grandfather",
+      "sex": "M",
+      "name": "Arthur",
+      "status": "deceased"
+    },
+    {
+      "id": "grandmother",
+      "sex": "F",
+      "name": "Edith",
+      "status": "deceased",
+      "answers": {
+        "hearing_loss": [
+          {
+            "id": "60700002",
+            "name": "Sensorineural hearing loss"
+          }
+        ],
+        "onset_age": 62
+      }
+    },
+    {
+      "id": "father",
+      "sex": "M",
+      "father": "grandfather",
+      "mother": "grandmother",
+      "name": "Peter",
+      "answers": {
+        "enrolled": true,
+        "audiogram": true
+      }
+    },
+    {
+      "id": "mother",
+      "sex": "F",
+      "name": "Ruth",
+      "answers": {
+        "enrolled": true,
+        "audiogram": true
+      }
+    },
+    {
+      "id": "aunt",
+      "sex": "F",
+      "father": "grandfather",
+      "mother": "grandmother",
+      "name": "Joan"
+    },
+    {
+      "id": "uncle-in-law",
+      "sex": "M",
+      "name": "Colin"
+    },
+    {
+      "id": "cousin",
+      "sex": "M",
+      "father": "uncle-in-law",
+      "mother": "aunt",
+      "name": "Sam",
+      "answers": {
+        "hearing_loss": [
+          {
+            "id": "44057004",
+            "name": "Conductive hearing loss"
+          }
+        ],
+        "onset_age": 7
+      }
+    },
+    {
+      "id": "daughter",
+      "sex": "F",
+      "father": "father",
+      "mother": "mother",
+      "name": "Lily",
+      "proband": true,
+      "answers": {
+        "enrolled": true,
+        "hearing_loss": [
+          {
+            "id": "700453005",
+            "name": "Congenital sensorineural hearing loss"
+          }
+        ],
+        "onset_age": 0,
+        "audiogram": true
+      }
+    },
+    {
+      "id": "son",
+      "sex": "M",
+      "father": "father",
+      "mother": "mother",
+      "name": "Ben",
+      "answers": {
+        "enrolled": true,
+        "hearing_loss": [
+          {
+            "id": "700453005",
+            "name": "Congenital sensorineural hearing loss"
+          }
+        ],
+        "onset_age": 0,
+        "audiogram": true
+      }
+    },
+    {
+      "id": "son-2",
+      "sex": "M",
+      "father": "father",
+      "mother": "mother",
+      "name": "Tom",
+      "answers": {
+        "enrolled": true,
+        "audiogram": true
+      }
+    }
+  ]
+}

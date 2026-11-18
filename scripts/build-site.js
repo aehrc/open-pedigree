@@ -90,8 +90,13 @@ function aboutProblems(about) {
     const source = about.source || {};
     ['citation', 'doi', 'figure'].forEach((k) => text(source[k]) || problems.push(`a historic example needs source.${k}`));
     paragraphs(about.simplified) || problems.push('a historic example needs simplified: a list of what was left out or left open');
+  } else if (about.kind === 'form') {
+    const notes = about.questionnaire;
+    if (!Array.isArray(notes) || !notes.length || !notes.every((n) => n && text(n.linkId) && text(n.what))) {
+      problems.push('a form example needs questionnaire: a list of {linkId, what} for its notable items');
+    }
   } else if (about.kind !== 'classic') {
-    problems.push('kind must be classic or historic');
+    problems.push('kind must be classic, historic or form');
   }
   return problems;
 }
