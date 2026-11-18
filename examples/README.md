@@ -57,4 +57,6 @@ Partnerships are the couples who have a child together; there are no others.
 
 `kind` is `classic` (no `source` or `simplified`), `historic` (both required) or `form`. `order` places it in its list on the landing page.
 
-A `form` example has a `questionnaire.json`, and `about.json` adds `"questionnaire": [{ "linkId": ..., "what": ... }]`: the notable items, each shown on the page with what it does. Its form must pass `OpenPedigree.checkQuestionnaire` with no problems (the build refuses it otherwise). Start it from `dist/defaultQuestionnaire.json` and add a tab, so the rest of the form stays as the editor's own. Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
+Historic families are drawn from the cited figure only: never from another editor's files or from uncited genealogy. Anything the figure leaves open is left unset here, and listed under `simplified`.
+
+A `form` example has a `questionnaire.json`, and `about.json` adds `"questionnaire": [{ "linkId": ..., "what": ... }]`: the notable items, each shown on the page with what it does. Its form must pass `OpenPedigree.checkQuestionnaire` with no problems (the build refuses it otherwise). Start it from `dist/defaultQuestionnaire.json` and add a tab, so the rest of the form stays as the editor's own.

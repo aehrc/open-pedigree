@@ -143,3 +143,53 @@ describe('checkQuestionnaire', () => {
     expect(checkQuestionnaire(odd).problems.every((p) => typeof p.message === 'string')).toBe(true);
   });
 });
+
+describe('checkQuestionnaire: what the editor drops or can never evaluate', () => {
+  it('reports an item with no linkId, once, with how many items inside it go too', () => {
+    const result = checkQuestionnaire(q([group([
+      { type: 'string', text: 'Age' },
+      { type: 'group', text: 'Sub', item: [{ linkId: 'a', type: 'string' }, { linkId: 'b', type: 'string' }] },
+      { linkId: 'kept', type: 'string' },
+    ])]));
+    expect(result.problems.map((p) => p.message)).toEqual([
+      'An item with no linkId ("Age") isn\'t on the form: every item needs a linkId.',
+      'An item with no linkId ("Sub") isn\'t on the form, nor are the 2 items inside it: every item needs a linkId.',
+    ]);
+  });
+
+  it('reports what sits inside an item the editor dropped, and a condition on it', () => {
+    quiet();
+    const result = checkQuestionnaire(q([group([
+      { linkId: 'scan', type: 'attachment', item: [{ linkId: 'note', type: 'string' }] },
+      { linkId: 'seen', type: 'string', enableWhen: [{ question: 'scan', operator: 'exists', answerBoolean: true }] },
+    ])]));
+    expect(effects(result)).toEqual([['scan', 'ignored'], ['note', 'ignored'], ['seen', 'ignored']]);
+    expect(result.problems[1].message).toContain('sits inside scan, which the editor dropped');
+    expect(result.problems[2].message).toContain('is on scan, which isn\'t on the form');
+  });
+
+  it('reports an operator the editor doesn\'t know, a missing one, and nothing to compare with', () => {
+    const result = checkQuestionnaire(q([group([
+      { linkId: 'tested', type: 'boolean' },
+      { linkId: 'a', type: 'string', enableWhen: [{ question: 'tested', operator: '==', answerBoolean: true }] },
+      { linkId: 'b', type: 'string', enableWhen: [{ question: 'tested', answerBoolean: true }] },
+      { linkId: 'c', type: 'string', disabledWhen: [{ question: 'tested', operator: '=' }] },
+      { linkId: 'd', type: 'string', enableWhen: [{ question: 'tested', operator: 'exists', answerBoolean: true }] },
+    ])]));
+    expect(effects(result)).toEqual([['a', 'ignored'], ['b', 'ignored'], ['c', 'ignored']]);
+    expect(result.problems[0].message).toContain('operator "=="');
+    expect(result.problems[1].message).toContain('has no operator');
+    expect(result.problems[2].message).toContain('no answer value');
+  });
+
+  it('reports a linkId the editor uses for its own items', () => {
+    const result = checkQuestionnaire(q([group([{ linkId: 'editRecord', type: 'string' }])]));
+    expect(effects(result)).toEqual([['editRecord', 'ignored']]);
+    expect(result.problems[0].message).toContain('its own linked-record items');
+  });
+
+  it('says what the editor does with what it can\'t use', () => {
+    expect(checkQuestionnaire(q([])).problems[0].message).toContain('form would be empty');
+    expect(checkQuestionnaire({ resourceType: 'Bundle' }).problems[0].message).toContain('can\'t build a form from it');
+  });
+});

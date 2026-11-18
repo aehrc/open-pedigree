@@ -295,3 +295,39 @@ test('a form example\'s page opens the editor with its own form', async ({ page 
   expect(await formItems(page)).toContain('hearing_loss');
   expect(await page.evaluate(() => !!window.editor.getQuestionnaireLegend('hearing_loss'))).toBe(true);
 });
+
+test('opening clears only open-pedigree\'s own copies: other sites\' storage on the shared origin is left alone', async ({ page }) => {
+  await serveSite(page);
+  await page.goto(BASE + 'examples/full-sib-mating/');
+  await page.evaluate(() => {
+    localStorage.setItem('questionnaire-draft', 'another site');
+    localStorage.setItem('example-settings', 'another site');
+    localStorage.setItem('questionnaire-form-logic', '{}');
+  });
+  await page.getByRole('button', { name: 'Open in the editor' }).click();
+  await page.waitForURL(BASE + 'editor/?example=full-sib-mating');
+  expect(await page.evaluate(() => [localStorage.getItem('questionnaire-draft'), localStorage.getItem('example-settings'), localStorage.getItem('questionnaire-form-logic')]))
+    .toEqual(['another site', 'another site', null]);
+});
+
+test('try: the pedigree last opened from the page is offered first, with the visitor\'s changes', async ({ page }) => {
+  await openTry(page);
+  await pasteOwn(page, MY_FORM);
+  await page.selectOption('#pedigree', 'full-sib-mating');
+  await openFromTry(page);
+  // a change, saved
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('pedigree:node:setproperty', { detail: { nodeID: 0, properties: { setFirstName: 'Changed' } } }));
+    document.getElementById('action-save').click();
+  });
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('example-try')).value)).toContain('Changed');
+
+  // back to the page, a corrected form, and open again
+  await page.goto(BASE + 'try/');
+  await expect(page.locator('#pedigree')).toHaveValue('__last__');
+  await expect(page.locator('#last-hint')).toBeVisible();
+  await pasteOwn(page, withTab([{ linkId: 'my_item_2', type: 'string' }]));
+  await openFromTry(page);
+  expect(await formItems(page)).toContain('my_item_2');
+  expect(await page.evaluate(() => Object.values(window.editor.getGraph().DG.GG.properties).map((p) => p.fName))).toContain('Changed');
+});

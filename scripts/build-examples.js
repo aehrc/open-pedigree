@@ -73,9 +73,11 @@ function readExample(name) {
     example.questionnaire = JSON.parse(fs.readFileSync(formFile, 'utf8'));
   }
   const linkIds = new Set();
-  const collect = (items) => (items || []).forEach((item) => {
-    linkIds.add(item.linkId);
-    collect(item.item);
+  const collect = (items) => (Array.isArray(items) ? items : []).forEach((item) => {
+    if (item && typeof item === 'object') {
+      linkIds.add(item.linkId);
+      collect(item.item);
+    }
   });
   collect(example.questionnaire && example.questionnaire.item);
   people.filter((p) => p.answers).forEach((p) => {

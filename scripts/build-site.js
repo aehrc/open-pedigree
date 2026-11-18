@@ -164,18 +164,23 @@ function examples() {
 }
 
 // The page script both an example page and the Try page use to open the editor: fetch a file,
-// and store an example (and a form) under the name's keys, clearing earlier copies first (the large
-// examples would soon fill the storage every aehrc.github.io site shares).
-const HANDOFF = `  function fetchText(url) {
+// and store an example (and a form) under the name's keys. Earlier copies are cleared first (the
+// large examples would soon fill the browser's storage) - only open-pedigree's own keys, for its
+// examples and the Try page, since every aehrc.github.io site shares that storage.
+function handoff(all) {
+  const names = all.map((e) => e.name).concat(['try']);
+  return `  var OPEN_PEDIGREE_NAMES = ${JSON.stringify(names)};
+  function fetchText(url) {
     return fetch(url, { cache: 'no-cache' }).then(function (response) {
       if (!response.ok) throw new Error(url + ' could not be loaded (' + response.status + ')');
       return response.text();
     });
   }
   function openInEditor(name, pedigreeText, questionnaire, root) {
-    Object.keys(localStorage).filter(function (key) {
-      return key.indexOf('example-') === 0 || key.indexOf('questionnaire-') === 0;
-    }).forEach(function (key) { localStorage.removeItem(key); });
+    OPEN_PEDIGREE_NAMES.forEach(function (n) {
+      localStorage.removeItem('example-' + n);
+      localStorage.removeItem('questionnaire-' + n);
+    });
     if (pedigreeText) {
       localStorage.setItem('example-' + name, JSON.stringify({ value: pedigreeText, svg: null, context: null }));
     }
@@ -184,6 +189,7 @@ const HANDOFF = `  function fetchText(url) {
     }
     window.location.href = root + 'editor/?example=' + name;
   }`;
+}
 
 function card(example) {
   const { name, about } = example;
@@ -216,7 +222,7 @@ function landing(all) {
 `);
 }
 
-function examplePage(example) {
+function examplePage(example, all) {
   const { name, about, questionnaire } = example;
   const isForm = about.kind === 'form';
   const items = isForm ? itemsByLinkId(questionnaire) : {};
@@ -248,7 +254,7 @@ ${paragraphs(about.shows)}
 <h2>${isForm ? 'Why it matters' : 'Why it\'s hard to draw'}</h2>
 ${paragraphs(about.hard)}${formNotes}${source}${simplified}
 <script>
-${HANDOFF}
+${handoff(all)}
   // A fresh copy of the example (and its form), under its own key: the visitor's own pedigree
   // (pedigreeData) is never touched, and opening again starts from the example as published.
   document.getElementById('open-in-editor').addEventListener('click', function () {
@@ -300,6 +306,7 @@ function tryPage(all) {
   <legend>2. The pedigree</legend>
   <label for="pedigree">Open the editor on:</label>
   <select id="pedigree"><option value="">A blank pedigree (choose a template)</option>${options}</select>
+  <p class="hint" id="last-hint" hidden>Your last pedigree from this page is kept: choose it to carry on with your changes, or another to start again.</p>
 </fieldset>
 
 <fieldset>
@@ -311,7 +318,22 @@ function tryPage(all) {
 
 <script src="../dist/pedigree.min.js"></script>
 <script>
-${HANDOFF}
+${handoff(all)}
+  // The pedigree last opened from this page, with the visitor's changes: offered first, so trying
+  // another version of a form doesn't lose it.
+  var lastPedigree = null;
+  try {
+    var stored = JSON.parse(localStorage.getItem('example-try'));
+    lastPedigree = stored && stored.value ? stored.value : null;
+  } catch (err) { lastPedigree = null; }
+  if (lastPedigree) {
+    var last = document.createElement('option');
+    last.value = '__last__';
+    last.textContent = 'The pedigree you last opened here, with your changes';
+    document.getElementById('pedigree').insertBefore(last, document.getElementById('pedigree').firstChild);
+    document.getElementById('pedigree').value = '__last__';
+    document.getElementById('last-hint').hidden = false;
+  }
   var textarea = document.getElementById('questionnaire');
   textarea.value = JSON.stringify(window.OpenPedigree.defaultQuestionnaire, null, 2);
   var summary = document.getElementById('check-summary');
@@ -365,7 +387,7 @@ ${HANDOFF}
   function report(result) {
     var n = result.problems.length;
     show(n === 0 ? 'No problems: the editor will use this form as it is.'
-      : result.fatal ? 'The editor can\\'t use this form (it would show its built-in form instead):'
+      : result.fatal ? 'The editor can\\'t use this form:'
         : n + (n === 1 ? ' problem' : ' problems') + ' - the editor will ignore ' + (n === 1 ? 'it' : 'them') + ' and use the rest of the form:', result.problems);
     return result;
   }
@@ -380,7 +402,9 @@ ${HANDOFF}
     checked().then(report).then(function (result) {
       if (result.fatal) return null;
       var pedigree = document.getElementById('pedigree').value;
-      return (pedigree ? fetchText('../examples/' + pedigree + '/pedigree.json') : Promise.resolve(null))
+      var text = pedigree === '__last__' ? Promise.resolve(lastPedigree)
+        : pedigree ? fetchText('../examples/' + pedigree + '/pedigree.json') : Promise.resolve(null);
+      return text
         .then(function (text) { openInEditor('try', text, result.questionnaire, '../'); });
     }).catch(failed('Couldn\\'t open the editor'));
   });
@@ -436,7 +460,7 @@ function build(out) {
   fs.cpSync(assets, path.join(out, 'editor', 'dist', 'assets'), { recursive: true });
   all.forEach((example) => {
     const dir = path.join(out, 'examples', example.name);
-    write(path.join(dir, 'index.html'), examplePage(example));
+    write(path.join(dir, 'index.html'), examplePage(example, all));
     ['pedigree.json', 'pedigree.svg'].concat(example.questionnaire ? ['questionnaire.json'] : [])
       .forEach((file) => fs.copyFileSync(path.join(EXAMPLES, example.name, file), path.join(dir, file)));
   });
