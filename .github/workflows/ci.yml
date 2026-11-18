@@ -25,11 +25,12 @@ jobs:
       - run: node scripts/build-site.js "$RUNNER_TEMP/site"
       - run: npx playwright install --with-deps chromium
       - run: npm run examples:check
-      # the examples as layout tests, the website's hand-off, and the editor's ?example key, against
+      # the examples as layout tests, the website (incl. Try your own form), the editor's ?example key
+      # and stored forms, and the form examples' round trip, against
       # the built dist/ served statically (the config's dev server reloads on test output)
       - run: |
           python3 -m http.server 9000 --bind 127.0.0.1 >/dev/null 2>&1 &
           # (up before Playwright looks, or it would start the config's dev server instead)
           for i in $(seq 1 50); do curl -s -o /dev/null http://127.0.0.1:9000/ && break; sleep 0.2; done
-          npx playwright test tests/e2e/example-layouts.spec.js tests/e2e/site.spec.js tests/e2e/example-key.spec.js
+          npx playwright test tests/e2e/example-layouts.spec.js tests/e2e/site.spec.js tests/e2e/example-key.spec.js tests/e2e/example-questionnaire.spec.js tests/e2e/example-forms.spec.js
       - run: npm test

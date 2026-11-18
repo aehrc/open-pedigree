@@ -18,7 +18,7 @@
 
 ## A free and open-source pedigree tool powered by PhenoTips®
 
-**[Website](https://aehrc.github.io/open-pedigree/): [try the editor](https://aehrc.github.io/open-pedigree/editor/), and explore [example pedigrees](https://aehrc.github.io/open-pedigree/#examples) from classic textbook structures to the Spanish Habsburgs.**
+**[Website](https://aehrc.github.io/open-pedigree/): [try the editor](https://aehrc.github.io/open-pedigree/editor/), [try it with your own form](https://aehrc.github.io/open-pedigree/try/) (a FHIR Questionnaire, checked first), and explore [example pedigrees](https://aehrc.github.io/open-pedigree/#examples) from classic textbook structures to the Spanish Habsburgs.**
 
 Open Pedigree is a robust browser-based genomic pedigree drawing solution using [Raphaël](https://dmitrybaranovskiy.github.io/raphael/) and [PhenoTips](https://phenotips.org).
 
@@ -145,6 +145,8 @@ See [`tests/unit/fixtures/current-forms-questionnaire.json`](tests/unit/fixtures
 const result = OpenPedigree.checkQuestionnaire(myQuestionnaire);
 if (result.problems.length) console.log(result.toString());
 ```
+
+The website's [Try your own form](https://aehrc.github.io/open-pedigree/try/) page runs this check on a pasted, uploaded or fetched Questionnaire, then opens the editor with it. Its *Configurable forms* examples show a custom legend and form logic, each with its Questionnaire to download.
 
 ### Known limitations
 
