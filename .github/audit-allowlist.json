@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "reason": "ReDoS in extglob patterns; no fixed release exists (4.0.7, the latest, is affected). Only build and test tooling reaches it (sass via @parcel/watcher, ts-loader, vitest/vite/tinyglobby, webpack-dev-server via chokidar): it is never imported by src/ and doesn't reach dist/, and the patterns it sees are the repo's own globs, not user input."
+  }
+]
