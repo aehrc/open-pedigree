@@ -178,7 +178,12 @@ export default class Controller {
           remember('setDeathDate', node.getDeathDate());
           remember('setGestationAge', node.getGestationAge());
           remember('setBirthDate', node.getBirthDate());
-          remember('setAdopted', node.getAdopted());
+          remember('setAdoption', node.getAdoption());
+        }
+        // Either direction's setter can clear the other: undo restores the direction as it was
+        // (applied after the setter's own value, in the memo's key order).
+        if (propertySetFunction == 'setAdopted' || propertySetFunction == 'setAdoptedOut') {
+          remember('setAdoption', node.getAdoption());
         }
         if (propertySetFunction == 'setDeathDate') {
           remember('setLifeStatus', node.getLifeStatus());
@@ -224,7 +229,8 @@ export default class Controller {
           }
         }
 
-        if (propertySetFunction == 'setAdopted') {
+        if (propertySetFunction == 'setAdopted' || propertySetFunction == 'setAdoptedOut' || propertySetFunction == 'setAdoption') {
+          // (also redraws every couple's child lines: an adopted-in child's is dashed)
           needUpdateAncestors = true;
           if (!twinUpdate) {
             twinUpdate = {};
@@ -553,6 +559,10 @@ export default class Controller {
     if (propertySetFunction == 'setGender') {
       var possibleGenders = editor.getGraph().getPossibleGenders(nodeID);
       return possibleGenders[propValue];
+    }
+    // A child of a childless or infertile couple is adopted in, so never adopted out.
+    if ((propertySetFunction == 'setAdoptedOut' && propValue) || (propertySetFunction == 'setAdoption' && propValue === 'out')) {
+      return !(editor.getGraph().isPerson(nodeID) && editor.getGraph().hasToBeAdopted(nodeID));
     }
     return true;
   }

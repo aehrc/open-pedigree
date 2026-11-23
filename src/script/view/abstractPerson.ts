@@ -7,11 +7,13 @@ export default class AbstractPerson extends AbstractNode {
 
   _gender: any;
   _isAdopted: any;
+  _isAdoptedOut: any;
 
   constructor(x: any, y: any, gender: any, id: any) {
     AbstractPerson._pendingGender = gender;
     super(x, y, id);
     this._isAdopted = false;
+    this._isAdoptedOut = false;
   }
 
   _generateGraphics(x: any, y: any): any {
@@ -44,13 +46,16 @@ export default class AbstractPerson extends AbstractNode {
     }
   }
 
+  /**
+   * Adopted in: brought into the family drawn (the parents drawn, if any, are adoptive). Adopted
+   * in and adopted out exclude each other: setting one clears the other.
+   */
   setAdopted(isAdopted: any): void {
-    this._isAdopted = isAdopted;
-    if (isAdopted) {
-      this.getGraphics().drawAdoptedShape();
-    } else {
-      this.getGraphics().removeAdoptedShape();
+    this._isAdopted = !!isAdopted;
+    if (this._isAdopted) {
+      this._isAdoptedOut = false;
     }
+    this._updateAdoptedShape();
   }
 
   isAdopted(): any {
@@ -59,6 +64,50 @@ export default class AbstractPerson extends AbstractNode {
 
   getAdopted(): any {
     return this.isAdopted();
+  }
+
+  /** Adopted out: born into the family drawn and adopted elsewhere (the parents drawn are birth parents). */
+  setAdoptedOut(isAdoptedOut: any): void {
+    this._isAdoptedOut = !!isAdoptedOut;
+    if (this._isAdoptedOut) {
+      this._isAdopted = false;
+    }
+    this._updateAdoptedShape();
+  }
+
+  isAdoptedOut(): any {
+    return this._isAdoptedOut;
+  }
+
+  getAdoptedOut(): any {
+    return this.isAdoptedOut();
+  }
+
+  /** The adoption direction as a code: 'in', 'out', or '' (not adopted). */
+  getAdoption(): string {
+    return this._isAdopted ? 'in' : (this._isAdoptedOut ? 'out' : '');
+  }
+
+  /** Sets the direction from a code: 'in' or 'out'; any other value means not adopted. */
+  setAdoption(code: any): void {
+    if (code === 'in') {
+      this.setAdopted(true);
+    } else if (code === 'out') {
+      this.setAdoptedOut(true);
+    } else {
+      this._isAdopted = false;
+      this._isAdoptedOut = false;
+      this._updateAdoptedShape();
+    }
+  }
+
+  // Brackets for either direction.
+  _updateAdoptedShape(): void {
+    if (this._isAdopted || this._isAdoptedOut) {
+      this.getGraphics().drawAdoptedShape();
+    } else {
+      this.getGraphics().removeAdoptedShape();
+    }
   }
 
   getProperties(): any {

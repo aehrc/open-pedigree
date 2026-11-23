@@ -205,6 +205,24 @@ The Observation's value is still the gene, so a reader that ignores components r
 
 A record-link provider can send a linked record's results with its genes, as the answer `{ "linkId": "gene_results", "value": { "BRCA1": "heterozygous" } }` (keys as the `candidate_genes` entries give the genes, values as above). It's reserved like the legends, so it needs no Questionnaire item, and a refresh treats each gene's result as any linked value: set when the record changes it, cleared when the record drops it only while the person still holds it, and left alone for genes that never came from the record.
 
+## Adoption: adopted in and adopted out
+
+A person is not adopted, **adopted in** (brought into the family drawn) or **adopted out** (born into it and adopted elsewhere) ([#5](https://github.com/aehrc/open-pedigree/issues/5)). The node menu's *Adoption* choice sets it. Setting one direction clears the other.
+
+They're drawn in standard notation: brackets around both. An adopted-in child's line of descent from the parents drawn is dashed, since those are the adoptive parents. An adopted-out child's line is solid, since those are their birth parents. A child of a couple marked childless or infertile is adopted in and can't be changed. A fetus has no adoption.
+
+An adopted-out person's parents are treated as their birth parents. Consanguinity is found through them, and they count as the couple's child, so the couple can't be marked childless.
+
+| | Saved as | GA4GH FHIR |
+| --- | --- | --- |
+| Adopted in, parents drawn | `isAdopted: true` | adoptive-parent relationships (`KIN:022`) |
+| Adopted in, no parents drawn | `isAdopted: true` | the `adopted` extension, `in` |
+| Adopted out | `isAdoptedOut: true` | natural parent relationships, and the `adopted` extension, `out` |
+
+A file from another tool that gives a child adoptive parents and `out` opens with the child adopted in, under those parents, with a note. DADA2 has one adopted flag: either direction is written as adopted, and DADA2 and GEDCOM imports read adopted as adopted in.
+
+A Questionnaire sets it with a choice item mapped to `adoption` (`…/PedigreeIndividual#PedigreeIndividual.adoption`): the code `in` is adopted in, `out` adopted out, and any other code (e.g. `none`) not adopted. The default Questionnaire's item is `adoption`. A yes/no item mapped to `isAdopted` still works: yes is adopted in, and no clears adopted in only, so it never undoes an adopted out set elsewhere.
+
 ## Black-and-white patterns and PNG export
 
 The toolbar's **Patterns** toggle draws each disorder, gene and custom legend entry with a black-and-white pattern instead of a colour, for colour-blind users and for printing ([#3](https://github.com/aehrc/open-pedigree/issues/3)). The legend's swatches show the same patterns. The first entry is solid black, as in a classic pedigree. Later entries get thin diagonal hatching, bold diagonal stripes the other way, cross-hatching, dots, horizontal and vertical lines, a grid, sparse dots and bold horizontal stripes. Patterns that run the same way differ in weight too, so they stay apart when a symbol is small. Each entry's pattern is its place in the order the legends list their entries (disorders, then genes, then custom legends), so the drawing always matches the legend. Adding or removing an entry moves the ones listed after it (a new disorder moves every gene down a pattern). Past ten entries the patterns repeat. Like *Numbers*, the toggle is view state: it's off when the editor opens, never saved, and never undone. A host can set it with `editor.getView().setFillPatterns(true)`.

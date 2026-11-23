@@ -265,7 +265,7 @@ describe('parseQuestionnaire', () => {
 
   it('MAPS_TO_FIELD_TARGETS covers every terminal segment used by the supported item.definition targets', () => {
     expect(Object.keys(MAPS_TO_FIELD_TARGETS).sort()).toEqual(
-      ['birthDate', 'carrierStatus', 'childlessStatus', 'comments', 'deceasedDateTime', 'evaluated', 'family',
+      ['adoption', 'birthDate', 'carrierStatus', 'childlessStatus', 'comments', 'deceasedDateTime', 'evaluated', 'family',
         'gender', 'gestationAge', 'given', 'identifier', 'isAdopted', 'lifeStatus', 'lostContact', 'monozygotic'].sort()
     );
   });

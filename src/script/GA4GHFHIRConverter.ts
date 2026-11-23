@@ -11,7 +11,7 @@ import { placeParents, chooseParentClaims, leftOutWarning, leftOutNote, placedCl
 
 import {
   LINKED_RECORD_REF_EXTENSION_URL, LINKED_RECORD_SNAPSHOT_EXTENSION_URL, FETUS_DATE_OF_DEATH_EXTENSION_URL,
-  ADOPTED_EXTENSION_URL, ADOPTED_IN, RETIRED_BASE, replacementFor,
+  ADOPTED_EXTENSION_URL, ADOPTED_IN, ADOPTED_OUT, RETIRED_BASE, replacementFor,
 } from 'pedigree/fhirUrls';
 
 // A node's link to an external record (record-link-provider), on its Patient resource; and what
@@ -226,6 +226,15 @@ function readFHIR(this: any, inputText) {
     const chosen = chooseParentClaims(nextPerson.parentClaims || [], fetus);
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     const placed = placedClaims(chosen, parents);
+    // Adopted out (never for a fetus). Adoptive-parent codes as well contradict it: the parents
+    // drawn are then adoptive, so the person opens adopted in (below), and the import says so.
+    if (nextPerson.adoptedOut && !fetus && newG.properties[personID]) {
+      if (chosen.adopted) {
+        found.note(personLabel(nextPerson.properties) + ': marked adopted out, but has adoptive parents in the file, so opened as adopted in, under them');
+      } else {
+        newG.properties[personID].isAdoptedOut = true;
+      }
+    }
     // every code for a parent placed must fit their gender, not just the one that placed them (a
     // parent left out can't fail the import)
     // (a child whose parents can't be placed is left without them, and the rest still checked)
@@ -1113,6 +1122,10 @@ GA4GHFHIRConverter.extractDataFromPatient = function (patientResource,
   if (adopted && adopted.valueCode === ADOPTED_IN) {
     (result as any).adoptedWithoutParents = true;
   }
+  // Adopted out: the parents drawn are birth parents (written whether or not they are)
+  if (adopted && adopted.valueCode === ADOPTED_OUT) {
+    (result as any).adoptedOut = true;
+  }
 
   return result;
 };
@@ -1518,6 +1531,11 @@ GA4GHFHIRConverter.processTreeNode = function (index, pedigree, privacySetting, 
   if (pedigree.GG.isAdopted(index) && pedigree.GG.getParents(index).length === 0
     && FETAL_STATUSES.indexOf(nodeProperties.lifeStatus) === -1) {
     pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION_URL, 'valueCode': ADOPTED_IN });
+  }
+  // Adopted out, whether or not the birth parents are drawn: no KIN code says it (their parent
+  // relationships below stay natural)
+  if (pedigree.GG.isAdoptedOut(index) && FETAL_STATUSES.indexOf(nodeProperties.lifeStatus) === -1) {
+    pedigreeIndividuals[index].extension.push({ 'url': ADOPTED_EXTENSION_URL, 'valueCode': ADOPTED_OUT });
   }
 
 
@@ -2146,7 +2164,8 @@ GA4GHFHIRConverter.buildQuestionnaireResponse = function (ref, nodeProperties, p
     }
     let value;
     if (item.mapping && item.mapping.kind === 'field') {
-      value = nodeProperties[MAPS_TO_FIELD_TARGETS[item.mapping.field].propertyBagKey];
+      const target = MAPS_TO_FIELD_TARGETS[item.mapping.field];
+      value = target.fromProperties ? target.fromProperties(nodeProperties) : nodeProperties[target.propertyBagKey];
     } else if (item.mapping && (item.mapping.kind === 'legendCondition' || item.mapping.kind === 'legendObservation') && RESERVED_LEGEND_TARGETS.hasOwnProperty(item.linkId)) {
       value = this._reservedLegendIdsToAnswers(item.linkId, nodeProperties);
     } else {

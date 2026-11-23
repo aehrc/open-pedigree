@@ -123,10 +123,18 @@ export const DEFAULT_QUESTIONNAIRE: any = {
           enableWhen: [predicateCondition('isFetus', true)]
         },
         {
-          linkId: 'adopted', type: 'boolean', text: 'Adopted',
-          definition: MAPS_TO_FIELD_DEFINITIONS.isAdopted, extension: [mapsToFieldExt()],
-          enableWhen: [predicateCondition('isFetus', true), predicateCondition('hasToBeAdopted', true)],
-          enableBehavior: 'all'
+          // (a child of a childless or infertile couple is adopted in, shown and not changeable)
+          linkId: 'adoption', type: 'choice', text: 'Adoption',
+          answerOption: [
+            { valueCoding: { code: 'none', display: 'Not adopted' } },
+            { valueCoding: { code: 'in', display: 'Adopted in' } },
+            { valueCoding: { code: 'out', display: 'Adopted out' } }
+          ],
+          columns: 3,
+          definition: MAPS_TO_FIELD_DEFINITIONS.adoption, extension: [mapsToFieldExt(), radioControl()],
+          enableWhen: [predicateCondition('isFetus', true)],
+          // (disabledWhen lists when it stays enabled, as for monozygotic)
+          disabledWhen: [predicateCondition('hasToBeAdopted', true)]
         },
         {
           linkId: 'monozygotic', type: 'boolean', text: 'Monozygotic twin',

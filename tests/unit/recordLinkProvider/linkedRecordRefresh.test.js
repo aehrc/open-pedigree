@@ -3,7 +3,7 @@ import { computeLinkedRecordRefresh, relinkRefreshInput, isUnusableAnswer, CLEAR
 import { GENE_RESULTS_LINK_ID, isGeneResultCode } from 'pedigree/model/geneResults';
 
 const SETTER_FOR = {
-  first_name: 'setFirstName', gender: 'setGender', dob: 'setBirthDate', dod: 'setDeathDate', weeks: 'setGestationAge', disorders: 'setDisorders',
+  first_name: 'setFirstName', adoption: 'setAdoption', gender: 'setGender', dob: 'setBirthDate', dod: 'setDeathDate', weeks: 'setGestationAge', disorders: 'setDisorders',
 };
 const sanitise = (id) => String(id).replace(/:/g, '_C_');
 
@@ -23,7 +23,7 @@ function refresh(answers, { current = {}, snapshot = {} } = {}) {
 describe('clear table and comparison', () => {
   it('has an unset value for every mapped setter, and null for generic answers', () => {
     expect(Object.keys(CLEAR_VALUES).sort()).toEqual([
-      'setAdopted', 'setBirthDate', 'setCarrierStatus', 'setChildlessStatus', 'setComments', 'setDeathDate',
+      'setAdopted', 'setAdoption', 'setBirthDate', 'setCarrierStatus', 'setChildlessStatus', 'setComments', 'setDeathDate',
       'setEvaluated', 'setExternalID', 'setFirstName', 'setGender', 'setGestationAge', 'setLastName',
       'setLifeStatus', 'setLostContact', 'setMonozygotic',
     ]);
@@ -35,6 +35,28 @@ describe('clear table and comparison', () => {
     expect(sameValue('setBirthDate', new Date(2001, 1, 3), '2001-02-03')).toBe(true);
     expect(sameValue('setQuestionnaireAnswer_count', 0, null)).toBe(false);
     expect(sameValue('setAdopted', false, '')).toBe(false);
+  });
+
+  it('takes any adoption code but in and out as not adopted', () => {
+    expect(CLEAR_VALUES.setAdoption).toBe('');
+    expect(sameValue('setAdoption', '', '0')).toBe(true);
+    expect(sameValue('setAdoption', '', 'none')).toBe(true);
+    expect(sameValue('setAdoption', 'out', 'in')).toBe(false);
+    expect(sameValue('setAdoption', 'out', 'out')).toBe(true);
+  });
+});
+
+describe('a linked row\'s adoption (pedigree-adopted-in-out D7)', () => {
+  it('sets adopted out from the row, and clears it when the row is emptied', () => {
+    const set = refresh([{ linkId: 'adoption', value: 'out' }], { current: { setAdoption: '' }, snapshot: { adoption: null } });
+    expect(set.properties).toEqual({ setAdoption: 'out' });
+    const cleared = refresh([{ linkId: 'adoption', value: null }], { current: { setAdoption: 'out' }, snapshot: { adoption: 'out' } });
+    expect(cleared.properties).toEqual({ setAdoption: '' });
+  });
+
+  it('leaves the node alone when the row says "not adopted" in another code and the node isn\'t adopted', () => {
+    const r = refresh([{ linkId: 'adoption', value: '0' }], { current: { setAdoption: '' }, snapshot: { adoption: 'in' } });
+    expect(r.properties).toEqual({});
   });
 });
 

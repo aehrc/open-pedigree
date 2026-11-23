@@ -23,7 +23,7 @@ describe('DEFAULT_QUESTIONNAIRE', () => {
     const linkIds = items.map(i => i.linkId);
     expect(linkIds).toEqual([
       'gender', 'first_name', 'last_name', 'link_patient', 'external_id', 'date_of_birth', 'date_of_death',
-      'state', 'gestation_age', 'childlessSelect', 'adopted', 'monozygotic', 'nocontact', 'placeholder',
+      'state', 'gestation_age', 'childlessSelect', 'adoption', 'monozygotic', 'nocontact', 'placeholder',
       'carrier', 'evaluated', 'disorders', 'import_from_record', 'candidate_genes', 'hpo_positive', 'comments',
     ]);
   });
@@ -46,7 +46,7 @@ describe('DEFAULT_QUESTIONNAIRE', () => {
     const byLinkId = Object.fromEntries(items.map(i => [i.linkId, i]));
     expect(byLinkId.gender.mapping).toEqual({ kind: 'field', field: 'gender' });
     expect(byLinkId.first_name.mapping).toEqual({ kind: 'field', field: 'given' });
-    expect(byLinkId.adopted.mapping).toEqual({ kind: 'field', field: 'isAdopted' });
+    expect(byLinkId.adoption.mapping).toEqual({ kind: 'field', field: 'adoption' });
     expect(byLinkId.monozygotic.mapping).toEqual({ kind: 'field', field: 'monozygotic' });
     expect(byLinkId.nocontact.mapping).toEqual({ kind: 'field', field: 'lostContact' });
     expect(byLinkId.childlessSelect.mapping).toEqual({ kind: 'field', field: 'childlessStatus' });
@@ -76,6 +76,17 @@ describe('DEFAULT_QUESTIONNAIRE', () => {
     const byLinkId = Object.fromEntries(items.map(i => [i.linkId, i]));
     expect(byLinkId.monozygotic.enableWhen).toEqual([{ predicate: 'isTwin', negate: false }]);
     expect(byLinkId.monozygotic.disabledWhen).toEqual([{ predicate: 'isTwinWithConsistentGender', negate: false }]);
+  });
+
+  it('adoption is a radio choice (not adopted / in / out), hidden for a fetus and locked for a child who has to be adopted', () => {
+    const { items } = parseQuestionnaire(DEFAULT_QUESTIONNAIRE);
+    const adoption = items.find((i) => i.linkId === 'adoption');
+    expect(adoption.fieldType).toBe('radio');
+    expect(adoption.mapping).toEqual({ kind: 'field', field: 'adoption' });
+    expect(adoption.answerOption.map((o) => o.value)).toEqual(['none', 'in', 'out']);
+    expect(adoption.enableWhen).toEqual([{ predicate: 'isFetus', negate: true }]);
+    expect(adoption.disabledWhen).toEqual([{ predicate: 'hasToBeAdopted', negate: true }]);
+    expect(items.some((i) => i.linkId === 'adopted')).toBe(false);
   });
 
   it('placeholder is unconditionally unsatisfiable (always inactive)', () => {

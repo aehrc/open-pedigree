@@ -203,7 +203,8 @@ PedigreeExport.exportAsDADA2 = function(pedigree) {
     }
     output += ' ' + lifeStatus;
 
-    if (pedigree.GG.properties[i].hasOwnProperty('isAdopted') && pedigree.GG.properties[i]['isAdopted']) {
+    // (DADA2 has one adopted flag: adopted out is written as adopted too)
+    if (pedigree.GG.isAdopted(i) || pedigree.GG.isAdoptedOut(i)) {
       output += ' 1';
     }
     output += '\n';

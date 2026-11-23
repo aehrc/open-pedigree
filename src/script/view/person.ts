@@ -260,6 +260,7 @@ export default class Person extends AbstractPerson {
     this._conceptionDate = '';
     this._gestationAge = '';
     this._isAdopted = false;
+    this._isAdoptedOut = false;
     this._externalID = '';
     this._lifeStatus = 'alive';
     this._childlessStatus = null;
@@ -534,7 +535,7 @@ export default class Person extends AbstractPerson {
 
       if (this.isFetus()) {
         this.setBirthDate('');
-        this.setAdopted(false);
+        this.setAdoption('');
         this.setChildlessStatus(null);
       }
       this.getGraphics().updateLifeStatusShapes(oldStatus);
@@ -1252,6 +1253,9 @@ export default class Person extends AbstractPerson {
     if (this.isAdopted()) {
       info['isAdopted'] = this.isAdopted();
     }
+    if (this.isAdoptedOut()) {
+      info['isAdoptedOut'] = true;
+    }
     if (this.getLifeStatus() !== 'alive') {
       info['lifeStatus'] = this.getLifeStatus();
     }
@@ -1365,8 +1369,10 @@ export default class Person extends AbstractPerson {
       this.setGenes(Array.isArray(info.candidateGenes) ? info.candidateGenes : []);
       // (after the genes: a result needs its gene)
       this.setGeneResults(info.geneResults || {});
-      if (info.hasOwnProperty('isAdopted') && this.isAdopted() !== info.isAdopted) {
-        this.setAdopted(info.isAdopted);
+      // (one direction or none: isAdopted is adopted in, isAdoptedOut adopted out)
+      const adoption = info.isAdopted ? 'in' : (info.isAdoptedOut ? 'out' : '');
+      if (this.getAdoption() !== adoption) {
+        this.setAdoption(adoption);
       }
       if (info.hasOwnProperty('lifeStatus') && this.getLifeStatus() !== info.lifeStatus) {
         this.setLifeStatus(info.lifeStatus);

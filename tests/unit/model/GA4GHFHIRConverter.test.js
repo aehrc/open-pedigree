@@ -402,6 +402,46 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     expect(Object.values(graph.properties).filter((p) => p.isAdopted).map((p) => p.fName)).toEqual(['John']);
   });
 
+  // pedigree-adopted-in-out D5
+  it('keeps an adopted-out child adopted out, under natural parent relationships', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { fName: 'Kid', isAdoptedOut: true });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'minimal', null, null);
+    expect(exported).not.toContain('KIN:022');
+    expect(exported).toContain('KIN:027');
+    const adoptedExt = (p) => (p.extension || []).filter((e) => e.url === 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted');
+    const marked = patients(exported).filter((p) => adoptedExt(p).length);
+    expect(marked.length).toBe(1);
+    expect(adoptedExt(marked[0])).toEqual([{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueCode: 'out' }]);
+
+    const graph = GA4GHFHIRConverter.initFromFHIR(exported);
+    const people = Object.keys(graph.properties).map(Number).filter((v) => graph.isPerson(v));
+    const child = people.find((v) => graph.getParents(v).length === 2);
+    expect(graph.properties[child].isAdoptedOut).toBe(true);
+    expect(graph.properties[child].isAdopted).toBeFalsy();
+    expect(people.filter((v) => graph.properties[v].isAdoptedOut || graph.properties[v].isAdopted)).toEqual([child]);
+  });
+
+  it('writes no adoption for an adopted-out fetus', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { isAdoptedOut: true, lifeStatus: 'unborn' });
+    const exported = GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null);
+    expect(exported).not.toContain('/StructureDefinition/adopted');
+  });
+
+  it('opens a child with adoptive parents and adopted out as adopted in, and notes it', () => {
+    const gg = structuredClone(simpleGG);
+    Object.assign(gg[4].prop, { fName: 'Kid', isAdopted: true });
+    const bundle = JSON.parse(GA4GHFHIRConverter.exportAsFHIR({ GG: PedigreeImport.initFromPhenotipsInternal(gg) }, 'all', null, null));
+    const kid = bundle.entry.map((e) => e.resource).find((r) => r.resourceType === 'Patient' && r.name && r.name[0].given[0] === 'Kid');
+    kid.extension = (kid.extension || []).concat([{ url: 'https://aehrc.github.io/open-pedigree/fhir/StructureDefinition/adopted', valueCode: 'out' }]);
+    const graph = GA4GHFHIRConverter.initFromFHIR(JSON.stringify(bundle));
+    const read = Object.values(graph.properties).find((p) => p.fName === 'Kid');
+    expect(read.isAdopted).toBe(true);
+    expect(read.isAdoptedOut).toBeFalsy();
+    expect(graph.importNotes).toEqual(['Kid: marked adopted out, but has adoptive parents in the file, so opened as adopted in, under them']);
+  });
+
   it('reads neither the adoption nor a fetus date of death under the URLs used before 2.0.0, and says so', () => {
     const gg = structuredClone(simpleGG);
     gg[0].prop.isAdopted = true;

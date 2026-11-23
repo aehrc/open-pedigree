@@ -95,7 +95,7 @@ describe('Person.getSummary() driven by the default Questionnaire', () => {
     const summary = person.getSummary();
     for (const linkId of [
       'gender', 'first_name', 'last_name', 'link_patient', 'external_id', 'date_of_birth', 'date_of_death',
-      'state', 'gestation_age', 'childlessSelect', 'adopted', 'monozygotic', 'nocontact', 'placeholder',
+      'state', 'gestation_age', 'childlessSelect', 'adoption', 'monozygotic', 'nocontact', 'placeholder',
       'carrier', 'evaluated', 'disorders', 'import_from_record', 'candidate_genes', 'hpo_positive', 'comments',
     ]) {
       expect(summary).toHaveProperty(linkId);
@@ -156,17 +156,17 @@ describe('Person.getSummary() driven by the default Questionnaire', () => {
     expect(alive.getSummary().gestation_age.inactive).toBe(true);
   });
 
-  it('adopted is inactive when the node is a fetus OR has to be adopted', () => {
+  it('adoption is hidden for a fetus, and shown but not changeable for a child who has to be adopted', () => {
     vi.stubGlobal('editor', makeMockEditor({ graph: makeMockGraph({ hasToBeAdopted: () => true }) }));
-    const person = new Person(0, 0, 0, { gender: 'F', lifeStatus: 'alive' });
-    expect(person.getSummary().adopted.inactive).toBe(true);
+    const person = new Person(0, 0, 0, { gender: 'F', lifeStatus: 'alive', isAdopted: true });
+    expect(person.getSummary().adoption).toMatchObject({ value: 'in', inactive: false, disabled: true });
 
     vi.stubGlobal('editor', makeMockEditor());
     const fetus = new Person(0, 0, 0, { gender: 'F', lifeStatus: 'unborn' });
-    expect(fetus.getSummary().adopted.inactive).toBe(true);
+    expect(fetus.getSummary().adoption.inactive).toBe(true);
 
-    const neither = new Person(0, 0, 0, { gender: 'F', lifeStatus: 'alive' });
-    expect(neither.getSummary().adopted.inactive).toBe(false);
+    const neither = new Person(0, 0, 0, { gender: 'F', lifeStatus: 'alive', isAdoptedOut: true });
+    expect(neither.getSummary().adoption).toMatchObject({ value: 'out', inactive: false, disabled: false });
   });
 
   it('monozygotic is inactive when not a twin, and disabled when twins have inconsistent genders', () => {

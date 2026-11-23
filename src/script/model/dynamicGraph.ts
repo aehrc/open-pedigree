@@ -75,6 +75,13 @@ DynamicPositionedGraph.prototype = {
     return this.DG.GG.isAdopted(id);
   },
 
+  isAdoptedOut: function( id ) {
+    if (!this.isPerson(id)) {
+      throw 'Assertion failed: isAdoptedOut() is applied to a non-person';
+    }
+    return this.DG.GG.isAdoptedOut(id);
+  },
+
   getGeneration: function( id ) {
     var minRank = Math.min.apply(null, this.DG.ranks);
     return (this.DG.ranks[id] - minRank)/2 + 1;

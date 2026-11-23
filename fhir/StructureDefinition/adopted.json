@@ -6,7 +6,7 @@
   "title": "Adopted",
   "status": "active",
   "publisher": "AEHRC, CSIRO (open-pedigree)",
-  "description": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. `out` is defined for a later version and not yet written or read.",
+  "description": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. open-pedigree writes `out` for an adopted-out person, whether or not their birth parents are in the pedigree (their parent relationships stay natural, since no KIN code says it).",
   "fhirVersion": "4.0.1",
   "kind": "complex-type",
   "abstract": false,
@@ -25,7 +25,7 @@
         "id": "Extension",
         "path": "Extension",
         "short": "Adopted",
-        "definition": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. `out` is defined for a later version and not yet written or read."
+        "definition": "Which way a person was adopted, on their Patient in a GA4GH pedigree: `in` (adopted into this family) or `out` (adopted away from it). open-pedigree writes `in` for an adopted person with no parents in the pedigree; an adopted child whose adoptive parents are in the pedigree is described by those KIN:022 (isAdoptiveParent) relationships instead. open-pedigree writes `out` for an adopted-out person, whether or not their birth parents are in the pedigree (their parent relationships stay natural, since no KIN code says it)."
       },
       {
         "id": "Extension.extension",

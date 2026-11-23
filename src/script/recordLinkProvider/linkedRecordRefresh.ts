@@ -73,6 +73,7 @@ export const CLEAR_VALUES: Record<string, any> = {
   setGestationAge: '',
   setChildlessStatus: null,
   setAdopted: false,
+  setAdoption: '',
   setEvaluated: false,
   setMonozygotic: false,
   setLostContact: false,
@@ -101,6 +102,10 @@ function normalise(setter: string, value: any): any {
     // A record's 'YYYY-MM-DD' is that day here (new Date() would read it as UTC midnight).
     const date = parseLocalIsoDate(value);
     return date ? date.toDateString() : String(value);
+  }
+  if (setter === 'setAdoption') {
+    // (any code but in and out is "not adopted", as the setter takes it - e.g. REDCap's "0")
+    return value === 'in' || value === 'out' ? value : '';
   }
   if (setter === 'setGestationAge') {
     return (value === null || value === undefined || value === '' || isNaN(parseInt(value, 10))) ? '' : parseInt(value, 10);
