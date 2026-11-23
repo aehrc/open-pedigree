@@ -171,3 +171,55 @@ test('picking "Not adopted" for someone who isn\'t adopted is no change (no undo
   await setProperty(page, 'NOT', { setAdoption: 'none' });
   expect(await steps()).toBe(before);
 });
+
+const twinsOf = (page, ext) => page.evaluate((src) => window.editor.getGraph().getAllTwinsSortedByOrder(eval(src)), `(${personByExt})('${ext}')`);
+const setOn = (page, v, properties) => page.evaluate(([id, p]) => document.dispatchEvent(new window.CustomEvent('pedigree:node:setproperty', { detail: { nodeID: id, properties: p } })), [v, properties]);
+const adoptionOf = (page, v) => page.evaluate((id) => window.editor.getView().getNode(id).getAdoption(), v);
+const addTwin = (page, v) => page.evaluate((id) => document.dispatchEvent(new window.CustomEvent('pedigree:node:modify', { detail: { nodeID: id, modifications: { addTwin: 2 } } })), v);
+
+test('a fetal twin, once born, takes the adoption its twins share', async ({ page }) => {
+  await open(page, 'local:adoptInOut9?format=GA4GH', FAMILY);
+  const [first] = await twinsOf(page, 'IN');
+  await addTwin(page, first);
+  const twins = await twinsOf(page, 'IN');
+  const other = twins.find((v) => v !== first);
+  await setOn(page, other, { setLifeStatus: 'unborn' });
+  await setOn(page, first, { setAdoption: 'in' });
+  expect(await adoptionOf(page, other)).toBe('');
+  await setOn(page, other, { setLifeStatus: 'alive' });
+  expect(await adoptionOf(page, other)).toBe('in');
+  // every twin's line, the shared piece included, is dashed: all end at one of the twins
+  const xs = await Promise.all(twins.map((v) => page.evaluate((id) => Math.round(window.editor.getView().getNode(id).getX()), v)));
+  // (a line can be drawn either way: both its ends count)
+  const ends = await page.evaluate(() => [...document.querySelectorAll('#canvas svg path')]
+    .filter((p) => p.getAttribute('stroke-dasharray') && p.getAttribute('stroke-dasharray') !== 'none')
+    .flatMap((p) => {
+      const n = (p.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number);
+      return [Math.round(n[0]), Math.round(n[n.length - 2])];
+    }));
+  xs.forEach((x) => expect(ends).toContain(x));
+  // the shared piece, which ends at the twins' middle
+  const middle = Math.round((xs[0] + xs[1]) / 2);
+  expect(ends.some((x) => Math.abs(x - middle) <= 1)).toBe(true);
+});
+
+test('a twin added from a fetal twin shares the born twins\' adoption', async ({ page }) => {
+  await open(page, 'local:adoptInOut10?format=GA4GH', FAMILY);
+  const [first] = await twinsOf(page, 'IN');
+  await setOn(page, first, { setAdoption: 'in' });
+  await addTwin(page, first);
+  const fetal = (await twinsOf(page, 'IN')).find((v) => v !== first);
+  await setOn(page, fetal, { setLifeStatus: 'unborn' });
+  expect(await adoptionOf(page, fetal)).toBe('');
+  await page.evaluate((id) => document.dispatchEvent(new window.CustomEvent('pedigree:node:modify', { detail: { nodeID: id, modifications: { addTwin: 2 } } })), fetal);
+  const added = (await twinsOf(page, 'IN')).filter((v) => v !== first && v !== fetal);
+  expect(added.length).toBe(1);
+  expect(await adoptionOf(page, added[0])).toBe('in');
+});
+
+test('one change that has a fetus born and adopted keeps the adoption, whatever the order', async ({ page }) => {
+  await open(page, 'local:adoptInOut11?format=GA4GH', FAMILY);
+  await setProperty(page, 'NOT', { setLifeStatus: 'unborn' });
+  await setProperty(page, 'NOT', { setAdoption: 'in', setLifeStatus: 'alive' });
+  expect(await adoption(page, 'NOT')).toEqual({ code: 'in', brackets: true });
+});

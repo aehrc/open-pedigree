@@ -106,10 +106,39 @@ export default class Controller {
     return ordered;
   }
 
+  /**
+   * Life status before adoption: whether a person can be adopted depends on whether they're a fetus,
+   * so an event that has them born and adopted is judged on the life status it leaves.
+   */
+  static _lifeStatusBeforeAdoption(properties: any): any {
+    if (!properties || !properties.hasOwnProperty('setLifeStatus')
+      || !Controller.ADOPTION_SETTERS.some((setter) => properties.hasOwnProperty(setter))) {
+      return properties;
+    }
+    var ordered: any = { setLifeStatus: properties.setLifeStatus };
+    for (var key in properties) {
+      if (properties.hasOwnProperty(key) && key !== 'setLifeStatus') {
+        ordered[key] = properties[key];
+      }
+    }
+    return ordered;
+  }
+
+  /** The adoption twins share: a born twin's (a fetus has none), or null for no born twin but these. */
+  static _twinsAdoption(nodeID: any, except: any): any {
+    var graph = editor.getGraph();
+    if (graph.getTwinGroupId(nodeID) === null || graph.getTwinGroupId(nodeID) === undefined) {
+      return null;
+    }
+    var born = graph.getAllTwinsSortedByOrder(nodeID).filter((twin: any) => twin !== except
+      && !(editor.getView().getNode(twin).isFetus && editor.getView().getNode(twin).isFetus()));
+    return born.length ? editor.getView().getNode(born[0]).getAdoption() : null;
+  }
+
   handleSetProperty(event: any): void {
     var nodeID     = event.detail.nodeID;
     var node    = editor.getView().getNode(nodeID);
-    var properties = Controller._genesBeforeResults(Controller._orderDatePair(node, event.detail.properties));
+    var properties = Controller._lifeStatusBeforeAdoption(Controller._genesBeforeResults(Controller._orderDatePair(node, event.detail.properties)));
     var undoEvent  = {'eventName': event.type, 'memo': {'nodeID': nodeID, 'properties': cloneObject(properties)}};
     // Record each property's value from before this event only once: setters change other
     // properties as side effects (setLifeStatus clears the death date, and so on), so a later
@@ -208,7 +237,15 @@ export default class Controller {
 
         var field = propertySetFunction.replace(/^set/, '').toLowerCase();
         var adoptionBefore = node.getAdoption ? node.getAdoption() : '';
+        var wasFetus = !!(node.isFetus && node.isFetus());
         node[propertySetFunction](propValue);
+        // A fetal twin, when born, takes the adoption its twins share (it was skipped while a fetus).
+        if (propertySetFunction == 'setLifeStatus' && wasFetus && !node.isFetus()) {
+          var shared = Controller._twinsAdoption(nodeID, nodeID);
+          if (shared) {
+            node.setAdoption(shared);
+          }
+        }
         // (becoming a fetus clears an adoption: redraw the child lines and ancestors, as for any
         // change of adoption)
         if (node.getAdoption && node.getAdoption() !== adoptionBefore) {
@@ -337,9 +374,12 @@ export default class Controller {
             for (var i = 0; i < numNewTwins; i++ ) {
               // (twins share their adoption: their shared line of descent is drawn from it)
               var twinProperty: any = { 'gender': node.getGender() };
-              if (node.isAdopted && node.isAdopted()) {
+              // (a born twin's: added from a fetus, the new twin still shares its born twins' adoption)
+              var shared = Controller._twinsAdoption(nodeID, null);
+              var adoption = shared !== null ? shared : (node.getAdoption ? node.getAdoption() : '');
+              if (adoption === 'in') {
                 twinProperty['isAdopted'] = true;
-              } else if (node.isAdoptedOut && node.isAdoptedOut()) {
+              } else if (adoption === 'out') {
                 twinProperty['isAdoptedOut'] = true;
               }
               var changeSet = editor.getGraph().addTwin( nodeID, twinProperty );

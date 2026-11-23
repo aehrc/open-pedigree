@@ -108,3 +108,21 @@ describe('adoption in DADA2 (its column is "Adopted Outs")', () => {
     expect(people.filter(([inn]) => inn).length).toBe(0);
   });
 });
+
+describe('a fetus in DADA2 has no adoption', () => {
+  it('reads an adopted fetus row as not adopted, and writes no adoption for a fetus', async () => {
+    const { default: PedigreeExport } = await import('pedigree/model/export');
+    const read = DynamicPositionedGraph.makeEmpty(10, 2);
+    // columns: family, id, father, mother, sex, affected, life status (3 = unborn), adopted out
+    read.fromImport('DADA2 1 0 0 1 1 1\nDADA2 2 0 0 2 1 1\nDADA2 3 1 2 0 1 3 1', 'DADA2', {});
+    for (let v = 0; v <= read.getMaxNodeId(); v++) {
+      if (read.isPerson(v)) {
+        expect(read.isAdoptedOut(v), 'person ' + v).toBe(false);
+      }
+    }
+    const graph = graphFromPED('f M 0 0 1 1\nf F 0 0 2 1\nf C M F 1 1');
+    setProps(graph, 'C', { isAdoptedOut: true, lifeStatus: 'unborn' });
+    const rows = PedigreeExport.exportAsDADA2(graph.DG).trim().split('\n').map((l) => l.split(' '));
+    expect(rows.filter((r) => r.length > 7)).toEqual([]);
+  });
+});
