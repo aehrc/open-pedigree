@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.4.0...open-pedigree-v2.5.0) (2026-11-23)
+
+
+### Features
+
+* adopted in and adopted out, drawn in standard notation ([#117](https://github.com/aehrc/open-pedigree/issues/117)) ([093f215](https://github.com/aehrc/open-pedigree/commit/093f215ac27b9812656be7ae89d4542517b929f1))
+* check a Questionnaire, and try your own form on the website ([#116](https://github.com/aehrc/open-pedigree/issues/116)) ([d624b22](https://github.com/aehrc/open-pedigree/commit/d624b22d6ff4da8d4293d5eb224defde52cb072b))
+
+
+### Bug Fixes
+
+* the two diagonal fill patterns no longer look alike on small symbols ([#112](https://github.com/aehrc/open-pedigree/issues/112)) ([34d94a3](https://github.com/aehrc/open-pedigree/commit/34d94a3dfbeba836b5e5fb17330d54ba42106195))
+
 ## [2.4.0](https://github.com/aehrc/open-pedigree/compare/open-pedigree-v2.3.0...open-pedigree-v2.4.0) (2026-11-16)
 
 
