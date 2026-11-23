@@ -76,17 +76,28 @@ describe('adopted in vs adopted out in the graph', () => {
   });
 });
 
-describe('adoption in DADA2 (one adopted flag)', () => {
-  it('writes adopted in and adopted out both as adopted, and nothing for anyone else', async () => {
+describe('adoption in DADA2 (its column is "Adopted Outs")', () => {
+  it('writes 1 for adopted out only, and reads 1 back as adopted out', async () => {
     const { default: PedigreeExport } = await import('pedigree/model/export');
     const graph = graphFromPED('f M 0 0 1 1\nf F 0 0 2 1\nf C M F 1 1\nf D M F 2 1');
     setProps(graph, 'C', { isAdoptedOut: true });
     setProps(graph, 'D', { isAdopted: true });
-    const rows = PedigreeExport.exportAsDADA2(graph.DG).trim().split('\n').map((l) => l.split(' '));
-    // columns: family, id, father, mother, sex, affected, life status, [adopted]
-    const adoptedRows = rows.filter((r) => r.length > 7);
-    expect(adoptedRows.length).toBe(2);
-    adoptedRows.forEach((r) => expect(r[7]).toBe('1'));
-    expect(rows.filter((r) => r.length === 7).length).toBe(2);
+    const dada2 = PedigreeExport.exportAsDADA2(graph.DG);
+    // columns: family, id, father, mother, sex, affected, life status, [adopted out]
+    const rows = dada2.trim().split('\n').map((l) => l.split(' '));
+    const marked = rows.filter((r) => r.length > 7);
+    expect(marked.length).toBe(1);
+    expect(marked[0][7]).toBe('1');
+
+    const again = DynamicPositionedGraph.makeEmpty(10, 2);
+    again.fromImport(dada2, 'DADA2', {});
+    const people = [];
+    for (let v = 0; v <= again.getMaxNodeId(); v++) {
+      if (again.isPerson(v)) {
+        people.push([again.isAdopted(v), again.isAdoptedOut(v)]);
+      }
+    }
+    expect(people.filter(([, out]) => out).length).toBe(1);
+    expect(people.filter(([inn]) => inn).length).toBe(0);
   });
 });

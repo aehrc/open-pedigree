@@ -110,7 +110,11 @@
           {
             "code": "code"
           }
-        ]
+        ],
+        "binding": {
+          "strength": "extensible",
+          "valueSet": "https://aehrc.github.io/open-pedigree/fhir/ValueSet/adoption-direction"
+        }
       },
       {
         "id": "PedigreeIndividual.monozygotic",

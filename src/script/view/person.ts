@@ -1370,10 +1370,8 @@ export default class Person extends AbstractPerson {
       // (after the genes: a result needs its gene)
       this.setGeneResults(info.geneResults || {});
       // (one direction or none: isAdopted is adopted in, isAdoptedOut adopted out)
-      const adoption = info.isAdopted ? 'in' : (info.isAdoptedOut ? 'out' : '');
-      if (this.getAdoption() !== adoption) {
-        this.setAdoption(adoption);
-      }
+      // (always set: the reset above clears the flags but not the brackets drawn)
+      this.setAdoption(info.isAdopted ? 'in' : (info.isAdoptedOut ? 'out' : ''));
       if (info.hasOwnProperty('lifeStatus') && this.getLifeStatus() !== info.lifeStatus) {
         this.setLifeStatus(info.lifeStatus);
       }

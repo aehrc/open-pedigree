@@ -219,7 +219,7 @@ An adopted-out person's parents are treated as their birth parents. Consanguinit
 | Adopted in, no parents drawn | `isAdopted: true` | the `adopted` extension, `in` |
 | Adopted out | `isAdoptedOut: true` | natural parent relationships, and the `adopted` extension, `out` |
 
-A file from another tool that gives a child adoptive parents and `out` opens with the child adopted in, under those parents, with a note. DADA2 has one adopted flag: either direction is written as adopted, and DADA2 and GEDCOM imports read adopted as adopted in.
+A file from another tool that gives a child adoptive parents and `out` opens with the child adopted in, with a note. DADA2's adoption column is *Adopted Outs*, so DADA2 reads and writes `1` as adopted out, and has no place for adopted in. GEDCOM's `ADOP` reads as adopted in.
 
 A Questionnaire sets it with a choice item mapped to `adoption` (`…/PedigreeIndividual#PedigreeIndividual.adoption`): the code `in` is adopted in, `out` adopted out, and any other code (e.g. `none`) not adopted. The default Questionnaire's item is `adoption`. A yes/no item mapped to `isAdopted` still works: yes is adopted in, and no clears adopted in only, so it never undoes an adopted out set elsewhere.
 

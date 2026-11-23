@@ -439,7 +439,7 @@ describe('GA4GHFHIRConverter fetus and adoption round trips', () => {
     const read = Object.values(graph.properties).find((p) => p.fName === 'Kid');
     expect(read.isAdopted).toBe(true);
     expect(read.isAdoptedOut).toBeFalsy();
-    expect(graph.importNotes).toEqual(['Kid: marked adopted out, but has adoptive parents in the file, so opened as adopted in, under them']);
+    expect(graph.importNotes).toEqual(['Kid: marked adopted out, but has adoptive parents in the file, so opened as adopted in']);
   });
 
   it('reads neither the adoption nor a fetus date of death under the URLs used before 2.0.0, and says so', () => {

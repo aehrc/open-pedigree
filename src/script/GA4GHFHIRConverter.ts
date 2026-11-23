@@ -226,15 +226,6 @@ function readFHIR(this: any, inputText) {
     const chosen = chooseParentClaims(nextPerson.parentClaims || [], fetus);
     const parents = placeParents(chosen.claims, (node) => nodeData[node].properties.gender);
     const placed = placedClaims(chosen, parents);
-    // Adopted out (never for a fetus). Adoptive-parent codes as well contradict it: the parents
-    // drawn are then adoptive, so the person opens adopted in (below), and the import says so.
-    if (nextPerson.adoptedOut && !fetus && newG.properties[personID]) {
-      if (chosen.adopted) {
-        found.note(personLabel(nextPerson.properties) + ': marked adopted out, but has adoptive parents in the file, so opened as adopted in, under them');
-      } else {
-        newG.properties[personID].isAdoptedOut = true;
-      }
-    }
     // every code for a parent placed must fit their gender, not just the one that placed them (a
     // parent left out can't fail the import)
     // (a child whose parents can't be placed is left without them, and the rest still checked)
@@ -246,12 +237,21 @@ function readFHIR(this: any, inputText) {
         parentsOK = false;
       }
     }
+    // Adopted out (never for a fetus): the parents drawn, if any, are birth parents. Adoptive-parent
+    // codes as well contradict it: the person opens adopted in (below), and the import says so.
+    const adoptedOut = nextPerson.adoptedOut && !fetus && !!newG.properties[personID];
+    // (a parent problem fails the whole import: see throwIfAny below the loop)
     if (!parentsOK) {
       continue;
     }
     // (never for a fetus: chooseParentClaims places its biological parents)
     if (chosen.adopted && newG.properties[personID]) {
       newG.properties[personID].isAdopted = true;
+    }
+    if (adoptedOut && chosen.adopted) {
+      found.note(personLabel(nextPerson.properties) + ': marked adopted out, but has adoptive parents in the file, so opened as adopted in');
+    } else if (adoptedOut) {
+      newG.properties[personID].isAdoptedOut = true;
     }
     const leftOut = leftOutWarning(chosen, placed.dropped);
     if (leftOut) {

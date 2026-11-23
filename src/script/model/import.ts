@@ -1270,9 +1270,10 @@ PedigreeImport.initFromDADA2 = function(inputText) {
       }
     }
     if (parts.length > 7){
+      // (the format's column is "Adopted Outs": 1 is adopted out)
       const adoptedValue = parts[7];
       if (adoptedValue == 1){
-        newG.properties[id]['isAdopted'] = true;
+        newG.properties[id]['isAdoptedOut'] = true;
       }
     }
 

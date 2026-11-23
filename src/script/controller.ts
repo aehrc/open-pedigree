@@ -142,6 +142,11 @@ export default class Controller {
     for (var propertySetFunction in properties) {
       if (properties.hasOwnProperty(propertySetFunction)) {
         var propValue = properties[propertySetFunction];
+        // (any adoption code but in and out is "not adopted", as the setter takes it: so picking
+        // "Not adopted" for someone who isn't is no change)
+        if (propertySetFunction == 'setAdoption' && propValue !== 'in' && propValue !== 'out') {
+          propValue = '';
+        }
 
         if (!Controller._validatePropertyValue( nodeID, propertySetFunction, propValue)) {
           continue;
@@ -268,6 +273,10 @@ export default class Controller {
               continue;
             }
             var twinNode = editor.getView().getNode(twin);
+            // (a fetus has no adoption)
+            if (Controller.ADOPTION_SETTERS.indexOf(propertySetFunction) !== -1 && twinNode.isFetus && twinNode.isFetus()) {
+              continue;
+            }
             twinNode[propertySetFunction](propValue);
             var twinProperties = twinNode.getProperties();
             editor.getGraph().setProperties( twin, twinProperties );
@@ -320,7 +329,13 @@ export default class Controller {
           if (modificationType == 'addTwin') {
             var numNewTwins = modValue - 1;
             for (var i = 0; i < numNewTwins; i++ ) {
-              var twinProperty = { 'gender': node.getGender() };
+              // (twins share their adoption: their shared line of descent is drawn from it)
+              var twinProperty: any = { 'gender': node.getGender() };
+              if (node.isAdopted && node.isAdopted()) {
+                twinProperty['isAdopted'] = true;
+              } else if (node.isAdoptedOut && node.isAdoptedOut()) {
+                twinProperty['isAdoptedOut'] = true;
+              }
               var changeSet = editor.getGraph().addTwin( nodeID, twinProperty );
               editor.getView().applyChanges(changeSet, true);
             }
@@ -555,14 +570,27 @@ export default class Controller {
     return ordered;
   }
 
+  static ADOPTION_SETTERS = ['setAdopted', 'setAdoptedOut', 'setAdoption'];
+
   static _validatePropertyValue(nodeID: any, propertySetFunction: any, propValue: any): any {
     if (propertySetFunction == 'setGender') {
       var possibleGenders = editor.getGraph().getPossibleGenders(nodeID);
       return possibleGenders[propValue];
     }
-    // A child of a childless or infertile couple is adopted in, so never adopted out.
-    if ((propertySetFunction == 'setAdoptedOut' && propValue) || (propertySetFunction == 'setAdoption' && propValue === 'out')) {
-      return !(editor.getGraph().isPerson(nodeID) && editor.getGraph().hasToBeAdopted(nodeID));
+    if (Controller.ADOPTION_SETTERS.indexOf(propertySetFunction) !== -1 && editor.getGraph().isPerson(nodeID)) {
+      // the direction this would leave: 'in', 'out' or '' (a yes/no false clears adopted in only)
+      var node = editor.getView().getNode(nodeID);
+      var resulting = propertySetFunction == 'setAdoption' ? propValue
+        : propertySetFunction == 'setAdopted' ? (propValue ? 'in' : (node.isAdoptedOut() ? 'out' : ''))
+          : (propValue ? 'out' : (node.isAdopted() ? 'in' : ''));
+      // A fetus has no adoption.
+      if (resulting !== '' && node.isFetus && node.isFetus()) {
+        return false;
+      }
+      // A child of a childless or infertile couple is adopted in, and stays so.
+      if (resulting !== 'in' && editor.getGraph().hasToBeAdopted(nodeID)) {
+        return false;
+      }
     }
     return true;
   }

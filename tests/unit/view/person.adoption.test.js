@@ -110,6 +110,14 @@ describe('a person\'s adoption direction', () => {
     expect(inn.getAdoption()).toBe('');
   });
 
+  it('a re-assign that drops the adoption takes the brackets away too', () => {
+    const p = new Person(0, 0, 1, { gender: 'F', isAdoptedOut: true });
+    const removed = vi.spyOn(p.getGraphics(), 'removeAdoptedShape');
+    p.assignProperties({ gender: 'F' });
+    expect(p.getAdoption()).toBe('');
+    expect(removed).toHaveBeenCalled();
+  });
+
   it('a fetus is not adopted', () => {
     const p = new Person(0, 0, 1, { gender: 'F', isAdoptedOut: true });
     p.setLifeStatus('unborn');

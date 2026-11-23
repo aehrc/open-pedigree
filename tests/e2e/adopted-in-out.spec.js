@@ -120,4 +120,42 @@ test('a childless couple\'s child is adopted in, shown and not changeable, and c
 
   await setProperty(page, 'KID', { setAdoption: 'out' });
   expect((await adoption(page, 'KID')).code).toBe('in');
+  // nor "not adopted", however it comes (a linked row's "0", a yes/no's no)
+  await setProperty(page, 'KID', { setAdoption: '' });
+  await setProperty(page, 'KID', { setAdopted: false });
+  expect((await adoption(page, 'KID')).code).toBe('in');
+});
+
+test('a fetus is never adopted, directly or through a twin', async ({ page }) => {
+  await open(page, 'local:adoptInOut5?format=GA4GH', FAMILY);
+  await setProperty(page, 'NOT', { setLifeStatus: 'unborn' });
+  await setProperty(page, 'NOT', { setAdoption: 'out' });
+  await setProperty(page, 'NOT', { setAdopted: true });
+  expect(await adoption(page, 'NOT')).toEqual({ code: '', brackets: false });
+
+  // a twin of the fetus set adopted out: the fetus stays not adopted
+  await page.evaluate((src) => document.dispatchEvent(new window.CustomEvent('pedigree:node:modify', { detail: { nodeID: eval(src)('NOT'), modifications: { addTwin: 2 } } })), personByExt);
+  const twin = await page.evaluate((src) => window.editor.getGraph().getAllTwinsSortedByOrder(eval(src)('NOT')).find((v) => v !== eval(src)('NOT')), personByExt);
+  await page.evaluate((v) => {
+    document.dispatchEvent(new window.CustomEvent('pedigree:node:setproperty', { detail: { nodeID: v, properties: { setLifeStatus: 'alive' } } }));
+    document.dispatchEvent(new window.CustomEvent('pedigree:node:setproperty', { detail: { nodeID: v, properties: { setAdoption: 'out' } } }));
+  }, twin);
+  expect(await page.evaluate((v) => window.editor.getView().getNode(v).getAdoption(), twin)).toBe('out');
+  expect((await adoption(page, 'NOT')).code).toBe('');
+});
+
+test('a twin added to an adopted child shares the adoption', async ({ page }) => {
+  await open(page, 'local:adoptInOut6?format=GA4GH', FAMILY);
+  await setProperty(page, 'IN', { setAdoption: 'in' });
+  await page.evaluate((src) => document.dispatchEvent(new window.CustomEvent('pedigree:node:modify', { detail: { nodeID: eval(src)('IN'), modifications: { addTwin: 2 } } })), personByExt);
+  const codes = await page.evaluate((src) => window.editor.getGraph().getAllTwinsSortedByOrder(eval(src)('IN')).map((v) => window.editor.getView().getNode(v).getAdoption()), personByExt);
+  expect(codes).toEqual(['in', 'in']);
+});
+
+test('picking "Not adopted" for someone who isn\'t adopted is no change (no undo step)', async ({ page }) => {
+  await open(page, 'local:adoptInOut7?format=GA4GH', FAMILY);
+  const steps = () => page.evaluate(() => window.editor.getActionStack()._stack.length);
+  const before = await steps();
+  await setProperty(page, 'NOT', { setAdoption: 'none' });
+  expect(await steps()).toBe(before);
 });
