@@ -377,8 +377,9 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
         if (allTwins.length == 3) {
           currentTwinGroupCenterX = editor.getView().getNode(allTwins[1]).getX();
         }
-        // (twins share their adoption, so the first twin's says how the shared piece is drawn)
-        editor.getView().drawLineWithCrossings( id, currentTwinGroupCenterX, childlineY, currentTwinGroupCenterX, childlineY+twinCommonVerticalPieceLength, childLineAttr(allTwins[0]));
+        // (twins share their adoption, but a fetus has none: the shared piece is drawn from a born twin's)
+        var bornTwin = allTwins.find((t: any) => !(editor.getView().getNode(t).isFetus && editor.getView().getNode(t).isFetus())) ?? allTwins[0];
+        editor.getView().drawLineWithCrossings( id, currentTwinGroupCenterX, childlineY, currentTwinGroupCenterX, childlineY+twinCommonVerticalPieceLength, childLineAttr(bornTwin));
 
         currentIsMonozygothic = editor.getView().getNode(allTwins[0]).getMonozygotic();
 

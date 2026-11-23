@@ -69,6 +69,18 @@ test('an adopted-in child\'s line is dashed; adopted out and not adopted are sol
   await setProperty(page, 'IN', { setAdoption: 'out' });
   expect(await dashedLineEnds(page)).toEqual([]);
   expect(await adoption(page, 'IN')).toEqual({ code: 'out', brackets: true });
+  // and not adopted takes the brackets away
+  await setProperty(page, 'IN', { setAdoption: 'none' });
+  expect(await adoption(page, 'IN')).toEqual({ code: '', brackets: false });
+});
+
+test('an adopted-in child who becomes a fetus loses the dashed line with the adoption', async ({ page }) => {
+  await open(page, 'local:adoptInOut8?format=GA4GH', FAMILY);
+  await setProperty(page, 'IN', { setAdoption: 'in' });
+  expect((await dashedLineEnds(page)).length).toBeGreaterThan(0);
+  await setProperty(page, 'IN', { setLifeStatus: 'unborn' });
+  expect(await adoption(page, 'IN')).toEqual({ code: '', brackets: false });
+  expect(await dashedLineEnds(page)).toEqual([]);
 });
 
 test('the node menu sets adopted out, and undo brings back the choice before', async ({ page }) => {

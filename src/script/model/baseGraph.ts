@@ -681,7 +681,8 @@ BaseGraph.prototype = {
   // Adopted out: the parents drawn are birth parents, so everything that reads parents treats them
   // as biological; only the brackets and the formats tell it apart from not adopted.
   isAdoptedOut: function(v) {
-    return !!this.properties[v]['isAdoptedOut'];
+    // (never both: adopted in wins, as Person.assignProperties takes it)
+    return !!this.properties[v]['isAdoptedOut'] && !this.isAdopted(v);
   },
 
   getGender: function(v) {

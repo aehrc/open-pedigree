@@ -63,6 +63,13 @@ describe('adopted in vs adopted out in the graph', () => {
     expect(graph.hasNonPlaceholderNonAdoptedChildren(rel)).toBe(false);
   });
 
+  it('never reads a person as both: adopted in wins', () => {
+    const graph = graphFromPED('f M 0 0 1 1\nf F 0 0 2 1\nf C M F 1 1');
+    setProps(graph, 'C', { isAdopted: true, isAdoptedOut: true });
+    expect(graph.isAdopted(person(graph, 'C'))).toBe(true);
+    expect(graph.isAdoptedOut(person(graph, 'C'))).toBe(false);
+  });
+
   it('keeps an adopted-out person through the internal JSON', () => {
     const graph = graphFromPED('f M 0 0 1 1\nf F 0 0 2 1\nf C M F 1 1\nf D M F 2 1');
     setProps(graph, 'C', { isAdoptedOut: true });

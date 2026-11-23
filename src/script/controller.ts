@@ -207,7 +207,13 @@ export default class Controller {
         }
 
         var field = propertySetFunction.replace(/^set/, '').toLowerCase();
+        var adoptionBefore = node.getAdoption ? node.getAdoption() : '';
         node[propertySetFunction](propValue);
+        // (becoming a fetus clears an adoption: redraw the child lines and ancestors, as for any
+        // change of adoption)
+        if (node.getAdoption && node.getAdoption() !== adoptionBefore) {
+          needUpdateAncestors = true;
+        }
         document.dispatchEvent(new CustomEvent(`pedigree:person:set:${field}`, { detail: {
           'node': node,
           'value': propValue,
