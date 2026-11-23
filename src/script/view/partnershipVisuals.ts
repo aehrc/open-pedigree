@@ -354,6 +354,11 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
 
     var numPregnancies = 0;
 
+    // An adopted-in child's line of descent is dashed (the parents drawn are adoptive); any other
+    // child's, an adopted-out one's included (the parents drawn are birth parents), is solid.
+    var childLineAttr = (child: any) => (positionedGraph.isAdopted(child)
+      ? PedigreeEditorParameters.attributes.adoptedInLines : PedigreeEditorParameters.attributes.partnershipLines);
+
     for ( var j = 0; j < children.length; j++ ) {
       var child  = children[j];
 
@@ -372,7 +377,9 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
         if (allTwins.length == 3) {
           currentTwinGroupCenterX = editor.getView().getNode(allTwins[1]).getX();
         }
-        editor.getView().drawLineWithCrossings( id, currentTwinGroupCenterX, childlineY, currentTwinGroupCenterX, childlineY+twinCommonVerticalPieceLength, PedigreeEditorParameters.attributes.partnershipLines);
+        // (twins share their adoption, but a fetus has none: the shared piece is drawn from a born twin's)
+        var bornTwin = allTwins.find((t: any) => !(editor.getView().getNode(t).isFetus && editor.getView().getNode(t).isFetus())) ?? allTwins[0];
+        editor.getView().drawLineWithCrossings( id, currentTwinGroupCenterX, childlineY, currentTwinGroupCenterX, childlineY+twinCommonVerticalPieceLength, childLineAttr(bornTwin));
 
         currentIsMonozygothic = editor.getView().getNode(allTwins[0]).getMonozygotic();
 
@@ -404,10 +411,10 @@ export default class PartnershipVisuals extends AbstractNodeVisuals {
       // draw regular child line - for all nodes which are not monozygothic twins and for the
       // rightmost and leftmost monozygothic twin
       if (!currentIsMonozygothic || childX == positionL || childX == positionR ) {
-        editor.getView().drawLineWithCrossings( id, topLineX, topLineY, childX, childY, PedigreeEditorParameters.attributes.partnershipLines);
+        editor.getView().drawLineWithCrossings( id, topLineX, topLineY, childX, childY, childLineAttr(child));
       } else {
         var xIntercept = findXInterceptGivenLineAndY( twinlineY, currentTwinGroupCenterX, childlineY+twinCommonVerticalPieceLength, childX, childY);
-        editor.getView().drawLineWithCrossings( id, xIntercept, twinlineY, childX, childY, PedigreeEditorParameters.attributes.partnershipLines);
+        editor.getView().drawLineWithCrossings( id, xIntercept, twinlineY, childX, childY, childLineAttr(child));
       }
 
       var lostContact = editor.getGraph().isChildOfProband(child) && editor.getView().getNode(child).getLostContact();

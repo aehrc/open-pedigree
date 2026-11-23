@@ -137,15 +137,14 @@ export default class PersonGroup extends Person {
       disorders.push({id: disorder, value: disorderName});
     });
 
-    var cantChangeAdopted = this.isFetus() || editor.getGraph().hasToBeAdopted(this.getID());
-
     return {
       identifier:   {value : this.getID()},
       comment:      {value : this.getFirstName()},
       gender:       {value : this.getGender()},
       external_ids: {value : this.getExternalID()},
       disorders:    {value : disorders},
-      adopted:      {value : this.isAdopted(), inactive: cantChangeAdopted},
+      // (a fetus has no adoption; a childless couple's child is adopted in, not changeable)
+      adoption:     {value : this.getAdoption(), inactive: this.isFetus(), disabled: editor.getGraph().hasToBeAdopted(this.getID())},
       comments:     {value : this.getComments(), inactive: false},
       state:        {value : this.getLifeStatus()},
       numInGroup:   {value : this.getNumPersons()},

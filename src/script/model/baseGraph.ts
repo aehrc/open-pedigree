@@ -670,11 +670,19 @@ BaseGraph.prototype = {
     return (this.type[v] == BaseGraph.TYPE.VIRTUALEDGE);  // also: v > getmaxRealVertexId()
   },
 
+  // Adopted in (the parents drawn, if any, are adoptive parents).
   isAdopted: function(v) {
     if (this.properties[v].hasOwnProperty('isAdopted')) {
       return this.properties[v]['isAdopted'];
     }
     return false;
+  },
+
+  // Adopted out: the parents drawn are birth parents, so everything that reads parents treats them
+  // as biological; only the brackets and the formats tell it apart from not adopted.
+  isAdoptedOut: function(v) {
+    // (never both: adopted in wins, as Person.assignProperties takes it)
+    return !!this.properties[v]['isAdoptedOut'] && !this.isAdopted(v);
   },
 
   getGender: function(v) {

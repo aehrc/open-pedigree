@@ -203,7 +203,8 @@ PedigreeExport.exportAsDADA2 = function(pedigree) {
     }
     output += ' ' + lifeStatus;
 
-    if (pedigree.GG.properties[i].hasOwnProperty('isAdopted') && pedigree.GG.properties[i]['isAdopted']) {
+    // (the format's column is "Adopted Outs": adopted in has no place in it, and a fetus has no adoption)
+    if (pedigree.GG.isAdoptedOut(i) && ['unborn', 'stillborn', 'miscarriage', 'aborted'].indexOf(pedigree.GG.properties[i]['lifeStatus']) === -1) {
       output += ' 1';
     }
     output += '\n';

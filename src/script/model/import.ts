@@ -1270,9 +1270,11 @@ PedigreeImport.initFromDADA2 = function(inputText) {
       }
     }
     if (parts.length > 7){
+      // (the format's column is "Adopted Outs": 1 is adopted out - but a fetus has no adoption)
       const adoptedValue = parts[7];
-      if (adoptedValue == 1){
-        newG.properties[id]['isAdopted'] = true;
+      const fetal = ['unborn', 'stillborn', 'miscarriage', 'aborted'].indexOf(newG.properties[id]['lifeStatus']) !== -1;
+      if (adoptedValue == 1 && !fetal){
+        newG.properties[id]['isAdoptedOut'] = true;
       }
     }
 

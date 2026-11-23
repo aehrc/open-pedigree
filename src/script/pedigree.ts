@@ -1490,10 +1490,17 @@ export default class PedigreeEditor {
         'function' : 'setEvaluated'
       },
       {
-        'name' : 'adopted',
-        'label' : 'Adopted',
-        'type' : 'checkbox',
-        'function' : 'setAdopted'
+        'name' : 'adoption',
+        'label' : 'Adoption',
+        'type' : 'radio',
+        'columns': 3,
+        'values' : [
+          { 'actual' : '', 'displayed' : 'Not adopted' },
+          { 'actual' : 'in', 'displayed' : 'Adopted in' },
+          { 'actual' : 'out', 'displayed' : 'Adopted out' }
+        ],
+        'default' : '',
+        'function' : 'setAdoption'
       }
     ], []);
   }

@@ -148,6 +148,7 @@ export default class AbstractPersonVisuals extends AbstractNodeVisuals {
 
   removeAdoptedShape(): void {
     this._adoptedShape && this._adoptedShape.remove();
+    this._adoptedShape = null;
   }
 
   getAdoptedShape(): any {

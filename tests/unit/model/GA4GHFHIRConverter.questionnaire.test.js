@@ -64,6 +64,22 @@ describe('GA4GHFHIRConverter.buildQuestionnaireResponse', () => {
     expect(carrierItem.answer).toEqual([{ valueBoolean: true }]);
   });
 
+  it('answers an adoption item from the two flags (pedigree-adopted-in-out D4)', () => {
+    vi.stubGlobal('editor', makeMockEditor({
+      canonicalUrl: 'http://example.org/Questionnaire/adoption',
+      items: [{ linkId: 'adoption', itemType: 'choice', fieldType: 'radio', repeats: false, mapping: { kind: 'field', field: 'adoption' },
+        answerOption: [{ answer: 'none' }, { answer: 'in' }, { answer: 'out' }] }],
+    }));
+    const answerOf = (props) => {
+      const qr = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/1', props, 'all');
+      const item = qr && qr.item.find((i) => i.linkId === 'adoption');
+      return item ? item.answer : undefined;
+    };
+    expect(JSON.stringify(answerOf({ isAdoptedOut: true }))).toContain('"out"');
+    expect(JSON.stringify(answerOf({ isAdopted: true }))).toContain('"in"');
+    expect(answerOf({})).toBeUndefined();
+  });
+
   it('returns null when questionnaireConfig is not set on the editor', () => {
     vi.stubGlobal('editor', makeMockEditor(null));
     const result = GA4GHFHIRConverter.buildQuestionnaireResponse('Patient/123', { questionnaireAnswers: { notes: 'x' } }, 'all');

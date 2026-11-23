@@ -59,7 +59,13 @@ export const MAPS_TO_FIELD_TARGETS: any = {
   // so e.g. "none" or REDCap's "0". A drop-down shows such an option for a blank value: "None".
   'childlessStatus':   { propertyBagKey: 'childlessStatus', getter: 'getChildlessStatus', setter: 'setChildlessStatus',
     isBlankCode: (code: any) => code !== 'childless' && code !== 'infertile' },
+  // isAdopted is adopted in (a yes/no item: yes = adopted in, no clears adopted in only).
   'isAdopted':         { propertyBagKey: 'isAdopted',      getter: 'getAdopted',         setter: 'setAdopted' },
+  // adoption: the direction as a code, 'in' or 'out'; any other code (e.g. "none", REDCap's "0")
+  // is not adopted. Stored as two flags, so fromProperties reads it from the properties bag.
+  'adoption':          { propertyBagKey: 'adoption',       getter: 'getAdoption',        setter: 'setAdoption',
+    isBlankCode: (code: any) => code !== 'in' && code !== 'out',
+    fromProperties: (properties: any) => (properties.isAdopted ? 'in' : (properties.isAdoptedOut ? 'out' : '')) },
   'monozygotic':       { propertyBagKey: 'monozygotic',    getter: 'getMonozygotic',     setter: 'setMonozygotic' },
   'evaluated':         { propertyBagKey: 'evaluated',      getter: 'getEvaluated',       setter: 'setEvaluated' },
   'lostContact':       { propertyBagKey: 'lostContact',    getter: 'getLostContact',     setter: 'setLostContact' }
@@ -81,6 +87,7 @@ export const MAPS_TO_FIELD_DEFINITIONS: any = {
   'comments':         PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.comments',
   'childlessStatus':  PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.childlessStatus',
   'isAdopted':        PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.isAdopted',
+  'adoption':         PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.adoption',
   'monozygotic':      PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.monozygotic',
   'evaluated':        PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.evaluated',
   'lostContact':      PEDIGREE_INDIVIDUAL_URL + '#PedigreeIndividual.lostContact'

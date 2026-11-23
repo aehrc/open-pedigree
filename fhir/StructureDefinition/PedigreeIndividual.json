@@ -89,8 +89,8 @@
       {
         "id": "PedigreeIndividual.isAdopted",
         "path": "PedigreeIndividual.isAdopted",
-        "short": "Adopted.",
-        "definition": "Adopted.",
+        "short": "Adopted in (brought into this family; the parents drawn, if any, are adoptive). For adopted out, use `adoption`.",
+        "definition": "Adopted in (brought into this family; the parents drawn, if any, are adoptive). For adopted out, use `adoption`.",
         "min": 0,
         "max": "1",
         "type": [
@@ -98,6 +98,23 @@
             "code": "boolean"
           }
         ]
+      },
+      {
+        "id": "PedigreeIndividual.adoption",
+        "path": "PedigreeIndividual.adoption",
+        "short": "Which way the person was adopted: `in` (into this family) or `out` (away from it, so the parents drawn are birth parents); any other code is not adopted.",
+        "definition": "Which way the person was adopted: `in` (into this family) or `out` (away from it, so the parents drawn are birth parents); any other code is not adopted.",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ],
+        "binding": {
+          "strength": "extensible",
+          "valueSet": "https://aehrc.github.io/open-pedigree/fhir/ValueSet/adoption-direction"
+        }
       },
       {
         "id": "PedigreeIndividual.monozygotic",

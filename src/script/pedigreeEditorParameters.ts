@@ -54,6 +54,8 @@ PedigreeEditorParameters.attributes = {
   partnershipLines : {'stroke-width': 3.0, stroke : '#333333'},
   consangrPartnershipLines : {'stroke-width': 3.0, stroke : '#333333'},
   noContactLines: {'stroke-width': 3.0, stroke : '#333333', 'stroke-dasharray': '.'},
+  // an adopted-in child's line of descent (standard notation: dashed from the adoptive parents)
+  adoptedInLines: {'stroke-width': 3.0, stroke : '#333333', 'stroke-dasharray': '- '},
   notInContactLineSize: 20,
   graphToCanvasScale: 12,
   layoutRelativePersonWidth: 10,

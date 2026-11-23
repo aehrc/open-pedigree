@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { FHIR_BASE, PUBLISHED_DEFINITION_URLS, DEFAULT_QUESTIONNAIRE_URL } from 'pedigree/fhirUrls';
 import { DEFAULT_QUESTIONNAIRE } from 'pedigree/questionnaire/defaultQuestionnaire';
+import { MAPS_TO_FIELD_DEFINITIONS } from 'pedigree/questionnaire/questionnaireParser';
 
 // The published definitions (fhir/, built into the Pages site by scripts/build-fhir-site.js):
 // shape checks only, not full FHIR validation.
@@ -70,5 +71,13 @@ describe('published FHIR definitions', () => {
   it('adoption direction has exactly in and out', () => {
     const codeSystem = definitions.find((d) => d.type === 'CodeSystem' && d.id === 'adoption-direction').resource;
     expect(codeSystem.concept.map((c) => c.code)).toEqual(['in', 'out']);
+  });
+
+  it('every PedigreeIndividual element a mapsToField definition points at exists', () => {
+    const model = definitions.find((d) => d.type === 'StructureDefinition' && d.id === 'PedigreeIndividual').resource;
+    const ids = model.differential.element.map((e) => e.id);
+    const pointedAt = Object.values(MAPS_TO_FIELD_DEFINITIONS).filter((url) => url.startsWith(model.url + '#')).map((url) => url.split('#')[1]);
+    expect(pointedAt).toContain('PedigreeIndividual.adoption');
+    pointedAt.forEach((id) => expect(ids, id).toContain(id));
   });
 });
